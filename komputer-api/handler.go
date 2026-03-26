@@ -72,7 +72,7 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 				return
 			}
 
-			if err := k8s.ForwardTaskToAgent(c.Request.Context(), podIP, req.Instructions, req.Model); err != nil {
+			if err := k8s.ForwardTaskToAgent(c.Request.Context(), existing.Status.PodName, podIP, req.Instructions, req.Model); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to forward task: " + err.Error()})
 				return
 			}
@@ -148,7 +148,7 @@ func cancelAgentTask(k8s *K8sClient) gin.HandlerFunc {
 			return
 		}
 
-		if err := k8s.CancelAgentTask(c.Request.Context(), podIP); err != nil {
+		if err := k8s.CancelAgentTask(c.Request.Context(), agent.Status.PodName, podIP); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to cancel: " + err.Error()})
 			return
 		}

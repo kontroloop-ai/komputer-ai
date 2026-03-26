@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -15,7 +16,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/remotecommand"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -113,49 +116,109 @@ func (k *K8sClient) DeleteAgent(ctx context.Context, name string) error {
 }
 
 // CancelAgentTask sends a cancel request to the agent's FastAPI endpoint.
-func (k *K8sClient) CancelAgentTask(ctx context.Context, podIP string) error {
-	url := fmt.Sprintf("http://%s:8000/cancel", podIP)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
+func (k *K8sClient) CancelAgentTask(ctx context.Context, podName, podIP string) error {
+	err := k.postToAgent(ctx, podIP, "/cancel", "")
 	if err != nil {
-		return err
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to cancel task: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("cancel returned status %d: %s", resp.StatusCode, string(body))
+		// Fallback: kubectl exec curl inside the pod
+		return k.execInPod(ctx, podName, "curl", "-s", "-X", "POST", "http://localhost:8000/cancel")
 	}
 	return nil
 }
 
-func (k *K8sClient) ForwardTaskToAgent(ctx context.Context, podIP, instructions, model string) error {
-	url := fmt.Sprintf("http://%s:8000/task", podIP)
+// ForwardTaskToAgent sends a task to an agent's FastAPI endpoint, falling back to kubectl exec.
+func (k *K8sClient) ForwardTaskToAgent(ctx context.Context, podName, podIP, instructions, model string) error {
 	bodyMap := map[string]string{"instructions": instructions}
 	if model != "" {
 		bodyMap["model"] = model
 	}
 	bodyJSON, _ := json.Marshal(bodyMap)
 
-	timeoutCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	err := k.postToAgent(ctx, podIP, "/task", string(bodyJSON))
+	if err != nil {
+		// Fallback: kubectl exec curl inside the pod
+		return k.execInPod(ctx, podName, "curl", "-s", "-X", "POST",
+			"-H", "Content-Type: application/json",
+			"-d", string(bodyJSON),
+			"http://localhost:8000/task")
+	}
+	return nil
+}
+
+// postToAgent makes a direct HTTP POST to an agent pod. Returns error if unreachable.
+func (k *K8sClient) postToAgent(ctx context.Context, podIP, path, body string) error {
+	url := fmt.Sprintf("http://%s:8000%s", podIP, path)
+
+	timeoutCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(timeoutCtx, http.MethodPost, url, strings.NewReader(string(bodyJSON)))
+
+	var reqBody io.Reader
+	if body != "" {
+		reqBody = strings.NewReader(body)
+	}
+
+	req, err := http.NewRequestWithContext(timeoutCtx, http.MethodPost, url, reqBody)
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Content-Type", "application/json")
+	if body != "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to forward task to agent: %w", err)
+		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
-		return fmt.Errorf("agent returned status %d", resp.StatusCode)
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("agent returned status %d: %s", resp.StatusCode, string(respBody))
 	}
+	return nil
+}
+
+// execInPod runs a command inside a pod using the Kubernetes API (equivalent to kubectl exec).
+func (k *K8sClient) execInPod(ctx context.Context, podName string, command ...string) error {
+	pod := &corev1.Pod{}
+	if err := k.client.Get(ctx, types.NamespacedName{Name: podName, Namespace: k.namespace}, pod); err != nil {
+		return fmt.Errorf("failed to get pod %s: %w", podName, err)
+	}
+
+	config, err := ctrl.GetConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get kubeconfig: %w", err)
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("failed to create clientset: %w", err)
+	}
+
+	execReq := clientset.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Name(podName).
+		Namespace(k.namespace).
+		SubResource("exec").
+		VersionedParams(&corev1.PodExecOptions{
+			Container: pod.Spec.Containers[0].Name,
+			Command:   command,
+			Stdout:    true,
+			Stderr:    true,
+		}, clientgoscheme.ParameterCodec)
+
+	exec, err := remotecommand.NewSPDYExecutor(config, "POST", execReq.URL())
+	if err != nil {
+		return fmt.Errorf("failed to create executor: %w", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	if err := exec.StreamWithContext(ctx, remotecommand.StreamOptions{
+		Stdout: &stdout,
+		Stderr: &stderr,
+	}); err != nil {
+		return fmt.Errorf("exec failed: %w (stderr: %s)", err, stderr.String())
+	}
+
 	return nil
 }
 

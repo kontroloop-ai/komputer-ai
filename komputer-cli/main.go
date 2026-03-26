@@ -615,6 +615,17 @@ func main() {
 			ep := resolveEndpoint(cmd)
 			agentName := args[0]
 
+			// Verify agent exists before connecting WebSocket
+			_, status, err := apiRequest("GET", fmt.Sprintf("%s/api/v1/agents/%s", ep, url.PathEscape(agentName)), nil)
+			if err != nil {
+				fmt.Println(errorStyle.Render("Request failed: " + err.Error()))
+				os.Exit(1)
+			}
+			if status == 404 {
+				fmt.Println(errorStyle.Render(fmt.Sprintf("Agent %q not found", agentName)))
+				os.Exit(1)
+			}
+
 			// Convert http(s) to ws(s)
 			wsURL := strings.Replace(ep, "https://", "wss://", 1)
 			wsURL = strings.Replace(wsURL, "http://", "ws://", 1)

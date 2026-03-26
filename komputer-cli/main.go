@@ -271,7 +271,15 @@ func formatEvent(event AgentEvent) string {
 	case "tool_result":
 		tool, _ := payload["tool"].(string)
 		output, _ := payload["output"].(string)
-		return fmt.Sprintf("%s %s %s\n%s", ts, eventResultStyle.Render("✓ Tool Result:"), eventResultStyle.Render(tool), dimStyle.Render("  "+truncate(output, 300)))
+		outputDisplay := dimStyle.Render("  " + truncate(output, 300))
+		icon := eventResultStyle.Render("✓ Tool Result:")
+		toolName := eventResultStyle.Render(tool)
+		if strings.Contains(output, "Error") || strings.Contains(output, "error") || strings.Contains(output, "failed") || strings.Contains(output, "Stream closed") {
+			icon = eventErrorStyle.Render("✗ Tool Error:")
+			toolName = eventErrorStyle.Render(tool)
+			outputDisplay = eventErrorStyle.Render("  " + truncate(output, 500))
+		}
+		return fmt.Sprintf("%s %s %s\n%s", ts, icon, toolName, outputDisplay)
 
 	case "task_completed":
 		result, _ := payload["result"].(string)

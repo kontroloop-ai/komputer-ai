@@ -94,7 +94,7 @@ var (
 	// Event type styles
 	eventTextStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#F9FAFB"))
 	eventThinkStyle    = lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#A78BFA"))
-	eventToolStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#F59E0B"))
+	eventToolStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#10B981"))
 	eventResultStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#6EE7B7"))
 	eventErrorStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#EF4444"))
 	eventStartStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#3B82F6"))

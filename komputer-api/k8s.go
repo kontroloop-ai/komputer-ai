@@ -223,7 +223,7 @@ func (k *K8sClient) execInPod(ctx context.Context, podName string, command ...st
 }
 
 // PatchAgentTaskStatus patches only the task-related status fields on a KomputerAgent CR.
-func (k *K8sClient) PatchAgentTaskStatus(ctx context.Context, agentName, taskStatus, lastMessage string) error {
+func (k *K8sClient) PatchAgentTaskStatus(ctx context.Context, agentName, taskStatus, lastMessage, sessionID string) error {
 	agent := &komputerv1alpha1.KomputerAgent{}
 	key := types.NamespacedName{Name: agentName, Namespace: k.namespace}
 	if err := k.client.Get(ctx, key, agent); err != nil {
@@ -233,6 +233,9 @@ func (k *K8sClient) PatchAgentTaskStatus(ctx context.Context, agentName, taskSta
 	original := agent.DeepCopy()
 	agent.Status.TaskStatus = komputerv1alpha1.AgentTaskStatus(taskStatus)
 	agent.Status.LastTaskMessage = lastMessage
+	if sessionID != "" {
+		agent.Status.SessionID = sessionID
+	}
 
 	return k.client.Status().Patch(ctx, agent, client.MergeFrom(original))
 }

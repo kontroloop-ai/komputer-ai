@@ -1,4 +1,6 @@
 import asyncio
+import os
+from pathlib import Path
 
 from claude_agent_sdk import (
     AssistantMessage,
@@ -11,10 +13,33 @@ from claude_agent_sdk import (
     query,
 )
 
+# Point Claude config to the workspace PVC so sessions survive pod restarts.
+os.environ.setdefault("CLAUDE_CONFIG_DIR", "/workspace/.claude")
+
+SESSION_FILE = Path("/workspace/.komputer-session")
+
+
+def _load_session_id() -> str | None:
+    """Load the last session ID from the workspace."""
+    try:
+        return SESSION_FILE.read_text().strip() or None
+    except FileNotFoundError:
+        return None
+
+
+def _save_session_id(session_id: str):
+    """Save the session ID to the workspace for future tasks."""
+    SESSION_FILE.write_text(session_id)
+
 
 async def run_agent(instructions: str, model: str, publisher):
     """Run a Claude agent with the given instructions using the Claude Agent SDK."""
-    publisher.publish("task_started", {"instructions": instructions})
+    session_id = _load_session_id()
+
+    publisher.publish("task_started", {
+        "instructions": instructions,
+        "resuming_session": session_id is not None,
+    })
 
     async def post_tool_hook(input, session_id, ctx):
         publisher.publish(
@@ -39,6 +64,10 @@ async def run_agent(instructions: str, model: str, publisher):
         },
     )
 
+    # Resume previous session if one exists
+    if session_id:
+        options.resume = session_id
+
     result = None
     async for message in query(prompt=instructions, options=options):
         if isinstance(message, AssistantMessage):
@@ -57,12 +86,15 @@ async def run_agent(instructions: str, model: str, publisher):
             result = message
 
     if result:
+        # Persist session ID for future tasks
+        _save_session_id(result.session_id)
         publisher.publish("task_completed", {
             "result": result.result or "",
             "cost_usd": result.total_cost_usd,
             "duration_ms": result.duration_ms,
             "turns": result.num_turns,
             "stop_reason": result.stop_reason,
+            "session_id": result.session_id,
         })
 
     return result

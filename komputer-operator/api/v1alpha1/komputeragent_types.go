@@ -75,6 +75,10 @@ type KomputerAgentStatus struct {
 	// Managed by the API worker based on Redis events, not by the operator.
 	// +optional
 	LastTaskMessage string `json:"lastTaskMessage,omitempty"`
+	// SessionID is the Claude session ID for conversation continuity.
+	// Set by the API worker when a task completes, read by the agent on startup.
+	// +optional
+	SessionID string `json:"sessionId,omitempty"`
 }
 
 // +kubebuilder:object:root=true

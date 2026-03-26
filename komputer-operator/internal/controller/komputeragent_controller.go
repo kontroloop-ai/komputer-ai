@@ -334,6 +334,7 @@ func (r *KomputerAgentReconciler) buildPod(agent *komputerv1alpha1.KomputerAgent
 		corev1.EnvVar{Name: "KOMPUTER_INSTRUCTIONS", Value: agent.Spec.Instructions},
 		corev1.EnvVar{Name: "KOMPUTER_MODEL", Value: agent.Spec.Model},
 		corev1.EnvVar{Name: "KOMPUTER_AGENT_NAME", Value: agent.Name},
+		corev1.EnvVar{Name: "CLAUDE_CONFIG_DIR", Value: "/workspace/.claude"},
 	)
 
 	// Add volume mounts

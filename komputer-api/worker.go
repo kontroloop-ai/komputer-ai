@@ -14,6 +14,7 @@ import (
 // AgentEvent matches the JSON schema published by the komputer-agent.
 type AgentEvent struct {
 	AgentName string                 `json:"agentName"`
+	Namespace string                 `json:"namespace,omitempty"`
 	Type      string                 `json:"type"`
 	Timestamp string                 `json:"timestamp"`
 	Payload   map[string]interface{} `json:"payload"`
@@ -170,7 +171,7 @@ func StartRedisWorker(ctx context.Context, cfg RedisWorkerConfig, k8s *K8sClient
 						sessionID, _ = event.Payload["session_id"].(string)
 					}
 
-					if err := k8s.PatchAgentTaskStatus(ctx, k8s.defaultNamespace, event.AgentName, taskStatus, lastMessage, sessionID); err != nil {
+					if err := k8s.PatchAgentTaskStatus(ctx, event.Namespace, event.AgentName, taskStatus, lastMessage, sessionID); err != nil {
 						log.Printf("failed to patch task status for %s: %v", event.AgentName, err)
 					}
 				}
@@ -215,8 +216,15 @@ func parseStreamMessage(msg redis.XMessage) (AgentEvent, error) {
 		return AgentEvent{}, fmt.Errorf("missing or invalid timestamp field")
 	}
 
+	// Namespace is optional (backward-compatible with old agents).
+	namespace, _ := msg.Values["namespace"].(string)
+	if namespace == "" {
+		namespace = "default"
+	}
+
 	event := AgentEvent{
 		AgentName: agentName,
+		Namespace: namespace,
 		Type:      typ,
 		Timestamp: timestamp,
 	}

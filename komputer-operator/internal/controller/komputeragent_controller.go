@@ -334,6 +334,7 @@ func (r *KomputerAgentReconciler) buildPod(agent *komputerv1alpha1.KomputerAgent
 		{Name: "KOMPUTER_INSTRUCTIONS", Value: agent.Spec.Instructions},
 		{Name: "KOMPUTER_MODEL", Value: agent.Spec.Model},
 		{Name: "KOMPUTER_AGENT_NAME", Value: agent.Name},
+		{Name: "KOMPUTER_NAMESPACE", Value: agent.Namespace},
 		{Name: "CLAUDE_CONFIG_DIR", Value: "/workspace/.claude"},
 	}
 	if agent.Spec.Role == "manager" {

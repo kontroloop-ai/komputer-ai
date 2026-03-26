@@ -6,6 +6,7 @@ import httpx
 from claude_agent_sdk import tool, create_sdk_mcp_server
 
 API_URL = os.environ.get("KOMPUTER_API_URL", "http://komputer-api:8080")
+NAMESPACE = os.environ.get("KOMPUTER_NAMESPACE", "default")
 
 
 def _sanitize_name(name: str) -> str:
@@ -27,8 +28,11 @@ def _err(text: str) -> dict:
 async def _request(method: str, path: str, timeout: int = 10, **kwargs) -> dict:
     """Make an HTTP request to the komputer API and return a tool response."""
     try:
+        # Always include namespace in query params.
+        params = kwargs.pop("params", {})
+        params["namespace"] = NAMESPACE
         async with httpx.AsyncClient(timeout=timeout) as client:
-            resp = await client.request(method, f"{API_URL}{path}", **kwargs)
+            resp = await client.request(method, f"{API_URL}{path}", params=params, **kwargs)
             if resp.status_code >= 400:
                 return _err(f"API error {resp.status_code}: {resp.text}")
             return _ok(resp.text)
@@ -55,6 +59,7 @@ async def create_agent(args):
         "name": full_name,
         "instructions": args["instructions"],
         "role": "worker",
+        "namespace": NAMESPACE,
     }
     if args.get("model"):
         payload["model"] = args["model"]

@@ -334,6 +334,8 @@ func (r *KomputerAgentReconciler) buildPod(agent *komputerv1alpha1.KomputerAgent
 		corev1.EnvVar{Name: "KOMPUTER_INSTRUCTIONS", Value: agent.Spec.Instructions},
 		corev1.EnvVar{Name: "KOMPUTER_MODEL", Value: agent.Spec.Model},
 		corev1.EnvVar{Name: "KOMPUTER_AGENT_NAME", Value: agent.Name},
+		corev1.EnvVar{Name: "KOMPUTER_ROLE", Value: agent.Spec.Role},
+		corev1.EnvVar{Name: "KOMPUTER_API_URL", Value: fmt.Sprintf("http://komputer-api.%s.svc.cluster.local:8080", agent.Namespace)},
 		corev1.EnvVar{Name: "CLAUDE_CONFIG_DIR", Value: "/workspace/.claude"},
 	)
 

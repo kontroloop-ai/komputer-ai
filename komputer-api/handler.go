@@ -15,6 +15,7 @@ type CreateAgentRequest struct {
 	Instructions string `json:"instructions" binding:"required"`
 	Model        string `json:"model"`
 	TemplateRef  string `json:"templateRef"`
+	Role         string `json:"role"` // "manager" or "" (default worker)
 }
 
 type AgentResponse struct {
@@ -93,7 +94,16 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 			return
 		}
 
-		agent, err := k8s.CreateAgent(c.Request.Context(), req.Name, req.Instructions, req.Model, req.TemplateRef)
+		instructions := req.Instructions
+		role := req.Role
+		if role == "" {
+			role = "worker"
+		}
+		if role == "manager" {
+			instructions = managerSystemPrompt + "\n---\n\n## Your Task\n" + req.Instructions
+		}
+
+		agent, err := k8s.CreateAgent(c.Request.Context(), req.Name, instructions, req.Model, req.TemplateRef, role)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create agent: " + err.Error()})
 			return

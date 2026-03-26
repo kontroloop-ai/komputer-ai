@@ -59,6 +59,11 @@ spec:
                 default: claude-sonnet-4-20250514
                 description: Model is the Claude model to use.
                 type: string
+              role:
+                default: worker
+                description: Role is "manager" or "worker". Managers get orchestration
+                  tools.
+                type: string
               templateRef:
                 default: default
                 description: TemplateRef is the name of the KomputerAgentTemplate

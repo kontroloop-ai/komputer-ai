@@ -49,6 +49,10 @@ type KomputerAgentSpec struct {
 	// Model is the Claude model to use.
 	// +kubebuilder:default="claude-sonnet-4-20250514"
 	Model string `json:"model,omitempty"`
+	// Role is "manager" or "worker". Managers get orchestration tools.
+	// +kubebuilder:default="worker"
+	// +optional
+	Role string `json:"role,omitempty"`
 }
 
 // KomputerAgentStatus defines the observed state of KomputerAgent.

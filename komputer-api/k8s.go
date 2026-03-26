@@ -46,7 +46,7 @@ func NewK8sClient(namespace string) (*K8sClient, error) {
 	return &K8sClient{client: c, namespace: namespace}, nil
 }
 
-func (k *K8sClient) CreateAgent(ctx context.Context, name, instructions, model, templateRef string) (*komputerv1alpha1.KomputerAgent, error) {
+func (k *K8sClient) CreateAgent(ctx context.Context, name, instructions, model, templateRef, role string) (*komputerv1alpha1.KomputerAgent, error) {
 	if model == "" {
 		model = "claude-sonnet-4-20250514"
 	}
@@ -66,6 +66,7 @@ func (k *K8sClient) CreateAgent(ctx context.Context, name, instructions, model, 
 			TemplateRef:  templateRef,
 			Instructions: instructions,
 			Model:        model,
+			Role:         role,
 		},
 	}
 

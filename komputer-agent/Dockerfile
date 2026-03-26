@@ -17,6 +17,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Run as non-root user (required by Claude CLI for --dangerously-skip-permissions)
+RUN useradd -m -s /bin/bash komputer && mkdir -p /workspace && chown komputer:komputer /workspace
+USER komputer
+
 WORKDIR /workspace
 
+ENV PYTHONUNBUFFERED=1
 ENTRYPOINT ["python", "/app/main.py"]

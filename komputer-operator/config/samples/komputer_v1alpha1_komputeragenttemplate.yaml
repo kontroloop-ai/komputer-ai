@@ -7,6 +7,13 @@ spec:
     containers:
       - name: agent
         image: komputer-agent:latest
+        imagePullPolicy: Never
+        env:
+          - name: ANTHROPIC_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: anthropic-api-key
+                key: api-key
         resources:
           requests:
             cpu: "500m"

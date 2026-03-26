@@ -119,3 +119,18 @@ func (k *K8sClient) ForwardTaskToAgent(ctx context.Context, podIP, instructions 
 	}
 	return nil
 }
+
+// PatchAgentTaskStatus patches only the task-related status fields on a KomputerAgent CR.
+func (k *K8sClient) PatchAgentTaskStatus(ctx context.Context, agentName, taskStatus, lastMessage string) error {
+	agent := &komputerv1alpha1.KomputerAgent{}
+	key := types.NamespacedName{Name: agentName, Namespace: k.namespace}
+	if err := k.client.Get(ctx, key, agent); err != nil {
+		return fmt.Errorf("failed to get agent %s: %w", agentName, err)
+	}
+
+	original := agent.DeepCopy()
+	agent.Status.TaskStatus = komputerv1alpha1.AgentTaskStatus(taskStatus)
+	agent.Status.LastTaskMessage = lastMessage
+
+	return k.client.Status().Patch(ctx, agent, client.MergeFrom(original))
+}

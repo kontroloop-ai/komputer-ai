@@ -16,11 +16,13 @@ type CreateAgentRequest struct {
 }
 
 type AgentResponse struct {
-	Name      string `json:"name"`
-	Namespace string `json:"namespace"`
-	Model     string `json:"model"`
-	Status    string `json:"status"`
-	CreatedAt string `json:"createdAt"`
+	Name            string `json:"name"`
+	Namespace       string `json:"namespace"`
+	Model           string `json:"model"`
+	Status          string `json:"status"`
+	TaskStatus      string `json:"taskStatus,omitempty"`
+	LastTaskMessage string `json:"lastTaskMessage,omitempty"`
+	CreatedAt       string `json:"createdAt"`
 }
 
 type AgentListResponse struct {
@@ -68,11 +70,13 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 
 			log.Printf("forwarded task to existing agent %s", req.Name)
 			c.JSON(http.StatusOK, AgentResponse{
-				Name:      existing.Name,
-				Namespace: existing.Namespace,
-				Model:     existing.Spec.Model,
-				Status:    string(existing.Status.Phase),
-				CreatedAt: existing.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
+				Name:            existing.Name,
+				Namespace:       existing.Namespace,
+				Model:           existing.Spec.Model,
+				Status:          string(existing.Status.Phase),
+				TaskStatus:      string(existing.Status.TaskStatus),
+				LastTaskMessage: existing.Status.LastTaskMessage,
+				CreatedAt:       existing.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
 			})
 			return
 		}
@@ -105,11 +109,13 @@ func listAgents(k8s *K8sClient) gin.HandlerFunc {
 		resp := AgentListResponse{Agents: make([]AgentResponse, 0, len(agents))}
 		for _, a := range agents {
 			resp.Agents = append(resp.Agents, AgentResponse{
-				Name:      a.Name,
-				Namespace: a.Namespace,
-				Model:     a.Spec.Model,
-				Status:    string(a.Status.Phase),
-				CreatedAt: a.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
+				Name:            a.Name,
+				Namespace:       a.Namespace,
+				Model:           a.Spec.Model,
+				Status:          string(a.Status.Phase),
+				TaskStatus:      string(a.Status.TaskStatus),
+				LastTaskMessage: a.Status.LastTaskMessage,
+				CreatedAt:       a.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
 			})
 		}
 

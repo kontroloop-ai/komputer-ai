@@ -30,6 +30,15 @@ const (
 	AgentPhaseFailed    KomputerAgentPhase = "Failed"
 )
 
+// AgentTaskStatus represents whether the agent is actively working on a task.
+type AgentTaskStatus string
+
+const (
+	AgentTaskIdle  AgentTaskStatus = "Idle"
+	AgentTaskBusy  AgentTaskStatus = "Busy"
+	AgentTaskError AgentTaskStatus = "Error"
+)
+
 // KomputerAgentSpec defines the desired state of KomputerAgent.
 type KomputerAgentSpec struct {
 	// TemplateRef is the name of the KomputerAgentTemplate to use.
@@ -58,11 +67,20 @@ type KomputerAgentStatus struct {
 	CompletionTime *metav1.Time `json:"completionTime,omitempty"`
 	// Message is a human-readable status message.
 	Message string `json:"message,omitempty"`
+	// TaskStatus indicates whether the agent is actively working on a task.
+	// Managed by the API worker based on Redis events, not by the operator.
+	// +optional
+	TaskStatus AgentTaskStatus `json:"taskStatus,omitempty"`
+	// LastTaskMessage is the most recent event summary from the agent.
+	// Managed by the API worker based on Redis events, not by the operator.
+	// +optional
+	LastTaskMessage string `json:"lastTaskMessage,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
+// +kubebuilder:printcolumn:name="Task",type=string,JSONPath=`.status.taskStatus`
 // +kubebuilder:printcolumn:name="Model",type=string,JSONPath=`.spec.model`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 

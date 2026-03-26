@@ -30,10 +30,15 @@ def main():
     configure(publisher, model)
 
     # Run initial task in a background thread
+    def run_initial_task():
+        try:
+            run_agent_sync(instructions, model, publisher)
+        except Exception as e:
+            print(f"Initial task failed: {e}", flush=True)
+            publisher.publish("error", {"error": str(e)})
+
     if instructions:
-        thread = threading.Thread(
-            target=run_agent_sync, args=(instructions, model, publisher), daemon=True
-        )
+        thread = threading.Thread(target=run_initial_task, daemon=True)
         thread.start()
 
     # Start FastAPI server (blocks)

@@ -7,10 +7,11 @@ class EventPublisher:
     def __init__(self, redis_config: dict, agent_name: str):
         self.agent_name = agent_name
         self.queue = redis_config.get("queue", "komputer-events")
+        password = redis_config.get("password") or None
         self.client = redis.Redis(
             host=redis_config["address"].split(":")[0],
             port=int(redis_config["address"].split(":")[1]),
-            password=redis_config.get("password", ""),
+            password=password,
             db=redis_config.get("db", 0),
         )
 

@@ -18,6 +18,9 @@ spec:
     - jsonPath: .status.phase
       name: Phase
       type: string
+    - jsonPath: .status.taskStatus
+      name: Task
+      type: string
     - jsonPath: .spec.model
       name: Model
       type: string
@@ -71,6 +74,11 @@ spec:
                 description: CompletionTime is when the agent finished.
                 format: date-time
                 type: string
+              lastTaskMessage:
+                description: |-
+                  LastTaskMessage is the most recent event summary from the agent.
+                  Managed by the API worker based on Redis events, not by the operator.
+                type: string
               message:
                 description: Message is a human-readable status message.
                 type: string
@@ -86,6 +94,11 @@ spec:
               startTime:
                 description: StartTime is when the agent was started.
                 format: date-time
+                type: string
+              taskStatus:
+                description: |-
+                  TaskStatus indicates whether the agent is actively working on a task.
+                  Managed by the API worker based on Redis events, not by the operator.
                 type: string
             type: object
         type: object

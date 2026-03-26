@@ -2,11 +2,21 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"log"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 )
+
+// AgentEvent matches the JSON schema published by the komputer-agent.
+type AgentEvent struct {
+	AgentName string                 `json:"agentName"`
+	Type      string                 `json:"type"`
+	Timestamp string                 `json:"timestamp"`
+	Payload   map[string]interface{} `json:"payload"`
+}
 
 type RedisWorkerConfig struct {
 	Address  string
@@ -15,7 +25,7 @@ type RedisWorkerConfig struct {
 	Queue    string
 }
 
-func StartRedisWorker(ctx context.Context, cfg RedisWorkerConfig) {
+func StartRedisWorker(ctx context.Context, cfg RedisWorkerConfig, k8s *K8sClient) {
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     cfg.Address,
 		Password: cfg.Password,
@@ -44,9 +54,56 @@ func StartRedisWorker(ctx context.Context, cfg RedisWorkerConfig) {
 				continue
 			}
 
-			if len(result) >= 2 {
-				log.Printf("agent event: %s", result[1])
+			if len(result) < 2 {
+				continue
+			}
+
+			raw := result[1]
+			log.Printf("agent event: %s", raw)
+
+			var event AgentEvent
+			if err := json.Unmarshal([]byte(raw), &event); err != nil {
+				log.Printf("failed to parse agent event: %v", err)
+				continue
+			}
+
+			if event.AgentName == "" {
+				continue
+			}
+
+			taskStatus, lastMessage := mapEventToTaskStatus(event)
+			if taskStatus == "" {
+				continue
+			}
+
+			if err := k8s.PatchAgentTaskStatus(ctx, event.AgentName, taskStatus, lastMessage); err != nil {
+				log.Printf("failed to patch task status for %s: %v", event.AgentName, err)
 			}
 		}
 	}()
+}
+
+func mapEventToTaskStatus(event AgentEvent) (taskStatus string, lastMessage string) {
+	switch event.Type {
+	case "message":
+		content, _ := event.Payload["content"].(string)
+		return "Busy", truncate(fmt.Sprintf("Message: %s", content), 256)
+	case "tool_call":
+		tool, _ := event.Payload["tool"].(string)
+		return "Busy", truncate(fmt.Sprintf("Tool call: %s", tool), 256)
+	case "completion":
+		return "Idle", "Task completed"
+	case "error":
+		errMsg, _ := event.Payload["error"].(string)
+		return "Error", truncate(fmt.Sprintf("Error: %s", errMsg), 256)
+	default:
+		return "", ""
+	}
+}
+
+func truncate(s string, max int) string {
+	if len(s) > max {
+		return s[:max]
+	}
+	return s
 }

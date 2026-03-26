@@ -45,7 +45,7 @@ func main() {
 		Password: redisPassword,
 		DB:       0,
 		Queue:    redisQueue,
-	})
+	}, k8s)
 	log.Println("redis worker started")
 
 	r := gin.Default()

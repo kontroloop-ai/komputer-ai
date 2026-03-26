@@ -78,13 +78,13 @@ func (r *KomputerAgentReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		})
 	}
 
-	// 3. Auto-discover the singleton KomputerRedisConfig in the namespace
-	redisConfig, err := r.getRedisConfig(ctx, agent.Namespace)
+	// 3. Auto-discover the singleton cluster-scoped KomputerRedisConfig
+	redisConfig, err := r.getRedisConfig(ctx)
 	if err != nil {
 		log.Error(err, "Failed to get KomputerRedisConfig")
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, r.updateStatus(ctx, agent, func(s *komputerv1alpha1.KomputerAgentStatus) {
 			s.Phase = komputerv1alpha1.AgentPhasePending
-			s.Message = "No KomputerRedisConfig found in namespace"
+			s.Message = "No KomputerRedisConfig found in the cluster"
 		})
 	}
 
@@ -119,14 +119,14 @@ func (r *KomputerAgentReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	return ctrl.Result{}, nil
 }
 
-// getRedisConfig lists KomputerRedisConfig in namespace and returns the first one.
-func (r *KomputerAgentReconciler) getRedisConfig(ctx context.Context, namespace string) (*komputerv1alpha1.KomputerRedisConfig, error) {
+// getRedisConfig lists cluster-scoped KomputerRedisConfig resources and returns the first one.
+func (r *KomputerAgentReconciler) getRedisConfig(ctx context.Context) (*komputerv1alpha1.KomputerRedisConfig, error) {
 	list := &komputerv1alpha1.KomputerRedisConfigList{}
-	if err := r.List(ctx, list, client.InNamespace(namespace)); err != nil {
+	if err := r.List(ctx, list); err != nil {
 		return nil, err
 	}
 	if len(list.Items) == 0 {
-		return nil, fmt.Errorf("no KomputerRedisConfig found in namespace %s", namespace)
+		return nil, fmt.Errorf("no KomputerRedisConfig found in the cluster")
 	}
 	return &list.Items[0], nil
 }

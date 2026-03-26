@@ -49,6 +49,7 @@ type KomputerRedisConfigStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Cluster
 
 // KomputerRedisConfig is the Schema for the komputerredisconfigs API.
 type KomputerRedisConfig struct {

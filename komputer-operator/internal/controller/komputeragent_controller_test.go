@@ -66,11 +66,10 @@ var _ = Describe("KomputerAgent Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 		}
 
-		// Create KomputerRedisConfig "default"
+		// Create KomputerRedisConfig "default" (cluster-scoped)
 		redisConfig := &komputerv1alpha1.KomputerRedisConfig{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "default",
-				Namespace: "default",
+				Name: "default",
 			},
 			Spec: komputerv1alpha1.KomputerRedisConfigSpec{
 				Address: "redis:6379",
@@ -78,7 +77,7 @@ var _ = Describe("KomputerAgent Controller", func() {
 				Queue:   "komputer-events",
 			},
 		}
-		err = k8sClient.Get(ctx, types.NamespacedName{Name: "default", Namespace: "default"}, &komputerv1alpha1.KomputerRedisConfig{})
+		err = k8sClient.Get(ctx, types.NamespacedName{Name: "default"}, &komputerv1alpha1.KomputerRedisConfig{})
 		if apierrors.IsNotFound(err) {
 			Expect(k8sClient.Create(ctx, redisConfig)).To(Succeed())
 		} else {

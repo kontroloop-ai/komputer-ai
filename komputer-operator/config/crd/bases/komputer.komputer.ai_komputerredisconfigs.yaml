@@ -12,7 +12,7 @@ spec:
     listKind: KomputerRedisConfigList
     plural: komputerredisconfigs
     singular: komputerredisconfig
-  scope: Namespaced
+  scope: Cluster
   versions:
   - name: v1alpha1
     schema:

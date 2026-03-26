@@ -29,6 +29,16 @@ rules:
 - apiGroups:
   - komputer.komputer.ai
   resources:
+  - komputeragentclustertemplates
+  - komputeragenttemplates
+  - komputerredisconfigs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - komputer.komputer.ai
+  resources:
   - komputeragents
   verbs:
   - create
@@ -52,12 +62,3 @@ rules:
   - get
   - patch
   - update
-- apiGroups:
-  - komputer.komputer.ai
-  resources:
-  - komputeragenttemplates
-  - komputerredisconfigs
-  verbs:
-  - get
-  - list
-  - watch

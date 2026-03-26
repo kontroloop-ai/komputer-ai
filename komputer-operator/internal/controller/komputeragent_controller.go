@@ -45,6 +45,7 @@ type KomputerAgentReconciler struct {
 // +kubebuilder:rbac:groups=komputer.komputer.ai,resources=komputeragents/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=komputer.komputer.ai,resources=komputeragents/finalizers,verbs=update
 // +kubebuilder:rbac:groups=komputer.komputer.ai,resources=komputeragenttemplates,verbs=get;list;watch
+// +kubebuilder:rbac:groups=komputer.komputer.ai,resources=komputeragentclustertemplates,verbs=get;list;watch
 // +kubebuilder:rbac:groups=komputer.komputer.ai,resources=komputerredisconfigs,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
@@ -69,17 +70,22 @@ func (r *KomputerAgentReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if templateRef == "" {
 		templateRef = "default"
 	}
+	// Resolve template: namespaced KomputerAgentTemplate first, then cluster-scoped KomputerAgentClusterTemplate.
 	template := &komputerv1alpha1.KomputerAgentTemplate{}
-	// Try the agent's namespace first, then fall back to "default" namespace (cluster-wide templates).
 	if err := r.Get(ctx, types.NamespacedName{Name: templateRef, Namespace: agent.Namespace}, template); err != nil {
-		fallbackErr := r.Get(ctx, types.NamespacedName{Name: templateRef, Namespace: "default"}, template)
-		if fallbackErr != nil {
-			log.Error(err, "Failed to get KomputerAgentTemplate", "templateRef", templateRef, "triedNamespaces", []string{agent.Namespace, "default"})
+		// Fall back to cluster-scoped template.
+		clusterTemplate := &komputerv1alpha1.KomputerAgentClusterTemplate{}
+		if clusterErr := r.Get(ctx, types.NamespacedName{Name: templateRef}, clusterTemplate); clusterErr != nil {
+			log.Error(err, "Failed to get template", "templateRef", templateRef, "namespace", agent.Namespace)
 			_ = r.updateStatus(ctx, agent, func(s *komputerv1alpha1.KomputerAgentStatus) {
 				s.Phase = komputerv1alpha1.AgentPhasePending
-				s.Message = fmt.Sprintf("Template %q not found in namespace %q or default", templateRef, agent.Namespace)
+				s.Message = fmt.Sprintf("Template %q not found (checked namespace %q and cluster scope)", templateRef, agent.Namespace)
 			})
 			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+		}
+		// Convert cluster template to template format for buildPod.
+		template = &komputerv1alpha1.KomputerAgentTemplate{
+			Spec: *clusterTemplate.Spec.DeepCopy(),
 		}
 	}
 

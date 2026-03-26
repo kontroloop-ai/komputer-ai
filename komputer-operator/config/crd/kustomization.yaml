@@ -4,6 +4,7 @@
 resources:
 - bases/komputer.komputer.ai_komputeragents.yaml
 - bases/komputer.komputer.ai_komputeragenttemplates.yaml
+- bases/komputer.komputer.ai_komputeragentclustertemplates.yaml
 - bases/komputer.komputer.ai_komputerredisconfigs.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 

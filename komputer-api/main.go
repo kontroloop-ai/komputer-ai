@@ -28,9 +28,9 @@ func main() {
 		redisAddr = "localhost:6379"
 	}
 	redisPassword := os.Getenv("REDIS_PASSWORD")
-	redisQueue := os.Getenv("REDIS_QUEUE")
-	if redisQueue == "" {
-		redisQueue = "komputer-events"
+	redisStreamPrefix := os.Getenv("REDIS_STREAM_PREFIX")
+	if redisStreamPrefix == "" {
+		redisStreamPrefix = "komputer-events"
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -44,12 +44,13 @@ func main() {
 
 	hub := NewHub()
 
-	StartRedisWorker(ctx, RedisWorkerConfig{
-		Address:  redisAddr,
-		Password: redisPassword,
-		DB:       0,
-		Queue:    redisQueue,
+	rw := StartRedisWorker(ctx, RedisWorkerConfig{
+		Address:      redisAddr,
+		Password:     redisPassword,
+		DB:           0,
+		StreamPrefix: redisStreamPrefix,
 	}, k8s, hub)
+	_ = rw // available for Phase 2 event endpoint
 	log.Println("redis worker started")
 
 	r := gin.Default()

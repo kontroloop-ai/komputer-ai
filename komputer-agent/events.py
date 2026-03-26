@@ -6,7 +6,7 @@ import redis
 class EventPublisher:
     def __init__(self, redis_config: dict, agent_name: str):
         self.agent_name = agent_name
-        self.queue = redis_config.get("queue", "komputer-events")
+        self.stream_prefix = redis_config.get("stream_prefix", "komputer-events")
         password = redis_config.get("password") or None
         self.client = redis.Redis(
             host=redis_config["address"].split(":")[0],
@@ -20,6 +20,7 @@ class EventPublisher:
             "agentName": self.agent_name,
             "type": event_type,
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "payload": payload,
+            "payload": json.dumps(payload),
         }
-        self.client.rpush(self.queue, json.dumps(event))
+        stream_key = f"{self.stream_prefix}:{self.agent_name}"
+        self.client.xadd(stream_key, event, maxlen=200, approximate=True)

@@ -25,7 +25,7 @@ type RedisWorkerConfig struct {
 	Queue    string
 }
 
-func StartRedisWorker(ctx context.Context, cfg RedisWorkerConfig, k8s *K8sClient) {
+func StartRedisWorker(ctx context.Context, cfg RedisWorkerConfig, k8s *K8sClient, hub *Hub) {
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     cfg.Address,
 		Password: cfg.Password,
@@ -70,6 +70,9 @@ func StartRedisWorker(ctx context.Context, cfg RedisWorkerConfig, k8s *K8sClient
 			if event.AgentName == "" {
 				continue
 			}
+
+			// Broadcast to WebSocket subscribers
+			hub.Broadcast(event.AgentName, []byte(raw))
 
 			taskStatus, lastMessage := mapEventToTaskStatus(event)
 			if taskStatus == "" {

@@ -40,16 +40,18 @@ func main() {
 	}
 	log.Println("kubernetes client initialized")
 
+	hub := NewHub()
+
 	StartRedisWorker(ctx, RedisWorkerConfig{
 		Address:  redisAddr,
 		Password: redisPassword,
 		DB:       0,
 		Queue:    redisQueue,
-	}, k8s)
+	}, k8s, hub)
 	log.Println("redis worker started")
 
 	r := gin.Default()
-	SetupRoutes(r, k8s)
+	SetupRoutes(r, k8s, hub)
 
 	go func() {
 		sigCh := make(chan os.Signal, 1)

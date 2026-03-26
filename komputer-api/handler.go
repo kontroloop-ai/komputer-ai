@@ -30,11 +30,12 @@ type AgentListResponse struct {
 	Agents []AgentResponse `json:"agents"`
 }
 
-func SetupRoutes(r *gin.Engine, k8s *K8sClient) {
+func SetupRoutes(r *gin.Engine, k8s *K8sClient, hub *Hub) {
 	v1 := r.Group("/api/v1")
 	{
 		v1.POST("/agents", createOrTriggerAgent(k8s))
 		v1.GET("/agents", listAgents(k8s))
+		v1.GET("/agents/:name/ws", HandleAgentWS(hub))
 	}
 }
 

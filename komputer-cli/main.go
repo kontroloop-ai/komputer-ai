@@ -519,26 +519,35 @@ func main() {
 
 	// ── delete ───────────────────────────────────────────────────────────
 	root.AddCommand(&cobra.Command{
-		Use:     "delete <name>",
+		Use:     "delete <name> [name...]",
 		Aliases: []string{"rm"},
-		Short:   "Delete an agent and all its resources",
-		Args:    cobra.ExactArgs(1),
+		Short:   "Delete one or more agents and all their resources",
+		Args:    cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			ep := resolveEndpoint(cmd)
-			data, status, err := apiRequest("DELETE", fmt.Sprintf("%s/api/v1/agents/%s", ep, url.PathEscape(args[0])), nil)
-			if err != nil {
-				fmt.Println(errorStyle.Render("Request failed: " + err.Error()))
+			hasError := false
+			for _, name := range args {
+				data, status, err := apiRequest("DELETE", fmt.Sprintf("%s/api/v1/agents/%s", ep, url.PathEscape(name)), nil)
+				if err != nil {
+					fmt.Println(errorStyle.Render(fmt.Sprintf("Failed to delete %q: %s", name, err.Error())))
+					hasError = true
+					continue
+				}
+				if status == 404 {
+					fmt.Println(errorStyle.Render(fmt.Sprintf("Agent %q not found", name)))
+					hasError = true
+					continue
+				}
+				if status != 200 {
+					fmt.Println(errorStyle.Render(fmt.Sprintf("Failed to delete %q (%d): %s", name, status, string(data))))
+					hasError = true
+					continue
+				}
+				fmt.Println(successStyle.Render(fmt.Sprintf("✔ Agent %q deleted", name)))
+			}
+			if hasError {
 				os.Exit(1)
 			}
-			if status == 404 {
-				fmt.Println(errorStyle.Render(fmt.Sprintf("Agent %q not found", args[0])))
-				os.Exit(1)
-			}
-			if status != 200 {
-				fmt.Println(errorStyle.Render(fmt.Sprintf("API error (%d): %s", status, string(data))))
-				os.Exit(1)
-			}
-			fmt.Println(successStyle.Render(fmt.Sprintf("✔ Agent %q deleted", args[0])))
 		},
 	})
 

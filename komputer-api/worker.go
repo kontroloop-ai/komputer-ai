@@ -88,13 +88,20 @@ func StartRedisWorker(ctx context.Context, cfg RedisWorkerConfig, k8s *K8sClient
 
 func mapEventToTaskStatus(event AgentEvent) (taskStatus string, lastMessage string) {
 	switch event.Type {
-	case "message":
+	case "task_started":
+		return "Busy", "Task started"
+	case "text":
 		content, _ := event.Payload["content"].(string)
-		return "Busy", truncate(fmt.Sprintf("Message: %s", content), 256)
+		return "Busy", truncate(content, 256)
+	case "thinking":
+		return "Busy", "Thinking..."
 	case "tool_call":
 		tool, _ := event.Payload["tool"].(string)
-		return "Busy", truncate(fmt.Sprintf("Tool call: %s", tool), 256)
-	case "completion":
+		return "Busy", truncate(fmt.Sprintf("Calling %s", tool), 256)
+	case "tool_result":
+		tool, _ := event.Payload["tool"].(string)
+		return "Busy", truncate(fmt.Sprintf("Got result from %s", tool), 256)
+	case "task_completed":
 		return "Idle", "Task completed"
 	case "error":
 		errMsg, _ := event.Payload["error"].(string)

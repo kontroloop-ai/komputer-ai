@@ -487,15 +487,23 @@ func main() {
 	root.AddCommand(createCmd)
 
 	// ── get ──────────────────────────────────────────────────────────────
-	root.AddCommand(&cobra.Command{
+	getCmd := &cobra.Command{
 		Use:   "get <name>",
-		Short: "Get details of a specific agent",
+		Short: "Get details of a specific agent and its recent events",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			ep := resolveEndpoint(cmd)
-			data, status, err := apiRequest("GET", ep+"/api/v1/agents", nil)
+			agentName := args[0]
+			limit, _ := cmd.Flags().GetInt("events")
+
+			// Fetch agent details
+			data, status, err := apiRequest("GET", fmt.Sprintf("%s/api/v1/agents/%s", ep, url.PathEscape(agentName)), nil)
 			if err != nil {
 				fmt.Println(errorStyle.Render("Request failed: " + err.Error()))
+				os.Exit(1)
+			}
+			if status == 404 {
+				fmt.Println(errorStyle.Render(fmt.Sprintf("Agent %q not found", agentName)))
 				os.Exit(1)
 			}
 			if status != 200 {
@@ -503,19 +511,33 @@ func main() {
 				os.Exit(1)
 			}
 
-			var resp AgentListResponse
-			json.Unmarshal(data, &resp)
+			var agent AgentResponse
+			json.Unmarshal(data, &agent)
+			printAgent(agent)
 
-			for _, a := range resp.Agents {
-				if a.Name == args[0] {
-					printAgent(a)
-					return
+			// Fetch recent events
+			eventsData, eventsStatus, err := apiRequest("GET", fmt.Sprintf("%s/api/v1/agents/%s/events?limit=%d", ep, url.PathEscape(agentName), limit), nil)
+			if err != nil || eventsStatus != 200 {
+				return // silently skip events if unavailable
+			}
+
+			var eventsResp struct {
+				Events []AgentEvent `json:"events"`
+			}
+			json.Unmarshal(eventsData, &eventsResp)
+
+			if len(eventsResp.Events) > 0 {
+				fmt.Println(labelStyle.Render(fmt.Sprintf("  Recent Events (%d)", len(eventsResp.Events))))
+				fmt.Println(dimStyle.Render("  " + strings.Repeat("─", 60)))
+				for _, e := range eventsResp.Events {
+					fmt.Println(formatEvent(e))
+					fmt.Println()
 				}
 			}
-			fmt.Println(errorStyle.Render(fmt.Sprintf("Agent %q not found", args[0])))
-			os.Exit(1)
 		},
-	})
+	}
+	getCmd.Flags().Int("events", 5, "Number of recent events to show")
+	root.AddCommand(getCmd)
 
 	// ── delete ───────────────────────────────────────────────────────────
 	root.AddCommand(&cobra.Command{

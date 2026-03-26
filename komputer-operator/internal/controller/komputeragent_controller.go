@@ -218,7 +218,7 @@ func (r *KomputerAgentReconciler) ensureConfigMap(ctx context.Context, agent *ko
 			"address":  redisConfig.Spec.Address,
 			"password": password,
 			"db":       redisConfig.Spec.DB,
-			"queue":    redisConfig.Spec.Queue,
+			"stream_prefix": redisConfig.Spec.Queue,
 		},
 	}
 

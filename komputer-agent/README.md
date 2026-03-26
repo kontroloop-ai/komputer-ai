@@ -37,7 +37,7 @@ Gracefully cancels the running asyncio task. The Claude CLI subprocess is termin
 
 ## Event Format
 
-Events are published to a Redis list as JSON:
+Events are published to a per-agent Redis Stream as JSON:
 
 ```json
 {"agentName": "my-agent", "type": "task_started", "timestamp": "2026-03-26T10:00:00Z", "payload": {"instructions": "..."}}
@@ -71,7 +71,7 @@ Mounted by the operator at `/etc/komputer/config.json`:
     "address": "redis:6379",
     "password": "",
     "db": 0,
-    "queue": "komputer-events"
+    "stream_prefix": "komputer-events"
   }
 }
 ```
@@ -100,7 +100,7 @@ pip install -r requirements.txt
 npm install -g @anthropic-ai/claude-code
 
 # Create a config file
-echo '{"redis":{"address":"localhost:6379","db":0,"queue":"komputer-events"}}' > /tmp/config.json
+echo '{"redis":{"address":"localhost:6379","db":0,"stream_prefix":"komputer-events"}}' > /tmp/config.json
 
 # Run
 KOMPUTER_CONFIG_PATH=/tmp/config.json \

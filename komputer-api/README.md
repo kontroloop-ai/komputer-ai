@@ -81,7 +81,7 @@ Connect to receive real-time events as the agent works:
 
 ## Redis Event Worker
 
-The API runs a background goroutine that consumes agent events from a Redis queue. For each event it:
+The API runs a background goroutine that consumes agent events from Redis Streams. For each event it:
 
 1. Logs the raw event
 2. Broadcasts to WebSocket subscribers for that agent
@@ -99,7 +99,7 @@ All configuration via environment variables:
 | `NAMESPACE` | `default` | Kubernetes namespace for agent CRs |
 | `REDIS_ADDRESS` | `localhost:6379` | Redis host:port |
 | `REDIS_PASSWORD` | (empty) | Redis password |
-| `REDIS_QUEUE` | `komputer-events` | Redis queue name |
+| `REDIS_STREAM_PREFIX` | `komputer-events` | Redis stream prefix for agent events |
 
 Requires a valid kubeconfig (in-cluster or `~/.kube/config`).
 

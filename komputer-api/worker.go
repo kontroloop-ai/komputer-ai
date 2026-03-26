@@ -76,6 +76,17 @@ func StartRedisWorker(ctx context.Context, cfg RedisWorkerConfig, k8s *K8sClient
 				continue
 			}
 
+			// Prune lastIDs for streams that no longer exist.
+			activeStreams := make(map[string]struct{}, len(streams))
+			for _, s := range streams {
+				activeStreams[s] = struct{}{}
+			}
+			for k := range lastIDs {
+				if _, ok := activeStreams[k]; !ok {
+					delete(lastIDs, k)
+				}
+			}
+
 			if len(streams) == 0 {
 				// No streams yet — wait and retry.
 				select {
@@ -225,7 +236,7 @@ func parseStreamMessage(msg redis.XMessage) (AgentEvent, error) {
 }
 
 // GetAgentEvents reads the most recent events from an agent's stream in chronological order.
-func GetAgentEvents(rdb *redis.Client, ctx context.Context, agentName string, limit int64, streamPrefix string) ([]AgentEvent, error) {
+func GetAgentEvents(ctx context.Context, rdb *redis.Client, agentName string, limit int64, streamPrefix string) ([]AgentEvent, error) {
 	streamKey := fmt.Sprintf("%s:%s", streamPrefix, agentName)
 
 	// XREVRANGE gets most recent first; we reverse to return chronological order.
@@ -247,7 +258,7 @@ func GetAgentEvents(rdb *redis.Client, ctx context.Context, agentName string, li
 }
 
 // DeleteAgentStream removes an agent's event stream from Redis.
-func DeleteAgentStream(rdb *redis.Client, ctx context.Context, agentName string, streamPrefix string) error {
+func DeleteAgentStream(ctx context.Context, rdb *redis.Client, agentName string, streamPrefix string) error {
 	streamKey := fmt.Sprintf("%s:%s", streamPrefix, agentName)
 	if err := rdb.Del(ctx, streamKey).Err(); err != nil {
 		return fmt.Errorf("delete stream %s: %w", streamKey, err)
@@ -256,7 +267,7 @@ func DeleteAgentStream(rdb *redis.Client, ctx context.Context, agentName string,
 }
 
 // ListAgentStreams returns agent names that have active event streams.
-func ListAgentStreams(rdb *redis.Client, ctx context.Context, streamPrefix string) ([]string, error) {
+func ListAgentStreams(ctx context.Context, rdb *redis.Client, streamPrefix string) ([]string, error) {
 	streams, err := scanStreams(ctx, rdb, streamPrefix+":*")
 	if err != nil {
 		return nil, err
@@ -297,8 +308,9 @@ func mapEventToTaskStatus(event AgentEvent) (taskStatus string, lastMessage stri
 }
 
 func truncate(s string, max int) string {
-	if len(s) > max {
-		return s[:max]
+	runes := []rune(s)
+	if len(runes) > max {
+		return string(runes[:max])
 	}
 	return s
 }

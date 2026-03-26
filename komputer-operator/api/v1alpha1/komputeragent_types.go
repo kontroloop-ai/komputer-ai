@@ -20,26 +20,51 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+// KomputerAgentPhase represents the lifecycle phase of a KomputerAgent.
+type KomputerAgentPhase string
+
+const (
+	AgentPhasePending   KomputerAgentPhase = "Pending"
+	AgentPhaseRunning   KomputerAgentPhase = "Running"
+	AgentPhaseSucceeded KomputerAgentPhase = "Succeeded"
+	AgentPhaseFailed    KomputerAgentPhase = "Failed"
+)
 
 // KomputerAgentSpec defines the desired state of KomputerAgent.
 type KomputerAgentSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// Foo is an example field of KomputerAgent. Edit komputeragent_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// TemplateRef is the name of the KomputerAgentTemplate to use.
+	// +kubebuilder:default="default"
+	TemplateRef string `json:"templateRef,omitempty"`
+	// Instructions is the prompt/task for the Claude agent.
+	Instructions string `json:"instructions"`
+	// Model is the Claude model to use.
+	// +kubebuilder:default="claude-sonnet-4-20250514"
+	Model string `json:"model,omitempty"`
 }
 
 // KomputerAgentStatus defines the observed state of KomputerAgent.
 type KomputerAgentStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Phase is the current lifecycle phase.
+	Phase KomputerAgentPhase `json:"phase,omitempty"`
+	// PodName is the name of the agent pod.
+	PodName string `json:"podName,omitempty"`
+	// PvcName is the name of the agent PVC.
+	PvcName string `json:"pvcName,omitempty"`
+	// StartTime is when the agent was started.
+	// +optional
+	StartTime *metav1.Time `json:"startTime,omitempty"`
+	// CompletionTime is when the agent finished.
+	// +optional
+	CompletionTime *metav1.Time `json:"completionTime,omitempty"`
+	// Message is a human-readable status message.
+	Message string `json:"message,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
+// +kubebuilder:printcolumn:name="Model",type=string,JSONPath=`.spec.model`
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // KomputerAgent is the Schema for the komputeragents API.
 type KomputerAgent struct {

@@ -516,23 +516,29 @@ func main() {
 			defer conn.Close()
 
 			// Handle Ctrl+C
+			interrupted := make(chan struct{})
 			sigCh := make(chan os.Signal, 1)
 			signal.Notify(sigCh, os.Interrupt)
 			go func() {
 				<-sigCh
+				close(interrupted)
 				fmt.Println()
 				fmt.Println(dimStyle.Render("Disconnected."))
 				conn.Close()
-				os.Exit(0)
 			}()
 
 			for {
 				_, msg, err := conn.ReadMessage()
 				if err != nil {
-					if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
-						fmt.Println(dimStyle.Render("Connection closed."))
-					} else {
-						fmt.Println(errorStyle.Render("WebSocket error: " + err.Error()))
+					select {
+					case <-interrupted:
+						// User pressed Ctrl+C, exit silently
+					default:
+						if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
+							fmt.Println(dimStyle.Render("Connection closed."))
+						} else {
+							fmt.Println(errorStyle.Render("WebSocket error: " + err.Error()))
+						}
 					}
 					return
 				}

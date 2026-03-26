@@ -11,12 +11,72 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gorilla/websocket"
 	"github.com/spf13/cobra"
 )
+
+// ─── Spinner ────────────────────────────────────────────────────────────────
+
+type Spinner struct {
+	mu      sync.Mutex
+	msg     string
+	stop    chan struct{}
+	stopped chan struct{}
+}
+
+func NewSpinner(msg string) *Spinner {
+	s := &Spinner{
+		msg:     msg,
+		stop:    make(chan struct{}),
+		stopped: make(chan struct{}),
+	}
+	go s.run()
+	return s
+}
+
+func (s *Spinner) run() {
+	defer close(s.stopped)
+	frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+	i := 0
+	ticker := time.NewTicker(80 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-s.stop:
+			// Clear the spinner line.
+			fmt.Printf("\r\033[K")
+			return
+		case <-ticker.C:
+			s.mu.Lock()
+			msg := s.msg
+			s.mu.Unlock()
+			frame := busyStyle.Render(frames[i%len(frames)])
+			fmt.Printf("\r\033[K%s %s", frame, dimStyle.Render(msg))
+			i++
+		}
+	}
+}
+
+func (s *Spinner) SetMessage(msg string) {
+	s.mu.Lock()
+	s.msg = msg
+	s.mu.Unlock()
+}
+
+func (s *Spinner) Stop() {
+	select {
+	case <-s.stop:
+		return // already stopped
+	default:
+		close(s.stop)
+		<-s.stopped
+	}
+}
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
@@ -604,15 +664,18 @@ func main() {
 			wsURL = strings.Replace(wsURL, "http://", "ws://", 1)
 			wsURL = fmt.Sprintf("%s/api/v1/agents/%s/ws", wsURL, url.PathEscape(agentName))
 
-			// Retry connection (pod may not be ready yet)
+			// Retry connection with spinner (pod may not be ready yet)
+			spinner := NewSpinner("Waiting for agent pod to start...")
 			var conn *websocket.Conn
-			for i := 0; i < 10; i++ {
+			for i := 0; i < 30; i++ {
 				conn, _, err = websocket.DefaultDialer.Dial(wsURL, nil)
 				if err == nil {
 					break
 				}
+				spinner.SetMessage(fmt.Sprintf("Waiting for agent pod to start... (%ds)", i+1))
 				time.Sleep(1 * time.Second)
 			}
+			spinner.Stop()
 			if conn == nil {
 				fmt.Println(errorStyle.Render("Could not connect to WebSocket: " + err.Error()))
 				os.Exit(1)
@@ -628,9 +691,48 @@ func main() {
 				conn.Close()
 			}()
 
+			// Idle spinner: shows when no events are received for a while.
+			idleSpinner := (*Spinner)(nil)
+			idleMu := sync.Mutex{}
+			lastEvent := time.Now()
+
+			// Background goroutine to start/update idle spinner.
+			idleDone := make(chan struct{})
+			go func() {
+				defer close(idleDone)
+				ticker := time.NewTicker(500 * time.Millisecond)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-interrupted:
+						return
+					case <-ticker.C:
+						idleMu.Lock()
+						idle := time.Since(lastEvent)
+						s := idleSpinner
+						idleMu.Unlock()
+
+						if idle > 3*time.Second && s == nil {
+							ns := NewSpinner("Agent working...")
+							idleMu.Lock()
+							idleSpinner = ns
+							idleMu.Unlock()
+						} else if s != nil {
+							elapsed := int(idle.Seconds())
+							s.SetMessage(fmt.Sprintf("Agent working... (%ds)", elapsed))
+						}
+					}
+				}
+			}()
+
 			for {
 				_, msg, err := conn.ReadMessage()
 				if err != nil {
+					idleMu.Lock()
+					if idleSpinner != nil {
+						idleSpinner.Stop()
+					}
+					idleMu.Unlock()
 					select {
 					case <-interrupted:
 						fmt.Println()
@@ -639,6 +741,15 @@ func main() {
 					}
 					return
 				}
+
+				// Stop idle spinner when we get an event.
+				idleMu.Lock()
+				lastEvent = time.Now()
+				if idleSpinner != nil {
+					idleSpinner.Stop()
+					idleSpinner = nil
+				}
+				idleMu.Unlock()
 
 				var event AgentEvent
 				if err := json.Unmarshal(msg, &event); err != nil {

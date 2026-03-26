@@ -362,15 +362,30 @@ func main() {
 			fmt.Println(titleStyle.Render(fmt.Sprintf("  %d agent(s)  ", len(resp.Agents))))
 			fmt.Println()
 
+			// Compute dynamic column widths.
+			nameW := len("NAME")
+			modelW := len("MODEL")
+			for _, a := range resp.Agents {
+				if len(a.Name) > nameW {
+					nameW = len(a.Name)
+				}
+				if len(a.Model) > modelW {
+					modelW = len(a.Model)
+				}
+			}
+			nameW += 2  // padding
+			modelW += 2 // padding
+			totalW := nameW + 12 + 10 + modelW + 22
+
 			// Table header
 			fmt.Printf("  %s  %s  %s  %s  %s\n",
-				labelStyle.Render(fmt.Sprintf("%-20s", "NAME")),
+				labelStyle.Render(fmt.Sprintf("%-*s", nameW, "NAME")),
 				labelStyle.Render(fmt.Sprintf("%-10s", "PHASE")),
 				labelStyle.Render(fmt.Sprintf("%-8s", "TASK")),
-				labelStyle.Render(fmt.Sprintf("%-28s", "MODEL")),
+				labelStyle.Render(fmt.Sprintf("%-*s", modelW, "MODEL")),
 				labelStyle.Render(fmt.Sprintf("%-20s", "CREATED")),
 			)
-			fmt.Println(dimStyle.Render("  " + strings.Repeat("─", 95)))
+			fmt.Println(dimStyle.Render("  " + strings.Repeat("─", totalW)))
 
 			for _, a := range resp.Agents {
 				phase := a.Status
@@ -398,10 +413,10 @@ func main() {
 				}
 
 				fmt.Printf("  %s  %s  %s  %s  %s\n",
-					valueStyle.Render(fmt.Sprintf("%-20s", a.Name)),
+					valueStyle.Render(fmt.Sprintf("%-*s", nameW, a.Name)),
 					phase,
 					task,
-					dimStyle.Render(fmt.Sprintf("%-28s", a.Model)),
+					dimStyle.Render(fmt.Sprintf("%-*s", modelW, a.Model)),
 					dimStyle.Render(fmt.Sprintf("%-20s", a.CreatedAt)),
 				)
 			}

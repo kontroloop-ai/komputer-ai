@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	komputerv1alpha1 "github.com/komputer-ai/komputer-operator/api/v1alpha1"
@@ -30,11 +31,13 @@ type AgentListResponse struct {
 	Agents []AgentResponse `json:"agents"`
 }
 
-func SetupRoutes(r *gin.Engine, k8s *K8sClient, hub *Hub) {
+func SetupRoutes(r *gin.Engine, k8s *K8sClient, hub *Hub, worker *RedisWorker) {
 	v1 := r.Group("/api/v1")
 	{
 		v1.POST("/agents", createOrTriggerAgent(k8s))
 		v1.GET("/agents", listAgents(k8s))
+		v1.GET("/agents/:name", getAgent(k8s))
+		v1.GET("/agents/:name/events", getAgentEvents(worker))
 		v1.DELETE("/agents/:name", deleteAgent(k8s))
 		v1.POST("/agents/:name/cancel", cancelAgentTask(k8s))
 		v1.GET("/agents/:name/ws", HandleAgentWS(hub))
@@ -155,6 +158,51 @@ func cancelAgentTask(k8s *K8sClient) gin.HandlerFunc {
 
 		log.Printf("cancelled task on agent %s", name)
 		c.JSON(http.StatusOK, gin.H{"status": "cancelling", "name": name})
+	}
+}
+
+func getAgent(k8s *K8sClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		name := c.Param("name")
+		agent, err := k8s.GetAgent(c.Request.Context(), name)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				c.JSON(http.StatusNotFound, gin.H{"error": "agent not found"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, AgentResponse{
+			Name:            agent.Name,
+			Namespace:       agent.Namespace,
+			Model:           agent.Spec.Model,
+			Status:          string(agent.Status.Phase),
+			TaskStatus:      string(agent.Status.TaskStatus),
+			LastTaskMessage: agent.Status.LastTaskMessage,
+			CreatedAt:       agent.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
+		})
+	}
+}
+
+func getAgentEvents(worker *RedisWorker) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		name := c.Param("name")
+		limit := int64(50)
+		if l := c.Query("limit"); l != "" {
+			parsed, err := strconv.ParseInt(l, 10, 64)
+			if err != nil || parsed < 1 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid limit parameter"})
+				return
+			}
+			limit = parsed
+		}
+		events, err := GetAgentEvents(c.Request.Context(), worker.Rdb, name, limit, worker.StreamPrefix)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get agent events: " + err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"agent": name, "events": events})
 	}
 }
 

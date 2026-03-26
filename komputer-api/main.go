@@ -50,11 +50,10 @@ func main() {
 		DB:           0,
 		StreamPrefix: redisStreamPrefix,
 	}, k8s, hub)
-	_ = rw // available for Phase 2 event endpoint
 	log.Println("redis worker started")
 
 	r := gin.Default()
-	SetupRoutes(r, k8s, hub)
+	SetupRoutes(r, k8s, hub, rw)
 
 	srv := &http.Server{
 		Addr:    ":" + port,

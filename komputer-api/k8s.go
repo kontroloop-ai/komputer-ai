@@ -73,22 +73,8 @@ func (k *K8sClient) EnsureNamespace(ctx context.Context, ns string) error {
 		return fmt.Errorf("failed to create namespace: %w", err)
 	}
 
-	// Copy default template from defaultNamespace to new namespace
-	srcTemplate := &komputerv1alpha1.KomputerAgentTemplate{}
-	if err := k.client.Get(ctx, types.NamespacedName{Name: "default", Namespace: k.defaultNamespace}, srcTemplate); err == nil {
-		newTemplate := &komputerv1alpha1.KomputerAgentTemplate{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "default",
-				Namespace: ns,
-			},
-			Spec: *srcTemplate.Spec.DeepCopy(),
-		}
-		if createErr := k.client.Create(ctx, newTemplate); createErr != nil && !errors.IsAlreadyExists(createErr) {
-			log.Printf("warning: failed to copy default template to namespace %s: %v", ns, createErr)
-		}
-	}
-
-	// Copy secrets referenced by the template (e.g., anthropic-api-key)
+	// Copy secrets referenced by agent templates (e.g., anthropic-api-key).
+	// Templates don't need copying — the operator falls back to the default namespace.
 	for _, secretName := range []string{"anthropic-api-key", "redis-secret"} {
 		srcSecret := &corev1.Secret{}
 		if err := k.client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: k.defaultNamespace}, srcSecret); err == nil {

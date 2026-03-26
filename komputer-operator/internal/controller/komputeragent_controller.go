@@ -70,13 +70,17 @@ func (r *KomputerAgentReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		templateRef = "default"
 	}
 	template := &komputerv1alpha1.KomputerAgentTemplate{}
+	// Try the agent's namespace first, then fall back to "default" namespace (cluster-wide templates).
 	if err := r.Get(ctx, types.NamespacedName{Name: templateRef, Namespace: agent.Namespace}, template); err != nil {
-		log.Error(err, "Failed to get KomputerAgentTemplate", "templateRef", templateRef)
-		_ = r.updateStatus(ctx, agent, func(s *komputerv1alpha1.KomputerAgentStatus) {
-			s.Phase = komputerv1alpha1.AgentPhasePending
-			s.Message = fmt.Sprintf("Template %q not found", templateRef)
-		})
-		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+		fallbackErr := r.Get(ctx, types.NamespacedName{Name: templateRef, Namespace: "default"}, template)
+		if fallbackErr != nil {
+			log.Error(err, "Failed to get KomputerAgentTemplate", "templateRef", templateRef, "triedNamespaces", []string{agent.Namespace, "default"})
+			_ = r.updateStatus(ctx, agent, func(s *komputerv1alpha1.KomputerAgentStatus) {
+				s.Phase = komputerv1alpha1.AgentPhasePending
+				s.Message = fmt.Sprintf("Template %q not found in namespace %q or default", templateRef, agent.Namespace)
+			})
+			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+		}
 	}
 
 	// 3. Auto-discover the singleton cluster-scoped KomputerRedisConfig

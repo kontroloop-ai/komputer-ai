@@ -1,8 +1,6 @@
-import asyncio
 import json
 import os
 import re
-import time
 
 import httpx
 import redis
@@ -48,35 +46,6 @@ def _field(fields: dict, key: str) -> str:
     """Extract a string field from Redis stream entry, handling bytes."""
     val = fields.get(key.encode(), fields.get(key, b""))
     return val.decode() if isinstance(val, bytes) else str(val)
-
-
-def _poll_once(pending: dict, results: dict, terminal_types: set):
-    """Non-blocking: check each pending stream for terminal events."""
-    if not pending:
-        return
-
-    # Check each stream individually using XRANGE (works even if stream is new).
-    # XREAD with block=0 can behave unexpectedly with non-existent streams.
-    for full_name, info in list(pending.items()):
-        try:
-            # Read entries starting from our last checkpoint.
-            # Use the last_id directly — XRANGE is inclusive, but we track
-            # the last processed ID so we might re-read it. We skip dupes below.
-            min_id = info["last_id"] if info["last_id"] != "0-0" else "-"
-            entries = _redis_client.xrange(info["stream_key"], min_id, "+", count=100)
-        except redis.RedisError:
-            continue
-
-        for entry_id, fields in entries:
-            info["last_id"] = entry_id.decode() if isinstance(entry_id, bytes) else entry_id
-            etype = _field(fields, "type")
-            if etype in terminal_types:
-                results[info["display_name"]] = {
-                    "status": etype,
-                    "payload": json.loads(_field(fields, "payload") or "{}"),
-                }
-                del pending[full_name]
-                break
 
 
 def _fetch_recent_events(names: list[str]) -> dict:
@@ -126,18 +95,14 @@ async def create_agent(args):
 
 @tool(
     name="wait_for_completion",
-    description="Block until one or more sub-agents finish their tasks, then return their final results and last few events. This is the PREFERRED way to wait for sub-agents — it subscribes to Redis streams directly instead of polling, saving time and tokens. Supports waiting for multiple agents at once.",
+    description="Check if one or more sub-agents have finished their tasks. Returns results for completed agents and 'pending' status for agents still working. Call this repeatedly until all agents are done. Much more efficient than calling get_agent_status for each agent individually — checks all agents in one call via Redis streams.",
     input_schema={
         "type": "object",
         "properties": {
             "names": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "List of sub-agent names to wait for (as passed to create_agent). Waits until ALL complete.",
-            },
-            "timeout_seconds": {
-                "type": "integer",
-                "description": "Max seconds to wait (default 300 = 5 minutes). Returns partial results on timeout.",
+                "description": "List of sub-agent names to check (as passed to create_agent).",
             },
         },
         "required": ["names"],
@@ -148,56 +113,50 @@ async def wait_for_completion(args):
         return _err("Redis not configured for manager tools")
 
     names = args["names"]
-    timeout_seconds = args.get("timeout_seconds", 300)
-    deadline = time.time() + timeout_seconds
+    terminal_types = {"task_completed", "error", "task_cancelled"}
+    results = {}
+    still_pending = []
 
-    # Build stream keys and track which agents are still pending.
-    pending = {}
     for name in names:
         full_name = _sub_name(name)
         stream_key = f"{_stream_prefix}:{full_name}"
-        pending[full_name] = {"stream_key": stream_key, "display_name": name, "last_id": "0-0"}
+        found_terminal = False
 
-    results = {}
-    terminal_types = {"task_completed", "error", "task_cancelled"}
-
-    # First pass: check existing stream entries for already-completed agents.
-    for full_name, info in list(pending.items()):
         try:
-            entries = _redis_client.xrange(info["stream_key"], "-", "+")
-            for entry_id, fields in entries:
-                info["last_id"] = entry_id.decode() if isinstance(entry_id, bytes) else entry_id
-                if _field(fields, "type") in terminal_types:
-                    results[info["display_name"]] = {
-                        "status": _field(fields, "type"),
+            entries = _redis_client.xrange(stream_key, "-", "+")
+            for _, fields in entries:
+                etype = _field(fields, "type")
+                if etype in terminal_types:
+                    results[name] = {
+                        "status": etype,
                         "payload": json.loads(_field(fields, "payload") or "{}"),
                     }
-                    del pending[full_name]
+                    found_terminal = True
                     break
         except redis.RedisError as e:
-            results[info["display_name"]] = {"status": "error", "payload": {"error": f"Redis error: {e}"}}
-            del pending[full_name]
+            results[name] = {"status": "error", "payload": {"error": f"Redis error: {e}"}}
+            found_terminal = True
 
-    # Async polling loop: non-blocking XREAD + asyncio.sleep.
-    # We use short sleeps (2s) so the MCP server's event loop stays responsive
-    # and the stdio transport doesn't time out.
-    while pending and time.time() < deadline:
-        _poll_once(pending, results, terminal_types)
-        if not pending:
-            break
-        await asyncio.sleep(2)
+        if not found_terminal:
+            still_pending.append(name)
+            results[name] = {"status": "pending"}
 
-    # Any still pending after timeout.
-    for full_name, info in pending.items():
-        results[info["display_name"]] = {"status": "timeout", "payload": {"error": f"Agent did not complete within {timeout_seconds}s"}}
+    # Fetch recent events for completed agents.
+    completed_names = [n for n in names if n not in still_pending]
+    if completed_names:
+        recent_map = _fetch_recent_events(completed_names)
+        for name, events in recent_map.items():
+            if name in results:
+                results[name]["recent_events"] = events
 
-    # Fetch the last few events for each agent (for context).
-    recent_map = _fetch_recent_events(names)
-    for name, events in recent_map.items():
-        if name in results:
-            results[name]["recent_events"] = events
-
-    return _ok(json.dumps(results, indent=2))
+    summary = {
+        "all_complete": len(still_pending) == 0,
+        "completed": len(completed_names),
+        "pending": len(still_pending),
+        "pending_names": still_pending,
+        "results": results,
+    }
+    return _ok(json.dumps(summary, indent=2))
 
 
 @tool(

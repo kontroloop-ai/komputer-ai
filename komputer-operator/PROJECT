@@ -35,7 +35,7 @@ resources:
   controller: true
   domain: komputer.ai
   group: komputer
-  kind: KomputerRedisConfig
+  kind: KomputerConfig
   path: github.com/komputer-ai/komputer-operator/api/v1alpha1
   version: v1alpha1
 version: "3"

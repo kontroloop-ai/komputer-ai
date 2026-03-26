@@ -46,7 +46,7 @@ type KomputerAgentReconciler struct {
 // +kubebuilder:rbac:groups=komputer.komputer.ai,resources=komputeragents/finalizers,verbs=update
 // +kubebuilder:rbac:groups=komputer.komputer.ai,resources=komputeragenttemplates,verbs=get;list;watch
 // +kubebuilder:rbac:groups=komputer.komputer.ai,resources=komputeragentclustertemplates,verbs=get;list;watch
-// +kubebuilder:rbac:groups=komputer.komputer.ai,resources=komputerredisconfigs,verbs=get;list;watch
+// +kubebuilder:rbac:groups=komputer.komputer.ai,resources=komputerconfigs,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
@@ -89,13 +89,13 @@ func (r *KomputerAgentReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	}
 
-	// 3. Auto-discover the singleton cluster-scoped KomputerRedisConfig
-	redisConfig, err := r.getRedisConfig(ctx)
+	// 3. Auto-discover the singleton cluster-scoped KomputerConfig
+	komputerConfig, err := r.getConfig(ctx)
 	if err != nil {
-		log.Error(err, "Failed to get KomputerRedisConfig")
+		log.Error(err, "Failed to get KomputerConfig")
 		_ = r.updateStatus(ctx, agent, func(s *komputerv1alpha1.KomputerAgentStatus) {
 			s.Phase = komputerv1alpha1.AgentPhasePending
-			s.Message = "No KomputerRedisConfig found in the cluster"
+			s.Message = "No KomputerConfig found in the cluster"
 		})
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
@@ -109,14 +109,14 @@ func (r *KomputerAgentReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	// 5. Ensure ConfigMap exists
 	configMapName := agent.Name + "-pod-config"
-	if err := r.ensureConfigMap(ctx, agent, redisConfig, configMapName); err != nil {
+	if err := r.ensureConfigMap(ctx, agent, komputerConfig, configMapName); err != nil {
 		log.Error(err, "Failed to ensure ConfigMap")
 		return ctrl.Result{}, err
 	}
 
 	// 6. Ensure Pod exists
 	podName := agent.Name + "-pod"
-	pod, err := r.ensurePod(ctx, agent, template, pvcName, configMapName, podName)
+	pod, err := r.ensurePod(ctx, agent, template, pvcName, configMapName, podName, komputerConfig.Spec.APIURL)
 	if err != nil {
 		log.Error(err, "Failed to ensure Pod")
 		return ctrl.Result{}, err
@@ -131,14 +131,14 @@ func (r *KomputerAgentReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	return ctrl.Result{}, nil
 }
 
-// getRedisConfig lists cluster-scoped KomputerRedisConfig resources and returns the first one.
-func (r *KomputerAgentReconciler) getRedisConfig(ctx context.Context) (*komputerv1alpha1.KomputerRedisConfig, error) {
-	list := &komputerv1alpha1.KomputerRedisConfigList{}
+// getConfig lists cluster-scoped KomputerConfig resources and returns the first one.
+func (r *KomputerAgentReconciler) getConfig(ctx context.Context) (*komputerv1alpha1.KomputerConfig, error) {
+	list := &komputerv1alpha1.KomputerConfigList{}
 	if err := r.List(ctx, list); err != nil {
 		return nil, err
 	}
 	if len(list.Items) == 0 {
-		return nil, fmt.Errorf("no KomputerRedisConfig found in the cluster")
+		return nil, fmt.Errorf("no KomputerConfig found in the cluster")
 	}
 	return &list.Items[0], nil
 }
@@ -195,7 +195,7 @@ func (r *KomputerAgentReconciler) ensurePVC(ctx context.Context, agent *komputer
 }
 
 // ensureConfigMap creates a ConfigMap with config.json containing redis config.
-func (r *KomputerAgentReconciler) ensureConfigMap(ctx context.Context, agent *komputerv1alpha1.KomputerAgent, redisConfig *komputerv1alpha1.KomputerRedisConfig, configMapName string) error {
+func (r *KomputerAgentReconciler) ensureConfigMap(ctx context.Context, agent *komputerv1alpha1.KomputerAgent, config *komputerv1alpha1.KomputerConfig, configMapName string) error {
 	cm := &corev1.ConfigMap{}
 	err := r.Get(ctx, types.NamespacedName{Name: configMapName, Namespace: agent.Namespace}, cm)
 	if err == nil {
@@ -205,30 +205,32 @@ func (r *KomputerAgentReconciler) ensureConfigMap(ctx context.Context, agent *ko
 		return err
 	}
 
+	redis := config.Spec.Redis
+
 	// Resolve the Redis password from a Kubernetes Secret if configured.
 	password := ""
-	if redisConfig.Spec.PasswordSecret != nil {
+	if redis.PasswordSecret != nil {
 		secret := &corev1.Secret{}
 		if err := r.Get(ctx, types.NamespacedName{
-			Name:      redisConfig.Spec.PasswordSecret.Name,
+			Name:      redis.PasswordSecret.Name,
 			Namespace: agent.Namespace,
 		}, secret); err != nil {
-			return fmt.Errorf("failed to get redis password secret %q: %w", redisConfig.Spec.PasswordSecret.Name, err)
+			return fmt.Errorf("failed to get redis password secret %q: %w", redis.PasswordSecret.Name, err)
 		}
-		if val, ok := secret.Data[redisConfig.Spec.PasswordSecret.Key]; ok {
+		if val, ok := secret.Data[redis.PasswordSecret.Key]; ok {
 			password = string(val)
 		} else {
-			return fmt.Errorf("key %q not found in secret %q", redisConfig.Spec.PasswordSecret.Key, redisConfig.Spec.PasswordSecret.Name)
+			return fmt.Errorf("key %q not found in secret %q", redis.PasswordSecret.Key, redis.PasswordSecret.Name)
 		}
 	}
 
 	// Build config.json content
 	configData := map[string]interface{}{
 		"redis": map[string]interface{}{
-			"address":       redisConfig.Spec.Address,
+			"address":       redis.Address,
 			"password":      password,
-			"db":            redisConfig.Spec.DB,
-			"stream_prefix": redisConfig.Spec.Queue,
+			"db":            redis.DB,
+			"stream_prefix": redis.StreamPrefix,
 		},
 	}
 
@@ -259,7 +261,7 @@ func (r *KomputerAgentReconciler) ensureConfigMap(ctx context.Context, agent *ko
 
 // ensurePod creates a Pod if it does not exist, or deletes it if it is in a terminal state
 // and the agent status has already been persisted as terminal (two-phase deletion).
-func (r *KomputerAgentReconciler) ensurePod(ctx context.Context, agent *komputerv1alpha1.KomputerAgent, template *komputerv1alpha1.KomputerAgentTemplate, pvcName, configMapName, podName string) (*corev1.Pod, error) {
+func (r *KomputerAgentReconciler) ensurePod(ctx context.Context, agent *komputerv1alpha1.KomputerAgent, template *komputerv1alpha1.KomputerAgentTemplate, pvcName, configMapName, podName, apiURL string) (*corev1.Pod, error) {
 	pod := &corev1.Pod{}
 	err := r.Get(ctx, types.NamespacedName{Name: podName, Namespace: agent.Namespace}, pod)
 	if err == nil {
@@ -287,7 +289,7 @@ func (r *KomputerAgentReconciler) ensurePod(ctx context.Context, agent *komputer
 	}
 
 	// Build and create the pod
-	pod, err = r.buildPod(agent, template, pvcName, configMapName, podName)
+	pod, err = r.buildPod(agent, template, pvcName, configMapName, podName, apiURL)
 	if err != nil {
 		return nil, err
 	}
@@ -304,7 +306,7 @@ func (r *KomputerAgentReconciler) ensurePod(ctx context.Context, agent *komputer
 }
 
 // buildPod deep copies the template PodSpec and injects env/volumes/mounts.
-func (r *KomputerAgentReconciler) buildPod(agent *komputerv1alpha1.KomputerAgent, template *komputerv1alpha1.KomputerAgentTemplate, pvcName, configMapName, podName string) (*corev1.Pod, error) {
+func (r *KomputerAgentReconciler) buildPod(agent *komputerv1alpha1.KomputerAgent, template *komputerv1alpha1.KomputerAgentTemplate, pvcName, configMapName, podName, apiURL string) (*corev1.Pod, error) {
 	podSpec := *template.Spec.PodSpec.DeepCopy()
 
 	if len(podSpec.Containers) == 0 {
@@ -350,7 +352,7 @@ func (r *KomputerAgentReconciler) buildPod(agent *komputerv1alpha1.KomputerAgent
 	if agent.Spec.Role == "manager" {
 		envVars = append(envVars,
 			corev1.EnvVar{Name: "KOMPUTER_ROLE", Value: agent.Spec.Role},
-			corev1.EnvVar{Name: "KOMPUTER_API_URL", Value: "http://komputer-api.default.svc.cluster.local:8080"},
+			corev1.EnvVar{Name: "KOMPUTER_API_URL", Value: apiURL},
 		)
 	}
 	container.Env = append(container.Env, envVars...)

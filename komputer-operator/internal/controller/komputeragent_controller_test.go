@@ -66,20 +66,23 @@ var _ = Describe("KomputerAgent Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 		}
 
-		// Create KomputerRedisConfig "default" (cluster-scoped)
-		redisConfig := &komputerv1alpha1.KomputerRedisConfig{
+		// Create KomputerConfig "default" (cluster-scoped)
+		komputerConfig := &komputerv1alpha1.KomputerConfig{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "default",
 			},
-			Spec: komputerv1alpha1.KomputerRedisConfigSpec{
-				Address: "redis:6379",
-				DB:      0,
-				Queue:   "komputer-events",
+			Spec: komputerv1alpha1.KomputerConfigSpec{
+				Redis: komputerv1alpha1.RedisSpec{
+					Address:      "redis:6379",
+					DB:           0,
+					StreamPrefix: "komputer-events",
+				},
+				APIURL: "http://komputer-api.default.svc.cluster.local:8080",
 			},
 		}
-		err = k8sClient.Get(ctx, types.NamespacedName{Name: "default"}, &komputerv1alpha1.KomputerRedisConfig{})
+		err = k8sClient.Get(ctx, types.NamespacedName{Name: "default"}, &komputerv1alpha1.KomputerConfig{})
 		if apierrors.IsNotFound(err) {
-			Expect(k8sClient.Create(ctx, redisConfig)).To(Succeed())
+			Expect(k8sClient.Create(ctx, komputerConfig)).To(Succeed())
 		} else {
 			Expect(err).NotTo(HaveOccurred())
 		}

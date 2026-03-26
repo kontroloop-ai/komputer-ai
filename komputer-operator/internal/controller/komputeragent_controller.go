@@ -72,20 +72,22 @@ func (r *KomputerAgentReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	template := &komputerv1alpha1.KomputerAgentTemplate{}
 	if err := r.Get(ctx, types.NamespacedName{Name: templateRef, Namespace: agent.Namespace}, template); err != nil {
 		log.Error(err, "Failed to get KomputerAgentTemplate", "templateRef", templateRef)
-		return ctrl.Result{}, r.updateStatus(ctx, agent, func(s *komputerv1alpha1.KomputerAgentStatus) {
+		_ = r.updateStatus(ctx, agent, func(s *komputerv1alpha1.KomputerAgentStatus) {
 			s.Phase = komputerv1alpha1.AgentPhasePending
 			s.Message = fmt.Sprintf("Template %q not found", templateRef)
 		})
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
 	// 3. Auto-discover the singleton cluster-scoped KomputerRedisConfig
 	redisConfig, err := r.getRedisConfig(ctx)
 	if err != nil {
 		log.Error(err, "Failed to get KomputerRedisConfig")
-		return ctrl.Result{RequeueAfter: 10 * time.Second}, r.updateStatus(ctx, agent, func(s *komputerv1alpha1.KomputerAgentStatus) {
+		_ = r.updateStatus(ctx, agent, func(s *komputerv1alpha1.KomputerAgentStatus) {
 			s.Phase = komputerv1alpha1.AgentPhasePending
 			s.Message = "No KomputerRedisConfig found in the cluster"
 		})
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
 	// 4. Ensure PVC exists

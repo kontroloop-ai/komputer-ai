@@ -19,13 +19,15 @@ You have these tools available via the "komputer" MCP server:
 1. Create sub-agents with clear, self-contained instructions
 2. Sub-agents take 30-60s to start and typically a few minutes to complete
 3. Call wait_for_completion with all agent names — if not all are done, use Bash to sleep 30 seconds and call it again
-4. Once all_complete is true, synthesize results into a final response
-5. MANDATORY: Delete every sub-agent you created by calling delete_agent for each one. Sub-agents consume cluster resources (pods, PVCs) — you MUST clean them up.
+4. Once all_complete is true, call get_agent_events for each agent to fetch its results
+5. Synthesize results into a final response
+6. MANDATORY: Delete every sub-agent you created by calling delete_agent for each one. Sub-agents consume cluster resources (pods, PVCs) — you MUST clean them up.
 
-Example wait loop:
+Example:
 - Call wait_for_completion(names=["agent1", "agent2"])
 - If all_complete is false, run: bash sleep 30, then call wait_for_completion again
-- Repeat until all_complete is true
+- Once all_complete is true, call get_agent_events(name="agent1") and get_agent_events(name="agent2")
+- Synthesize, then delete_agent for each
 
 ## Cleanup (REQUIRED)
 After you have collected all results and synthesized your response, you MUST delete every sub-agent you created:

@@ -48,24 +48,6 @@ def _field(fields: dict, key: str) -> str:
     return val.decode() if isinstance(val, bytes) else str(val)
 
 
-def _fetch_recent_events(names: list[str]) -> dict:
-    """Fetch the last few events for each agent."""
-    recent_map = {}
-    for name in names:
-        full_name = _sanitize_name(name)
-        stream_key = f"{_stream_prefix}:{full_name}"
-        try:
-            recent = _redis_client.xrevrange(stream_key, "+", "-", count=5)
-            recent_events = []
-            for _, fields in reversed(recent):
-                recent_events.append({
-                    "type": _field(fields, "type"),
-                    "payload": json.loads(_field(fields, "payload") or "{}"),
-                })
-            recent_map[name] = recent_events
-        except redis.RedisError:
-            pass
-    return recent_map
 
 
 @tool(
@@ -95,7 +77,7 @@ async def create_agent(args):
 
 @tool(
     name="wait_for_completion",
-    description="Check if one or more sub-agents have finished their tasks. Returns results for completed agents and 'pending' status for agents still working. Call this repeatedly until all agents are done. Much more efficient than calling get_agent_status for each agent individually — checks all agents in one call via Redis streams.",
+    description="Check if one or more sub-agents have finished. Returns completion status only (no payload). Once all_complete is true, use get_agent_events to fetch each agent's results. Call repeatedly with 'bash sleep 30' between calls until all_complete is true.",
     input_schema={
         "type": "object",
         "properties": {
@@ -127,31 +109,22 @@ async def wait_for_completion(args):
             for _, fields in entries:
                 etype = _field(fields, "type")
                 if etype in terminal_types:
-                    results[name] = {
-                        "status": etype,
-                        "payload": json.loads(_field(fields, "payload") or "{}"),
-                    }
+                    results[name] = {"status": etype}
                     found_terminal = True
                     break
         except redis.RedisError as e:
-            results[name] = {"status": "error", "payload": {"error": f"Redis error: {e}"}}
+            results[name] = {"status": "error", "error": f"Redis error: {e}"}
             found_terminal = True
 
         if not found_terminal:
             still_pending.append(name)
             results[name] = {"status": "pending"}
 
-    # Fetch recent events for completed agents.
-    completed_names = [n for n in names if n not in still_pending]
-    if completed_names:
-        recent_map = _fetch_recent_events(completed_names)
-        for name, events in recent_map.items():
-            if name in results:
-                results[name]["recent_events"] = events
+    completed_count = len(names) - len(still_pending)
 
     summary = {
         "all_complete": len(still_pending) == 0,
-        "completed": len(completed_names),
+        "completed": completed_count,
         "pending": len(still_pending),
         "pending_names": still_pending,
         "results": results,

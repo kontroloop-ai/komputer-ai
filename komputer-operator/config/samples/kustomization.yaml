@@ -1,0 +1,6 @@
+## Append samples of your project ##
+resources:
+- komputer_v1alpha1_komputeragent.yaml
+- komputer_v1alpha1_komputeragenttemplate.yaml
+- komputer_v1alpha1_komputerredisconfig.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

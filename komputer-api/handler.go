@@ -121,6 +121,11 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 			instructions = managerSystemPrompt + "\n---\n\n## Your Task\n" + req.Instructions
 		}
 
+		if err := k8s.EnsureNamespace(c.Request.Context(), ns); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to ensure namespace: " + err.Error()})
+			return
+		}
+
 		agent, err := k8s.CreateAgent(c.Request.Context(), ns, req.Name, instructions, req.Model, req.TemplateRef, role)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create agent: " + err.Error()})

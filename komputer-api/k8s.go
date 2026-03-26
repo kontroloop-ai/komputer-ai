@@ -12,6 +12,7 @@ import (
 
 	komputerv1alpha1 "github.com/komputer-ai/komputer-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -44,6 +45,30 @@ func NewK8sClient(defaultNamespace string) (*K8sClient, error) {
 	}
 
 	return &K8sClient{client: c, defaultNamespace: defaultNamespace}, nil
+}
+
+// EnsureNamespace creates the namespace if it doesn't exist.
+func (k *K8sClient) EnsureNamespace(ctx context.Context, ns string) error {
+	namespace := &corev1.Namespace{}
+	err := k.client.Get(ctx, types.NamespacedName{Name: ns}, namespace)
+	if err == nil {
+		return nil // already exists
+	}
+	if !errors.IsNotFound(err) {
+		return fmt.Errorf("failed to check namespace: %w", err)
+	}
+	namespace = &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: ns,
+			Labels: map[string]string{
+				"komputer.ai/managed": "true",
+			},
+		},
+	}
+	if err := k.client.Create(ctx, namespace); err != nil {
+		return fmt.Errorf("failed to create namespace: %w", err)
+	}
+	return nil
 }
 
 func (k *K8sClient) CreateAgent(ctx context.Context, ns, name, instructions, model, templateRef, role string) (*komputerv1alpha1.KomputerAgent, error) {

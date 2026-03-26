@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -36,21 +37,30 @@ func StartRedisWorker(ctx context.Context, cfg RedisWorkerConfig, k8s *K8sClient
 		log.Printf("redis worker started, consuming from queue %q at %s", cfg.Queue, cfg.Address)
 
 		for {
-			select {
-			case <-ctx.Done():
+			if ctx.Err() != nil {
 				log.Println("redis worker shutting down")
 				rdb.Close()
 				return
-			default:
 			}
 
 			result, err := rdb.BLPop(ctx, 5*time.Second, cfg.Queue).Result()
 			if err != nil {
-				if err == redis.Nil || err == context.Canceled {
+				if errors.Is(err, redis.Nil) {
 					continue
 				}
+				if ctx.Err() != nil {
+					log.Println("redis worker shutting down")
+					rdb.Close()
+					return
+				}
 				log.Printf("redis worker error: %v", err)
-				time.Sleep(1 * time.Second)
+				select {
+				case <-ctx.Done():
+					log.Println("redis worker shutting down")
+					rdb.Close()
+					return
+				case <-time.After(1 * time.Second):
+				}
 				continue
 			}
 

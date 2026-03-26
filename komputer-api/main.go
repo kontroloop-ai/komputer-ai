@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -53,16 +55,25 @@ func main() {
 	r := gin.Default()
 	SetupRoutes(r, k8s, hub)
 
+	srv := &http.Server{
+		Addr:    ":" + port,
+		Handler: r,
+	}
+
 	go func() {
 		sigCh := make(chan os.Signal, 1)
 		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 		<-sigCh
 		log.Println("shutting down...")
 		cancel()
+
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer shutdownCancel()
+		srv.Shutdown(shutdownCtx)
 	}()
 
 	log.Printf("listening on :%s", port)
-	if err := r.Run(":" + port); err != nil {
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("server error: %v", err)
 	}
 }

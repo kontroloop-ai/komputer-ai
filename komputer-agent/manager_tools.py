@@ -14,16 +14,12 @@ _redis_client: redis.Redis | None = None
 _stream_prefix: str = "komputer-events"
 
 
-def _sub_name(name: str) -> str:
-    """Prefix sub-agent name with manager name, sanitized for K8s.
-    If the name already starts with the manager prefix, return it as-is."""
-    prefix = f"{AGENT_NAME}-sub-"
-    if name.startswith(prefix):
-        return name
-    sanitized = re.sub(r'[^a-z0-9-]', '', name.lower())[:50]
+def _sanitize_name(name: str) -> str:
+    """Sanitize agent name for K8s resource naming."""
+    sanitized = re.sub(r'[^a-z0-9-]', '', name.lower())[:63]
     if not sanitized:
-        raise ValueError(f"Invalid sub-agent name: {name}")
-    return f"{prefix}{sanitized}"
+        raise ValueError(f"Invalid agent name: {name}")
+    return sanitized
 
 
 def _ok(text: str) -> dict:
@@ -56,7 +52,7 @@ def _fetch_recent_events(names: list[str]) -> dict:
     """Fetch the last few events for each agent."""
     recent_map = {}
     for name in names:
-        full_name = _sub_name(name)
+        full_name = _sanitize_name(name)
         stream_key = f"{_stream_prefix}:{full_name}"
         try:
             recent = _redis_client.xrevrange(stream_key, "+", "-", count=5)
@@ -78,7 +74,7 @@ def _fetch_recent_events(names: list[str]) -> dict:
     input_schema={
         "type": "object",
         "properties": {
-            "name": {"type": "string", "description": "Short descriptive name for the sub-agent (e.g. 'researcher', 'writer')"},
+            "name": {"type": "string", "description": "Unique name for the sub-agent (e.g. 'bitcoin-researcher', 'weather-agent'). Use lowercase with hyphens, no spaces. This exact name is used for all subsequent operations (wait, status, delete)."},
             "instructions": {"type": "string", "description": "Detailed task instructions for the sub-agent"},
             "model": {"type": "string", "description": "Claude model to use (optional, defaults to claude-sonnet)"},
         },
@@ -86,7 +82,7 @@ def _fetch_recent_events(names: list[str]) -> dict:
     },
 )
 async def create_agent(args):
-    full_name = _sub_name(args["name"])
+    full_name = _sanitize_name(args["name"])
     payload = {
         "name": full_name,
         "instructions": args["instructions"],
@@ -122,7 +118,7 @@ async def wait_for_completion(args):
     still_pending = []
 
     for name in names:
-        full_name = _sub_name(name)
+        full_name = _sanitize_name(name)
         stream_key = f"{_stream_prefix}:{full_name}"
         found_terminal = False
 
@@ -175,7 +171,7 @@ async def wait_for_completion(args):
     },
 )
 async def get_agent_status(args):
-    full_name = _sub_name(args["name"])
+    full_name = _sanitize_name(args["name"])
     return await _request("GET", f"/api/v1/agents/{full_name}")
 
 
@@ -192,7 +188,7 @@ async def get_agent_status(args):
     },
 )
 async def get_agent_events(args):
-    full_name = _sub_name(args["name"])
+    full_name = _sanitize_name(args["name"])
     limit = args.get("limit", 5)
     return await _request("GET", f"/api/v1/agents/{full_name}/events", params={"limit": limit})
 
@@ -209,7 +205,7 @@ async def get_agent_events(args):
     },
 )
 async def delete_agent(args):
-    full_name = _sub_name(args["name"])
+    full_name = _sanitize_name(args["name"])
     return await _request("DELETE", f"/api/v1/agents/{full_name}")
 
 

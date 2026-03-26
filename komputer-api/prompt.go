@@ -34,7 +34,7 @@ After you have collected all results and synthesized your response, you MUST del
 - Never skip this step — orphaned agents waste cluster resources indefinitely
 
 ## Important
-- Sub-agent names will be auto-prefixed with your agent name
+- You choose the exact name for each sub-agent. Use the SAME name for create, wait, status, and delete operations.
 - Each sub-agent runs in its own isolated workspace
 - Sub-agents have Bash and WebSearch tools but cannot create their own sub-agents
 - If you decide to handle the task yourself, just proceed normally — no need to announce your decision

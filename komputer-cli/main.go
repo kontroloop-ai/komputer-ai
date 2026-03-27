@@ -521,7 +521,7 @@ func main() {
 				os.Exit(1)
 			}
 
-			if status != 200 && status != 201 {
+			if status != 200 && status != 201 && status != 202 {
 				fmt.Println(errorStyle.Render(fmt.Sprintf("API error (%d): %s", status, string(data))))
 				os.Exit(1)
 			}
@@ -531,6 +531,8 @@ func main() {
 
 			if status == 201 {
 				fmt.Println(successStyle.Render("✔ Agent created"))
+			} else if status == 202 {
+				fmt.Println(successStyle.Render("✔ Waking sleeping agent"))
 			} else {
 				fmt.Println(successStyle.Render("✔ Task sent to existing agent"))
 			}
@@ -793,7 +795,7 @@ func main() {
 				fmt.Println(warnStyle.Render("⚠ " + errResp.Error))
 				os.Exit(1)
 			}
-			if status != 200 && status != 201 {
+			if status != 200 && status != 201 && status != 202 {
 				fmt.Println(errorStyle.Render(fmt.Sprintf("API error (%d): %s", status, string(data))))
 				os.Exit(1)
 			}
@@ -803,6 +805,8 @@ func main() {
 
 			if status == 201 {
 				fmt.Println(successStyle.Render("✔ Agent created"))
+			} else if status == 202 {
+				fmt.Println(successStyle.Render("✔ Waking sleeping agent"))
 			} else {
 				fmt.Println(successStyle.Render("✔ Task sent"))
 			}

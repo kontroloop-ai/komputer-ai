@@ -75,13 +75,16 @@ async def run_agent(instructions: str, model: str, publisher):
     if session_id:
         options.resume = session_id
 
+    from prompts import build_prompt
+    full_prompt = build_prompt(instructions)
+
     result = None
 
     async with ClaudeSDKClient(options=options) as client:
         # Register the client so signal handlers can interrupt it.
         state.set_active_client(client)
 
-        await client.query(instructions)
+        await client.query(full_prompt)
 
         async for message in client.receive_response():
             if isinstance(message, AssistantMessage):

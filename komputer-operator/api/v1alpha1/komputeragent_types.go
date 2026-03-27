@@ -34,8 +34,8 @@ const (
 type AgentTaskStatus string
 
 const (
-	AgentTaskIdle  AgentTaskStatus = "Idle"
-	AgentTaskBusy  AgentTaskStatus = "Busy"
+	AgentTaskComplete   AgentTaskStatus = "Complete"
+	AgentTaskInProgress AgentTaskStatus = "InProgress"
 	AgentTaskError AgentTaskStatus = "Error"
 )
 

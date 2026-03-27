@@ -291,22 +291,22 @@ func ListAgentStreams(ctx context.Context, rdb *redis.Client, streamPrefix strin
 func mapEventToTaskStatus(event AgentEvent) (taskStatus string, lastMessage string) {
 	switch event.Type {
 	case "task_started":
-		return "Busy", "Task started"
+		return "InProgress", "Task started"
 	case "text":
 		content, _ := event.Payload["content"].(string)
-		return "Busy", truncate(content, 256)
+		return "InProgress", truncate(content, 256)
 	case "thinking":
-		return "Busy", "Thinking..."
+		return "InProgress", "Thinking..."
 	case "tool_call":
 		tool, _ := event.Payload["tool"].(string)
-		return "Busy", truncate(fmt.Sprintf("Calling %s", tool), 256)
+		return "InProgress", truncate(fmt.Sprintf("Calling %s", tool), 256)
 	case "tool_result":
 		tool, _ := event.Payload["tool"].(string)
-		return "Busy", truncate(fmt.Sprintf("Got result from %s", tool), 256)
+		return "InProgress", truncate(fmt.Sprintf("Got result from %s", tool), 256)
 	case "task_completed":
-		return "Idle", "Task completed"
+		return "Complete", "Task completed"
 	case "task_cancelled":
-		return "Idle", "Task cancelled"
+		return "Complete", "Task cancelled"
 	case "error":
 		errMsg, _ := event.Payload["error"].(string)
 		return "Error", truncate(fmt.Sprintf("Error: %s", errMsg), 256)

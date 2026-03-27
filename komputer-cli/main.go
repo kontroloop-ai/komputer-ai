@@ -191,10 +191,10 @@ func printAgent(a AgentResponse) {
 
 	taskBadge := dimStyle.Render("—")
 	switch a.TaskStatus {
-	case "Busy":
-		taskBadge = busyStyle.Render("● Busy")
-	case "Idle":
-		taskBadge = idleStyle.Render("○ Idle")
+	case "InProgress":
+		taskBadge = busyStyle.Render("● In Progress")
+	case "Complete":
+		taskBadge = idleStyle.Render("✔ Complete")
 	case "Error":
 		taskBadge = errorStyle.Render("✗ Error")
 	}
@@ -430,10 +430,10 @@ func main() {
 
 				task := a.TaskStatus
 				switch task {
-				case "Busy":
-					task = busyStyle.Render(fmt.Sprintf("%-8s", "● Busy"))
-				case "Idle":
-					task = idleStyle.Render(fmt.Sprintf("%-8s", "○ Idle"))
+				case "InProgress":
+					task = busyStyle.Render(fmt.Sprintf("%-8s", "● In Progress"))
+				case "Complete":
+					task = idleStyle.Render(fmt.Sprintf("%-8s", "✔ Complete"))
 				case "Error":
 					task = errorStyle.Render(fmt.Sprintf("%-8s", "✗ Error"))
 				default:

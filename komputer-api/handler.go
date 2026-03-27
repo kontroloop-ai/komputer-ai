@@ -79,7 +79,7 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 				return
 			}
 
-			if existing.Status.TaskStatus == komputerv1alpha1.AgentTaskBusy {
+			if existing.Status.TaskStatus == komputerv1alpha1.AgentTaskInProgress {
 				c.JSON(http.StatusConflict, gin.H{"error": "agent is busy with another task"})
 				return
 			}

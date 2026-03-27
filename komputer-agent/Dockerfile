@@ -1,8 +1,9 @@
 FROM python:3.12-slim
 
-# Install Node.js (required for Claude Code CLI)
+# Install system dependencies
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl ca-certificates && \
+    apt-get install -y --no-install-recommends \
+      curl ca-certificates git jq unzip sudo && \
     curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -17,8 +18,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Run as non-root user (required by Claude CLI for --dangerously-skip-permissions)
-RUN useradd -m -s /bin/bash komputer && mkdir -p /workspace && chown komputer:komputer /workspace
+# Create non-root user with passwordless sudo access.
+# Non-root is required by Claude CLI for --dangerously-skip-permissions.
+# Sudo allows agents to install packages at runtime (apt-get, pip, npm).
+RUN useradd -m -s /bin/bash komputer && \
+    echo "komputer ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
+    mkdir -p /workspace && chown komputer:komputer /workspace
 USER komputer
 
 WORKDIR /workspace

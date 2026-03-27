@@ -1,4 +1,4 @@
-apiVersion: komputer.komputer.ai/v1
+apiVersion: komputer.komputer.ai/v1alpha1
 kind: KomputerAgentClusterTemplate
 metadata:
   name: default

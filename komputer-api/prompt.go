@@ -13,6 +13,13 @@ If you need credentials to complete your task (API keys, tokens, passwords):
 2. Use the matching secret value directly — do not print or log it
 3. If no matching secret is found, report what credential you need in your response
 
+## Installing Packages
+You can install packages — they persist across tasks on this agent:
+- Python: pip install <package> (installs to /workspace/.local)
+- Node.js: npm install -g <package> (installs to /workspace/.npm-global)
+- System: sudo apt-get install -y <package>
+- All pip and npm installs are saved to the persistent workspace automatically
+
 ## Git Operations
 If your task involves git operations on a private repo:
 - Use SECRET_GITHUB (or the relevant token) in the clone URL: git clone https://{token}@github.com/owner/repo.git

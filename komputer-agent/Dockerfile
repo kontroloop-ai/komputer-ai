@@ -28,5 +28,14 @@ USER komputer
 
 WORKDIR /workspace
 
-ENV PYTHONUNBUFFERED=1
+# Route package installs to the persistent workspace so they survive pod restarts.
+# pip: installs to /workspace/.local (via --user default)
+# npm: global installs to /workspace/.npm-global
+# PATH: includes both so installed binaries are found
+ENV PYTHONUNBUFFERED=1 \
+    PIP_USER=1 \
+    PYTHONUSERBASE=/workspace/.local \
+    NPM_CONFIG_PREFIX=/workspace/.npm-global \
+    PATH="/workspace/.local/bin:/workspace/.npm-global/bin:${PATH}"
+
 ENTRYPOINT ["python", "/app/main.py"]

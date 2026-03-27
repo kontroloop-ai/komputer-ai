@@ -39,7 +39,7 @@ If you need to store agent activity — for audit logs, user-facing chat history
 
 ### Your system owns the user experience
 
-komputer.ai has no UI. Your wrapper application provides the interface — whether that's a web dashboard, a Slack bot, a CLI, or an API for other services. komputer.ai provides the raw agent infrastructure; you shape it into a product.
+komputer.ai ships with a CLI ([komputer-cli](../komputer-cli/README.md)) for direct interaction with the API, but it has no authentication and no graphical UI (though both may come in the future). For production use, your wrapper application provides the user-facing interface — whether that's a web dashboard, a Slack bot, or an API for other services. komputer.ai provides the raw agent infrastructure; you shape it into a product.
 
 ## Base URL
 
@@ -90,7 +90,7 @@ Content-Type: application/json
 
 **Behavior:**
 - If the agent doesn't exist, it is created and starts working immediately
-- If the agent exists and is idle, the new task is forwarded to it
+- If the agent exists and is idle, the new task is assigned to it
 - If the agent exists and is busy, returns `409 Conflict`
 
 **Response (201 Created):**
@@ -169,7 +169,7 @@ Gracefully cancels the running task. The agent pod stays alive for future tasks.
 DELETE /api/v1/agents/:name?namespace=production
 ```
 
-Deletes the agent CR, which triggers the operator to clean up the pod, PVC, and ConfigMap.
+Deletes the agent CR, which triggers the operator to clean up the pod, PVC, Secrets and ConfigMap.
 
 ---
 

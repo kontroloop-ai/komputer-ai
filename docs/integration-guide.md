@@ -150,7 +150,7 @@ Returns the most recent events from the agent's Redis stream. `limit` defaults t
   "events": [
     {"agentName": "my-agent", "type": "task_started", "timestamp": "...", "payload": {"instructions": "..."}},
     {"agentName": "my-agent", "type": "text", "timestamp": "...", "payload": {"content": "Here is the report..."}},
-    {"agentName": "my-agent", "type": "task_completed", "timestamp": "...", "payload": {"result": "...", "cost_usd": 0.12, "duration_ms": 45000, "turns": 3}}
+    {"agentName": "my-agent", "type": "task_completed", "timestamp": "...", "payload": {"result": "...", "cost_usd": 0.12, "duration_ms": 45000, "turns": 3, "stop_reason": "end_turn", "session_id": "sess_01abc..."}}
   ]
 }
 ```
@@ -201,9 +201,64 @@ The connection stays open until you disconnect. Events arrive as JSON lines:
 | `tool_call` | Tool invocation (Bash, WebSearch, etc.) | `id`, `tool`, `input` |
 | `tool_result` | Tool execution output | `tool`, `output` |
 | `text` | Claude's text response | `content` |
-| `task_completed` | Task finished successfully | `result`, `cost_usd`, `duration_ms`, `turns` |
+| `task_completed` | Task finished successfully | `result`, `cost_usd`, `duration_ms`, `turns`, `stop_reason`, `session_id` |
 | `task_cancelled` | Task was cancelled | `reason` |
 | `error` | Error occurred | `error` |
+
+### Cost and Usage Tracking
+
+Every `task_completed` event includes usage metrics that your system should collect:
+
+```json
+{
+  "type": "task_completed",
+  "payload": {
+    "result": "Here is the summary report...",
+    "cost_usd": 0.08,
+    "duration_ms": 6000,
+    "turns": 2,
+    "stop_reason": "end_turn",
+    "session_id": "sess_01abc..."
+  }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `cost_usd` | Total Anthropic API cost for this task (input + output tokens) |
+| `duration_ms` | Wall-clock time from task start to completion |
+| `turns` | Number of agent turns (a turn = one Claude request/response cycle, including tool use) |
+| `stop_reason` | Why the agent stopped (`end_turn`, `max_tokens`, etc.) |
+| `session_id` | Claude session ID — the same agent reuses this across tasks for conversation continuity |
+
+**komputer.ai does not aggregate or store these metrics.** Your system is responsible for collecting them from the WebSocket stream (or the `/events` endpoint) and building whatever analytics you need. Common use cases:
+
+- **Cost dashboards** — track spend per agent, namespace, team, or time period
+- **Budgeting and alerts** — set cost thresholds per namespace and alert when exceeded
+- **Performance tracking** — monitor task duration and turn count to detect regressions or inefficient prompts
+- **Chargeback / billing** — attribute costs to internal teams or external customers
+- **Capacity planning** — correlate agent usage patterns with cluster resource consumption
+
+A minimal collector looks like this:
+
+```python
+# Collect cost data from the WebSocket stream
+ws = websocket.WebSocket()
+ws.connect(f"ws://localhost:8080/api/v1/agents/{agent_name}/ws")
+
+for msg in ws:
+    event = json.loads(msg)
+    if event["type"] == "task_completed":
+        payload = event["payload"]
+        db.insert({
+            "agent": event["agentName"],
+            "namespace": event["namespace"],
+            "timestamp": event["timestamp"],
+            "cost_usd": payload["cost_usd"],
+            "duration_ms": payload["duration_ms"],
+            "turns": payload["turns"],
+        })
+```
 
 ---
 

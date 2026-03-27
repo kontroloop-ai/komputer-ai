@@ -1,8 +1,8 @@
 # Custom Agent Images
 
-The default agent image (`komputer-agent`) ships with Python 3.12, Node.js 22, git, curl, jq, and the Claude Code CLI. Agents can install additional packages at runtime using `sudo apt-get`, `pip`, or `npm` — and those installs persist across tasks thanks to the workspace PVC.
+The default agent image (`komputer-agent`) ships with Python 3.12, Node.js 22, git, curl, jq, and the Claude Code CLI. Agents have sudo access and can install anything at runtime — `apt-get`, `pip`, `npm`, `cargo`, `go install`, downloading binaries, compiling from source, or any other method available on a Debian-based system. Package installs via `pip` and `npm` persist across tasks thanks to the workspace PVC.
 
-However, runtime installs happen every time a new pod starts. If you need specific packages, tools, or system-level dependencies baked into the image, you should build a custom agent image.
+Only `pip` and `npm` installs are persisted to the workspace PVC. System-level installs (`apt-get`, `cargo install`, downloaded binaries outside `/workspace`, etc.) live on the container filesystem and are **lost when the pod restarts**. If your agents consistently need specific tools or system packages across tasks, you should bake them into a custom agent image rather than relying on runtime installs.
 
 ## Extending the base image (recommended)
 

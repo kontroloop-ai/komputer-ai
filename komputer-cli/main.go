@@ -256,7 +256,9 @@ func formatEvent(event AgentEvent) string {
 
 	case "text":
 		content, _ := payload["content"].(string)
-		return fmt.Sprintf("%s %s\n%s", ts, labelStyle.Render("💬 Text"), eventTextStyle.Render("  "+content))
+		// Print content without lipgloss Render — it pads every line to terminal width,
+		// causing excessive whitespace on multi-line markdown output.
+		return fmt.Sprintf("%s %s\n  %s", ts, labelStyle.Render("💬 Text"), content)
 
 	case "thinking":
 		content, _ := payload["content"].(string)
@@ -300,7 +302,7 @@ func formatEvent(event AgentEvent) string {
 
 		lines := fmt.Sprintf("%s %s\n", ts, eventCompleteStyle.Render("✔ Task Completed"))
 		if result != "" {
-			lines += eventTextStyle.Render("  "+result) + "\n"
+			lines += "  " + result + "\n"
 		}
 		lines += dimStyle.Render(fmt.Sprintf("  Cost: $%.4f  Duration: %.1fs  Turns: %.0f", cost, duration/1000, turns))
 		return lines

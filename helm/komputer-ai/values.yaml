@@ -58,9 +58,10 @@ externalRedis:
     name: ""
     key: password
 
-# -- Anthropic API key secret reference (must exist in the release namespace)
+# -- Anthropic API key secret reference (REQUIRED — must exist in the release namespace)
+# Create it first: kubectl create secret generic anthropic-api-key --from-literal=api-key=sk-ant-...
 anthropicApiKeySecret:
-  name: anthropic-api-key
+  name: ""
   key: api-key
 
 # -- KomputerConfig settings

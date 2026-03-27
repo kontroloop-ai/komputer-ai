@@ -1,0 +1,7 @@
+{{/*
+Validation checks — fail fast on missing required configuration.
+*/}}
+
+{{- if not .Values.anthropicApiKeySecret.name }}
+{{- fail "\n\nERROR: anthropicApiKeySecret.name is required.\n\nYou must create an Anthropic API key secret before installing:\n\n  kubectl create secret generic anthropic-api-key \\\n    --from-literal=api-key=sk-ant-... \\\n    -n komputer-ai\n\nThen install with:\n\n  helm install komputer-ai ... --set anthropicApiKeySecret.name=anthropic-api-key\n" }}
+{{- end }}

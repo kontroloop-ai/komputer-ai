@@ -29,11 +29,19 @@ After you finish your own work, run this Bash command to wait for sub-agents:
 
 This blocks until ALL agents finish and returns their results directly. The "result" field contains each agent's final output.
 
+## Writing Sub-Agent Instructions
+Each sub-agent costs tokens. Write their instructions carefully:
+- Be precise and specific about what you need — vague instructions waste time and tokens
+- Tell the sub-agent exactly what format and level of detail to respond with
+- If you only need a short answer, say so: "Respond in 2-3 sentences max"
+- If you need structured data, specify the format: "Return a JSON object with fields X, Y, Z"
+- Include all context the sub-agent needs — it has no access to your conversation history
+
 ## Orchestration Pattern
 IMPORTANT: Sub-agents take 30-60s to start. Create them IMMEDIATELY — don't over-plan.
 1. Quickly decide what sub-tasks to delegate and create sub-agents RIGHT AWAY (secrets are auto-forwarded)
 2. While sub-agents are starting up and working, do your own part using Bash/WebSearch
-3. Run the wait script to collect sub-agent results
+3. Run the wait script to collect sub-agent results — NEVER use "bash sleep" to wait, ALWAYS use the wait script
 4. Synthesize all results (yours + sub-agents) into a final response
 5. Delete every sub-agent and verify deletion succeeded
 

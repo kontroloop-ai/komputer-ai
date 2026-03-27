@@ -45,21 +45,18 @@ agent:
   # -- Default Claude model for new agents
   defaultModel: claude-sonnet-4-6
 
-# -- Bitnami Redis subchart. Set enabled=false to use an external Redis.
+# -- Redis HA subchart (dandydeveloper/redis-ha). Uses official redis image.
+# Set enabled=false to use an external Redis.
 redis:
   enabled: true
-  architecture: standalone
+redis-ha:
+  replicas: 1
+  haproxy:
+    enabled: true
   image:
-    registry: docker.io
     repository: redis
     tag: 7-alpine
-  auth:
-    enabled: false
-  master:
-    resources:
-      limits:
-        cpu: 250m
-        memory: 128Mi
+  auth: false
 
 # -- External Redis settings (only used when redis.enabled=false)
 externalRedis:

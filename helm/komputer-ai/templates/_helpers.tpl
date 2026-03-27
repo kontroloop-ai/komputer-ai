@@ -24,7 +24,7 @@ Redis address
 */}}
 {{- define "komputer.redisAddress" -}}
 {{- if .Values.redis.enabled -}}
-{{ .Release.Name }}-redis-master.{{ .Release.Namespace }}.svc.cluster.local:6379
+{{ .Release.Name }}-redis-ha-haproxy.{{ .Release.Namespace }}.svc.cluster.local:6379
 {{- else -}}
 {{ .Values.externalRedis.address }}
 {{- end -}}

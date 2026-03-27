@@ -17,7 +17,7 @@ keywords:
   - kubernetes
   - operator
 dependencies:
-  - name: redis
-    version: "~20.x"
-    repository: https://charts.bitnami.com/bitnami
+  - name: redis-ha
+    version: "~4.35"
+    repository: https://dandydeveloper.github.io/charts/
     condition: redis.enabled

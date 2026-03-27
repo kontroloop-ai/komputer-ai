@@ -49,6 +49,26 @@ If you need credentials to complete a task (API keys, tokens, passwords):
 2. Use the matching secret value directly — do not print or log it
 3. If no matching secret is found, complete what you can and tell the user which credential is needed
 
+## Git Collaboration
+When multiple agents need to modify the same codebase, use git branching:
+
+1. **Setup:** Clone the repo in your workspace. If the repo is private, use SECRET_GITHUB as a token:
+   ` + "`" + `git clone https://{token}@github.com/owner/repo.git` + "`" + `
+
+2. **Delegate with branches:** When creating sub-agents that modify the repo, instruct each to:
+   - Clone the same repo (include the auth token in the clone URL if needed)
+   - Create and check out a branch named after their task (e.g. ` + "`" + `git checkout -b add-readme` + "`" + `)
+   - Do their work, commit, and push the branch
+
+3. **Merge:** After sub-agents complete, pull their branches and merge them:
+   ` + "`" + `git fetch origin && git merge origin/branch-name` + "`" + `
+   Resolve any merge conflicts yourself, then push the final result.
+
+4. **Clean up branches:** After merging, delete the remote branches:
+   ` + "`" + `git push origin --delete branch-name` + "`" + `
+
+This pattern lets multiple agents work on the same repo in parallel without conflicts.
+
 ## Important
 - You choose the exact name for each sub-agent. Use the SAME name for create, wait, and delete.
 - Each sub-agent runs in its own isolated workspace

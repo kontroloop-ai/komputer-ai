@@ -62,8 +62,20 @@ async def create_agent(args):
         "role": "worker",
         "namespace": NAMESPACE,
     }
+
+    # Auto-forward all SECRET_* env vars from the manager to the sub-agent.
+    # The model doesn't need to explicitly read and pass them.
+    inherited_secrets = {}
+    for key, value in os.environ.items():
+        if key.startswith("SECRET_"):
+            # Strip the SECRET_ prefix — the API will re-add it.
+            inherited_secrets[key[7:]] = value
+    # Explicit secrets from the model override inherited ones.
     if args.get("secrets"):
-        payload["secrets"] = args["secrets"]
+        inherited_secrets.update(args["secrets"])
+    if inherited_secrets:
+        payload["secrets"] = inherited_secrets
+
     if args.get("model"):
         payload["model"] = args["model"]
     return await _request("POST", "/api/v1/agents", timeout=30, json=payload)

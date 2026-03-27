@@ -1,5 +1,11 @@
 # komputer.ai Helm chart values
 
+# -- Image pull secrets for private registries (e.g. GHCR private repos).
+# Create the secret first: kubectl create secret docker-registry ghcr-pull-secret --docker-server=ghcr.io --docker-username=<user> --docker-password=<pat> -n komputer-ai
+imagePullSecrets: []
+# imagePullSecrets:
+#   - name: ghcr-pull-secret
+
 operator:
   image:
     repository: ghcr.io/kontroloop-ai/komputer-operator

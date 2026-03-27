@@ -6,6 +6,10 @@ metadata:
     {{- include "komputer.labels" . | nindent 4 }}
 spec:
   podSpec:
+    {{- with .Values.imagePullSecrets }}
+    imagePullSecrets:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
     containers:
     - name: agent
       image: {{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag }}

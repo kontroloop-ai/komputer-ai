@@ -94,7 +94,7 @@ chmod +x komputer && sudo mv komputer /usr/local/bin/
 
 ```bash
 # Port-forward the API (or use an Ingress)
-kubectl port-forward svc/komputer-api 8080:8080 -n komputer-ai &
+kubectl port-forward svc/komputer-ai-api 8080:8080 -n komputer-ai &
 
 komputer login http://localhost:8080
 komputer run my-agent "Write a haiku about Kubernetes"

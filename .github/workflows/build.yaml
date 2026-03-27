@@ -83,7 +83,8 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
+          # platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -126,7 +127,8 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
+          # platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -169,7 +171,8 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
+          # platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -212,45 +215,46 @@ jobs:
           name: komputer-${{ matrix.goos }}-${{ matrix.goarch }}
           path: komputer-${{ matrix.goos }}-${{ matrix.goarch }}
 
-  helm:
-    name: Publish Helm Chart
-    needs: changes
-    if: needs.changes.outputs.is_tag == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Helm
-        uses: azure/setup-helm@v4
-
-      - name: Log in to GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
-
-      - name: Update chart version from tag
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          sed -i "s/^version:.*/version: ${VERSION}/" helm/komputer/Chart.yaml
-          sed -i "s/^appVersion:.*/appVersion: \"${VERSION}\"/" helm/komputer/Chart.yaml
-
-      - name: Update image tags to release version
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          sed -i "s/tag: latest/tag: v${VERSION}/" helm/komputer/values.yaml
-
-      - name: Build dependencies
-        run: helm dependency build helm/komputer
-
-      - name: Package chart
-        run: helm package helm/komputer
-
-      - name: Push to GHCR
-        run: helm push komputer-*.tgz oci://ghcr.io/${{ github.repository_owner }}/charts
+  # TODO: Uncomment when ready to publish Helm chart
+  # helm:
+  #   name: Publish Helm Chart
+  #   needs: changes
+  #   if: needs.changes.outputs.is_tag == 'true'
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     packages: write
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #
+  #     - name: Install Helm
+  #       uses: azure/setup-helm@v4
+  #
+  #     - name: Log in to GHCR
+  #       run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
+  #
+  #     - name: Update chart version from tag
+  #       run: |
+  #         VERSION=${GITHUB_REF#refs/tags/v}
+  #         sed -i "s/^version:.*/version: ${VERSION}/" helm/komputer/Chart.yaml
+  #         sed -i "s/^appVersion:.*/appVersion: \"${VERSION}\"/" helm/komputer/Chart.yaml
+  #
+  #     - name: Update image tags to release version
+  #       run: |
+  #         VERSION=${GITHUB_REF#refs/tags/v}
+  #         sed -i "s/tag: latest/tag: v${VERSION}/" helm/komputer/values.yaml
+  #
+  #     - name: Build dependencies
+  #       run: helm dependency build helm/komputer
+  #
+  #     - name: Package chart
+  #       run: helm package helm/komputer
+  #
+  #     - name: Push to GHCR
+  #       run: helm push komputer-*.tgz oci://ghcr.io/${{ github.repository_owner }}/charts
 
   release:
     name: Create Release
-    needs: [changes, cli, helm]
+    needs: [changes, cli]
     if: needs.changes.outputs.is_tag == 'true'
     runs-on: ubuntu-latest
     permissions:

@@ -40,8 +40,9 @@ Each component is fully self-contained with no shared code, making it easy to ex
 1. [Concepts](docs/concepts.md) — Agents, templates, config, secrets, namespaces — how the system fits together
 2. [Getting Started](#quick-start) — Prerequisites, installation, and first agent
 3. [Integration Guide](docs/integration-guide.md) — How to connect external systems via HTTP API and WebSocket events
-4. [Architecture](#architecture) — System diagram and component interactions
-5. Komputer Components
+4. [Custom Agent Images](docs/custom-agent-image.md) — Build custom agent images with your own packages and tools
+5. [Architecture](#architecture) — System diagram and component interactions
+6. Komputer Components
    1. [komputer-api](komputer-api/README.md) — REST & WebSocket API reference, Swagger UI, configuration
    2. [komputer-operator](komputer-operator/README.md) — CRD definitions, reconciliation logic, operator development guide
    3. [komputer-agent](komputer-agent/README.md) — Agent runtime, Claude SDK integration, manager tools, event format

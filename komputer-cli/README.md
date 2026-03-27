@@ -90,10 +90,10 @@ Output:
 ```
   2 agent(s)
 
-  NAME              PHASE      TASK      MODEL                       CREATED
-  ─────────────────────────────────────────────────────────────────────────────
-  my-agent          Running    ● Busy    claude-sonnet-4-20250514    2026-03-26T...
-  other-agent       Running    ○ Idle    claude-sonnet-4-20250514    2026-03-26T...
+  NAME              PHASE      TASK             MODEL               CREATED
+  ──────────────────────────────────────────────────────────────────────────────
+  my-agent          Running    ● In Progress    claude-sonnet-4-6   2026-03-26T...
+  other-agent       Running    ✔ Complete       claude-sonnet-4-6   2026-03-26T...
 ```
 
 ### Get agent details
@@ -136,8 +136,25 @@ komputer list                       List all agents           (alias: ls)
 komputer get <name>                 Get agent details
 komputer watch <name>               Stream live events (WS)
 komputer cancel <name>              Cancel running task
-komputer delete <name>              Delete agent              (alias: rm)
+komputer delete <name> [name...]    Delete one or more agents (alias: rm)
 ```
+
+### Passing Secrets
+
+Pass credentials to agents at creation time using the `--secret` flag:
+
+```bash
+# Single secret
+komputer run github-bot "create a PR" --secret GITHUB=ghp_xxx
+
+# Multiple secrets
+komputer create deploy-agent "deploy to prod" \
+  --secret GITHUB=ghp_xxx \
+  --secret SLACK=xoxb-xxx \
+  --secret AWS_KEY=AKIA...
+```
+
+Secrets are stored as K8s Secrets and injected as `SECRET_*` env vars into the agent pod. The agent checks these env vars when credentials are needed.
 
 ## Global Flags
 
@@ -145,6 +162,7 @@ komputer delete <name>              Delete agent              (alias: rm)
 |------|-------------|
 | `--api <url>` | Override the saved API endpoint |
 | `-n, --namespace <ns>` | Target Kubernetes namespace |
+| `--secret KEY=VALUE` | Pass secrets to the agent (repeatable, on create/run) |
 | `--help` | Help for any command |
 
 ## Project Structure

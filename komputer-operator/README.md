@@ -75,9 +75,12 @@ spec:
   instructions: "Research AI news"
   model: "claude-sonnet-4-6"     # optional, has default
   role: "manager"                 # "manager" or "worker"
+  secrets:                        # optional list of K8s Secret names
+    - my-agent-secrets
 ```
 
-Agents have a `role` field: `manager` agents get orchestration tools (MCP) to create and manage sub-agents, while `worker` agents only have bash and web search tools.
+- `role`: `manager` agents get orchestration tools (MCP) to create and manage sub-agents, while `worker` agents only have bash and web search tools.
+- `secrets`: List of K8s Secret names. Each key in each secret is injected as an env var into the agent pod. The operator deduplicates env vars — agent secrets override template env vars with the same name.
 
 **Status fields:**
 
@@ -103,7 +106,9 @@ When a `KomputerAgent` CR is created:
 3. Creates a PVC (`{name}-pvc`) for the agent's persistent workspace
 4. Creates a ConfigMap (`{name}-pod-config`) with Redis config at `/etc/komputer/config.json`
 5. Creates a Pod from the template, injecting:
-   - `KOMPUTER_INSTRUCTIONS`, `KOMPUTER_MODEL`, `KOMPUTER_AGENT_NAME` env vars
+   - `KOMPUTER_INSTRUCTIONS`, `KOMPUTER_MODEL`, `KOMPUTER_AGENT_NAME`, `KOMPUTER_NAMESPACE` env vars
+   - For managers: `KOMPUTER_ROLE`, `KOMPUTER_API_URL`
+   - Env vars from `spec.secrets` (each key in each referenced K8s Secret)
    - Workspace PVC at `/workspace`
    - Config at `/etc/komputer`
 6. Keeps the pod alive — recreates on termination

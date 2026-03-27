@@ -63,6 +63,11 @@ Events are published to a per-agent Redis Stream as JSON:
 | `KOMPUTER_ROLE` | `manager` or `worker` — managers get MCP orchestration tools |
 | `KOMPUTER_API_URL` | Internal komputer-api URL (used by managers for sub-agent management) |
 | `ANTHROPIC_API_KEY` | Anthropic API key (from template env/secret) |
+| `SECRET_*` | Agent-specific secrets (e.g. `SECRET_GITHUB`, `SECRET_SLACK`) — injected from K8s Secrets listed in `spec.secrets` |
+
+### Secrets
+
+Agents can receive arbitrary secrets via `SECRET_*` env vars. These are created by the API when secrets are passed at agent creation time (e.g. `--secret GITHUB=ghp_xxx` in the CLI). The agent's system prompt instructs it to check these env vars when credentials are needed for a task.
 
 ### Config File
 

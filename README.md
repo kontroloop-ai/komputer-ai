@@ -137,6 +137,8 @@ spec:
   model: "claude-sonnet-4-6"
   templateRef: "default"
   role: "manager"    # or "worker" — managers get orchestration tools
+  secrets:           # optional list of K8s Secret names
+    - my-agent-secrets
 ```
 
 ## Quick Start
@@ -225,16 +227,36 @@ komputer login <endpoint>           # Save API endpoint
 komputer create <name> <prompt>     # Create agent or send task
 komputer run <name> <prompt>        # Create + stream output live
 komputer list                       # List all agents
-komputer get <name>                 # Get agent details
+komputer get <name>                 # Get agent details + recent events
 komputer watch <name>               # Stream live events (WebSocket)
 komputer cancel <name>              # Cancel running task
-komputer delete <name>              # Delete agent and resources
+komputer delete <name> [name...]    # Delete one or more agents
 
 # Flags
 --api <url>                         # Override saved endpoint
 --model <model>                     # Override Claude model per task
 -n, --namespace <ns>                # Target Kubernetes namespace
+--secret KEY=VALUE                  # Pass secrets (repeatable)
 ```
+
+### Secrets
+
+Pass credentials to agents at creation time. Secrets are stored as K8s Secrets and injected as `SECRET_*` env vars:
+
+```bash
+# Single secret
+komputer run github-bot "create a PR" --secret GITHUB=ghp_xxx
+
+# Multiple secrets
+komputer run deploy-agent "deploy to prod" \
+  --secret GITHUB=ghp_xxx \
+  --secret SLACK=xoxb-xxx \
+  --secret AWS_KEY=AKIA...
+
+# Agent sees: SECRET_GITHUB, SECRET_SLACK, SECRET_AWS_KEY as env vars
+```
+
+The agent is instructed to check `SECRET_*` env vars when credentials are needed. If a required secret is missing, the agent completes what it can and reports which credential is needed.
 
 ## How It Works
 

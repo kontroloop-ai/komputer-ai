@@ -34,11 +34,17 @@ Creates a new agent or sends a task to an existing one (upsert by name).
   "instructions": "Research quantum computing",
   "model": "claude-sonnet-4-6",
   "templateRef": "default",
-  "namespace": "my-namespace"
+  "namespace": "my-namespace",
+  "secrets": {
+    "GITHUB": "ghp_xxx",
+    "SLACK": "xoxb-xxx"
+  }
 }
 ```
 
-Required: `name`, `instructions`. Optional: `model`, `templateRef`, `namespace` (all have defaults).
+Required: `name`, `instructions`. Optional: `model`, `templateRef`, `namespace`, `secrets` (all have defaults).
+
+When `secrets` is provided, the API creates a K8s Secret named `{agent-name}-secrets` with each key prefixed by `SECRET_` (e.g. `SECRET_GITHUB`). The secret name is added to the agent CR's `spec.secrets` list, and the operator injects the values as env vars into the pod.
 
 **Response (201 Created):**
 ```json

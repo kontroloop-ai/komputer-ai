@@ -244,7 +244,9 @@ jobs:
           sed -i "s/tag: latest/tag: v${VERSION}/" helm/komputer-ai/values.yaml
 
       - name: Build dependencies
-        run: helm dependency build helm/komputer-ai
+        run: |
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm dependency build helm/komputer-ai
 
       - name: Package chart
         run: helm package helm/komputer-ai

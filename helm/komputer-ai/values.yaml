@@ -54,8 +54,9 @@ redis:
 # -- External Redis settings (only used when redis.enabled=false)
 externalRedis:
   address: ""
-  passwordSecretName: ""
-  passwordSecretKey: password
+  passwordSecret:
+    name: ""
+    key: password
 
 # -- Anthropic API key secret reference (must exist in the release namespace)
 anthropicApiKeySecret:
@@ -70,10 +71,6 @@ config:
     # -- Redis stream prefix for agent events
     streamPrefix: komputer-events
     db: 0
-    # -- Redis password secret reference (only used when redis.enabled=false)
-    passwordSecret:
-      name: ""
-      key: password
 
 # -- Default KomputerAgentClusterTemplate settings
 clusterTemplate:

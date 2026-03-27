@@ -1,4 +1,4 @@
-apiVersion: komputer.komputer.ai/v1
+apiVersion: komputer.komputer.ai/v1alpha1
 kind: KomputerConfig
 metadata:
   name: default
@@ -9,9 +9,9 @@ spec:
     address: {{ include "komputer.redisAddress" . }}
     db: {{ .Values.config.redis.db }}
     streamPrefix: {{ .Values.config.redis.streamPrefix }}
-    {{- if and (not .Values.redis.enabled) .Values.externalRedis.passwordSecretName }}
+    {{- if and (not .Values.redis.enabled) .Values.externalRedis.passwordSecret.name }}
     passwordSecret:
-      name: {{ .Values.externalRedis.passwordSecretName }}
-      key: {{ .Values.externalRedis.passwordSecretKey }}
+      name: {{ .Values.externalRedis.passwordSecret.name }}
+      key: {{ .Values.externalRedis.passwordSecret.key }}
     {{- end }}
   apiURL: {{ include "komputer.apiURL" . }}

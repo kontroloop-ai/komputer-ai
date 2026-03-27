@@ -463,8 +463,9 @@ func main() {
 			templateRef, _ := cmd.Flags().GetString("template")
 
 			ns, _ := cmd.Flags().GetString("namespace")
+			secretFlags, _ := cmd.Flags().GetStringSlice("secret")
 
-			body := map[string]string{
+			body := map[string]interface{}{
 				"name":         args[0],
 				"instructions": args[1],
 			}
@@ -476,6 +477,16 @@ func main() {
 			}
 			if ns != "" {
 				body["namespace"] = ns
+			}
+			if len(secretFlags) > 0 {
+				secrets := make(map[string]string)
+				for _, s := range secretFlags {
+					parts := strings.SplitN(s, "=", 2)
+					if len(parts) == 2 {
+						secrets[parts[0]] = parts[1]
+					}
+				}
+				body["secrets"] = secrets
 			}
 
 			data, status, err := apiRequest("POST", ep+"/api/v1/agents", body)
@@ -509,6 +520,7 @@ func main() {
 	}
 	createCmd.Flags().String("model", "", "Claude model to use")
 	createCmd.Flags().String("template", "", "KomputerAgentTemplate name")
+	createCmd.Flags().StringSlice("secret", nil, "Secrets as KEY=VALUE (repeatable, e.g. --secret GITHUB=ghp_xxx)")
 	root.AddCommand(createCmd)
 
 	// ── get ──────────────────────────────────────────────────────────────
@@ -719,8 +731,9 @@ func main() {
 
 			// Create agent
 			ns, _ := cmd.Flags().GetString("namespace")
+			secretFlags, _ := cmd.Flags().GetStringSlice("secret")
 
-			body := map[string]string{
+			body := map[string]interface{}{
 				"name":         agentName,
 				"instructions": instructions,
 			}
@@ -729,6 +742,16 @@ func main() {
 			}
 			if ns != "" {
 				body["namespace"] = ns
+			}
+			if len(secretFlags) > 0 {
+				secrets := make(map[string]string)
+				for _, s := range secretFlags {
+					parts := strings.SplitN(s, "=", 2)
+					if len(parts) == 2 {
+						secrets[parts[0]] = parts[1]
+					}
+				}
+				body["secrets"] = secrets
 			}
 
 			data, status, err := apiRequest("POST", ep+"/api/v1/agents", body)
@@ -868,6 +891,7 @@ func main() {
 		},
 	}
 	runCmd.Flags().String("model", "", "Claude model to use")
+	runCmd.Flags().StringSlice("secret", nil, "Secrets as KEY=VALUE (repeatable, e.g. --secret GITHUB=ghp_xxx)")
 	root.AddCommand(runCmd)
 
 	root.Execute()

@@ -43,6 +43,12 @@ After synthesizing results, you MUST delete every sub-agent:
 - Do this even if a sub-agent errored or timed out
 - Never skip this step — orphaned agents waste cluster resources indefinitely
 
+## Secrets & Authentication
+If you need credentials to complete a task (API keys, tokens, passwords):
+1. Check environment variables prefixed with SECRET_ (e.g. SECRET_GITHUB, SECRET_SLACK)
+2. Use the matching secret value directly — do not print or log it
+3. If no matching secret is found, complete what you can and tell the user which credential is needed
+
 ## Important
 - You choose the exact name for each sub-agent. Use the SAME name for create, wait, and delete.
 - Each sub-agent runs in its own isolated workspace

@@ -289,7 +289,7 @@ func (r *KomputerAgentReconciler) ensurePod(ctx context.Context, agent *komputer
 	}
 
 	// Build and create the pod
-	pod, err = r.buildPod(agent, template, pvcName, configMapName, podName, apiURL)
+	pod, err = r.buildPod(ctx, agent, template, pvcName, configMapName, podName, apiURL)
 	if err != nil {
 		return nil, err
 	}
@@ -306,7 +306,8 @@ func (r *KomputerAgentReconciler) ensurePod(ctx context.Context, agent *komputer
 }
 
 // buildPod deep copies the template PodSpec and injects env/volumes/mounts.
-func (r *KomputerAgentReconciler) buildPod(agent *komputerv1alpha1.KomputerAgent, template *komputerv1alpha1.KomputerAgentTemplate, pvcName, configMapName, podName, apiURL string) (*corev1.Pod, error) {
+func (r *KomputerAgentReconciler) buildPod(ctx context.Context, agent *komputerv1alpha1.KomputerAgent, template *komputerv1alpha1.KomputerAgentTemplate, pvcName, configMapName, podName, apiURL string) (*corev1.Pod, error) {
+	log := logf.FromContext(ctx)
 	podSpec := *template.Spec.PodSpec.DeepCopy()
 
 	if len(podSpec.Containers) == 0 {
@@ -355,7 +356,44 @@ func (r *KomputerAgentReconciler) buildPod(agent *komputerv1alpha1.KomputerAgent
 			corev1.EnvVar{Name: "KOMPUTER_API_URL", Value: apiURL},
 		)
 	}
-	container.Env = append(container.Env, envVars...)
+	// Inject env vars from agent secrets.
+	for _, secretName := range agent.Spec.Secrets {
+		secret := &corev1.Secret{}
+		if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: agent.Namespace}, secret); err != nil {
+			log.Error(err, "Failed to get agent secret", "secret", secretName)
+			continue
+		}
+		for key := range secret.Data {
+			envVars = append(envVars, corev1.EnvVar{
+				Name: key,
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{Name: secretName},
+						Key:                  key,
+					},
+				},
+			})
+		}
+	}
+
+	// Dedup env vars: agent secrets override template env vars with same name.
+	existingKeys := make(map[string]bool, len(container.Env))
+	for _, env := range container.Env {
+		existingKeys[env.Name] = true
+	}
+	for _, env := range envVars {
+		if existingKeys[env.Name] {
+			// Replace existing env var from template.
+			for i, existing := range container.Env {
+				if existing.Name == env.Name {
+					container.Env[i] = env
+					break
+				}
+			}
+		} else {
+			container.Env = append(container.Env, env)
+		}
+	}
 
 	// Add volume mounts
 	container.VolumeMounts = append(container.VolumeMounts,

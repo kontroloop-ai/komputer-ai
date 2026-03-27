@@ -11,12 +11,13 @@ import (
 )
 
 type CreateAgentRequest struct {
-	Name         string `json:"name" binding:"required"`
-	Instructions string `json:"instructions" binding:"required"`
-	Model        string `json:"model"`
-	TemplateRef  string `json:"templateRef"`
-	Role         string `json:"role"`      // "manager" or "" (default manager)
-	Namespace    string `json:"namespace"` // optional, defaults to server default
+	Name         string            `json:"name" binding:"required"`
+	Instructions string            `json:"instructions" binding:"required"`
+	Model        string            `json:"model"`
+	TemplateRef  string            `json:"templateRef"`
+	Role         string            `json:"role"`      // "manager" or "" (default manager)
+	Namespace    string            `json:"namespace"` // optional, defaults to server default
+	Secrets      map[string]string `json:"secrets"`   // optional key-value secrets (e.g. {"GITHUB": "ghp_xxx"})
 }
 
 type AgentResponse struct {
@@ -126,7 +127,17 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 			return
 		}
 
-		agent, err := k8s.CreateAgent(c.Request.Context(), ns, req.Name, instructions, req.Model, req.TemplateRef, role)
+		var secretNames []string
+		if len(req.Secrets) > 0 {
+			secretName, err := k8s.CreateAgentSecrets(c.Request.Context(), ns, req.Name, req.Secrets)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create secrets: " + err.Error()})
+				return
+			}
+			secretNames = []string{secretName}
+		}
+
+		agent, err := k8s.CreateAgent(c.Request.Context(), ns, req.Name, instructions, req.Model, req.TemplateRef, role, secretNames)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create agent: " + err.Error()})
 			return

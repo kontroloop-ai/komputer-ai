@@ -69,6 +69,13 @@ spec:
                 - worker
                 - manager
                 type: string
+              secrets:
+                description: |-
+                  Secrets is a list of K8s Secret names containing agent-specific secrets.
+                  Each key in each secret is injected as an env var into the agent pod.
+                items:
+                  type: string
+                type: array
               templateRef:
                 default: default
                 description: TemplateRef is the name of the KomputerAgentTemplate

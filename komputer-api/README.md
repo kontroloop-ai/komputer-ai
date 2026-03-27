@@ -6,10 +6,14 @@ REST and WebSocket API gateway for the komputer.ai platform. Creates and manages
 
 ### REST
 
+All endpoints support namespace selection via the `?namespace=` query parameter. If omitted, the server's default namespace is used.
+
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/api/v1/agents` | Create agent or send task to existing one |
 | `GET` | `/api/v1/agents` | List all agents with status |
+| `GET` | `/api/v1/agents/:name` | Get agent details |
+| `GET` | `/api/v1/agents/:name/events` | Get agent event history |
 | `DELETE` | `/api/v1/agents/:name` | Delete agent and all its resources |
 | `POST` | `/api/v1/agents/:name/cancel` | Cancel the running task on an agent |
 
@@ -28,19 +32,20 @@ Creates a new agent or sends a task to an existing one (upsert by name).
 {
   "name": "my-agent",
   "instructions": "Research quantum computing",
-  "model": "claude-sonnet-4-20250514",
-  "templateRef": "default"
+  "model": "claude-sonnet-4-6",
+  "templateRef": "default",
+  "namespace": "my-namespace"
 }
 ```
 
-Required: `name`, `instructions`. Optional: `model`, `templateRef` (both have defaults).
+Required: `name`, `instructions`. Optional: `model`, `templateRef`, `namespace` (all have defaults).
 
 **Response (201 Created):**
 ```json
 {
   "name": "my-agent",
   "namespace": "default",
-  "model": "claude-sonnet-4-20250514",
+  "model": "claude-sonnet-4-6",
   "status": "Pending",
   "createdAt": "2026-03-26T10:00:00Z"
 }
@@ -57,9 +62,9 @@ If the agent already exists, the task is forwarded to its running pod. Returns `
     {
       "name": "my-agent",
       "namespace": "default",
-      "model": "claude-sonnet-4-20250514",
+      "model": "claude-sonnet-4-6",
       "status": "Running",
-      "taskStatus": "Busy",
+      "taskStatus": "InProgress",
       "lastTaskMessage": "Calling WebSearch",
       "createdAt": "2026-03-26T10:00:00Z"
     }
@@ -72,11 +77,11 @@ If the agent already exists, the task is forwarded to its running pod. Returns `
 Connect to receive real-time events as the agent works:
 
 ```json
-{"agentName":"my-agent","type":"task_started","timestamp":"...","payload":{"instructions":"..."}}
-{"agentName":"my-agent","type":"thinking","timestamp":"...","payload":{"content":"..."}}
-{"agentName":"my-agent","type":"tool_call","timestamp":"...","payload":{"tool":"WebSearch","input":{...}}}
-{"agentName":"my-agent","type":"text","timestamp":"...","payload":{"content":"The answer is..."}}
-{"agentName":"my-agent","type":"task_completed","timestamp":"...","payload":{"result":"...","cost_usd":0.08,"duration_ms":30000}}
+{"agentName":"my-agent","namespace":"default","type":"task_started","timestamp":"...","payload":{"instructions":"..."}}
+{"agentName":"my-agent","namespace":"default","type":"thinking","timestamp":"...","payload":{"content":"..."}}
+{"agentName":"my-agent","namespace":"default","type":"tool_call","timestamp":"...","payload":{"tool":"WebSearch","input":{...}}}
+{"agentName":"my-agent","namespace":"default","type":"text","timestamp":"...","payload":{"content":"The answer is..."}}
+{"agentName":"my-agent","namespace":"default","type":"task_completed","timestamp":"...","payload":{"result":"...","cost_usd":0.08,"duration_ms":30000}}
 ```
 
 ## Redis Event Worker
@@ -85,9 +90,9 @@ The API runs a background goroutine that consumes agent events from Redis Stream
 
 1. Logs the raw event
 2. Broadcasts to WebSocket subscribers for that agent
-3. Patches the `KomputerAgent` CR status (`taskStatus` and `lastTaskMessage`)
+3. Patches the `KomputerAgent` CR status (`taskStatus` and `lastTaskMessage`) in the correct namespace
 
-This worker is designed to be extracted into a separate `komputer-event-handler` service later.
+Events include a `namespace` field so the worker can update CRs across namespaces.
 
 ## Configuration
 

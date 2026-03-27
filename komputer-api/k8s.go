@@ -95,7 +95,46 @@ func (k *K8sClient) EnsureNamespace(ctx context.Context, ns string) error {
 	return nil
 }
 
-func (k *K8sClient) CreateAgent(ctx context.Context, ns, name, instructions, model, templateRef, role string) (*komputerv1alpha1.KomputerAgent, error) {
+// CreateAgentSecrets creates a K8s Secret with agent-specific secrets.
+// Keys are prefixed with SECRET_ (e.g. "GITHUB" becomes "SECRET_GITHUB").
+// Returns the secret name.
+func (k *K8sClient) CreateAgentSecrets(ctx context.Context, ns, agentName string, secrets map[string]string) (string, error) {
+	secretName := agentName + "-secrets"
+	data := make(map[string][]byte, len(secrets))
+	for key, value := range secrets {
+		data["SECRET_"+strings.ToUpper(key)] = []byte(value)
+	}
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: ns,
+			Labels: map[string]string{
+				"komputer.ai/agent-name": agentName,
+			},
+		},
+		Data: data,
+	}
+
+	if err := k.client.Create(ctx, secret); err != nil {
+		if errors.IsAlreadyExists(err) {
+			// Update existing secret.
+			existing := &corev1.Secret{}
+			if getErr := k.client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: ns}, existing); getErr != nil {
+				return "", fmt.Errorf("failed to get existing secret: %w", getErr)
+			}
+			existing.Data = data
+			if updateErr := k.client.Update(ctx, existing); updateErr != nil {
+				return "", fmt.Errorf("failed to update secret: %w", updateErr)
+			}
+			return secretName, nil
+		}
+		return "", fmt.Errorf("failed to create secret: %w", err)
+	}
+	return secretName, nil
+}
+
+func (k *K8sClient) CreateAgent(ctx context.Context, ns, name, instructions, model, templateRef, role string, secretNames []string) (*komputerv1alpha1.KomputerAgent, error) {
 	if model == "" {
 		model = "claude-sonnet-4-6"
 	}
@@ -116,6 +155,7 @@ func (k *K8sClient) CreateAgent(ctx context.Context, ns, name, instructions, mod
 			Instructions: instructions,
 			Model:        model,
 			Role:         role,
+			Secrets:  secretNames,
 		},
 	}
 

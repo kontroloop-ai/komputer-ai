@@ -4,31 +4,35 @@ Kubernetes operator built with [operator-sdk](https://sdk.operatorframework.io/)
 
 ## CRDs
 
-### KomputerRedisConfig
+### KomputerConfig
 
-Cluster-scoped singleton holding Redis connection details. The operator auto-discovers this resource — no explicit reference needed.
+Cluster-scoped singleton holding platform configuration — Redis connection and internal API URL. The operator auto-discovers this resource.
 
 ```yaml
 apiVersion: komputer.komputer.ai/v1alpha1
-kind: KomputerRedisConfig
+kind: KomputerConfig
 metadata:
   name: default
 spec:
-  address: "redis:6379"
-  db: 0
-  queue: "komputer-events"
-  passwordSecret:
-    name: "redis-secret"
-    key: "password"
+  redis:
+    address: "redis.default:6379"
+    db: 0
+    streamPrefix: "komputer-events"
+    passwordSecret:
+      name: "redis-secret"
+      key: "password"
+  apiURL: "http://komputer-api.default.svc.cluster.local:8080"
 ```
 
-### KomputerAgentTemplate
+The `apiURL` is used by manager agents to create and manage sub-agents via the komputer-api.
 
-Reusable pod configuration with full `corev1.PodSpec` passthrough. Supports any pod-level settings — tolerations, node selectors, resource limits, env vars, etc.
+### KomputerAgentClusterTemplate
+
+Cluster-scoped reusable pod configuration with full `corev1.PodSpec` passthrough. Shared across all namespaces.
 
 ```yaml
 apiVersion: komputer.komputer.ai/v1alpha1
-kind: KomputerAgentTemplate
+kind: KomputerAgentClusterTemplate
 metadata:
   name: default
 spec:
@@ -53,6 +57,10 @@ spec:
     size: "5Gi"
 ```
 
+### KomputerAgentTemplate
+
+Namespace-scoped version of the template. If a `KomputerAgentTemplate` exists in the agent's namespace with the same name as a `KomputerAgentClusterTemplate`, the namespaced template takes precedence.
+
 ### KomputerAgent
 
 An agent instance. The operator creates a pod and PVC when this resource is created.
@@ -65,29 +73,33 @@ metadata:
 spec:
   templateRef: "default"          # optional, defaults to "default"
   instructions: "Research AI news"
-  model: "claude-sonnet-4-20250514"  # optional, has default
+  model: "claude-sonnet-4-6"     # optional, has default
+  role: "manager"                 # "manager" or "worker"
 ```
+
+Agents have a `role` field: `manager` agents get orchestration tools (MCP) to create and manage sub-agents, while `worker` agents only have bash and web search tools.
 
 **Status fields:**
 
 ```
 kubectl get komputeragents
-NAME       PHASE     TASK     MODEL                      AGE
-my-agent   Running   ● Busy   claude-sonnet-4-20250514   5m
+NAME       PHASE     TASK         MODEL              AGE
+my-agent   Running   InProgress   claude-sonnet-4-6  5m
 ```
 
 - `phase` — Pod lifecycle: Pending, Running, Succeeded, Failed
-- `taskStatus` — Agent activity: Idle, Busy, Error (managed by the API worker)
+- `taskStatus` — Agent activity: Complete, InProgress, Error (managed by the API worker)
 - `podName`, `pvcName` — Names of created resources
 - `startTime`, `completionTime` — Timestamps
 - `lastTaskMessage` — Latest event summary
+- `sessionId` — Claude session ID for conversation continuity
 
 ## Reconciliation Logic
 
 When a `KomputerAgent` CR is created:
 
-1. Resolves the `templateRef` to get the pod spec
-2. Auto-discovers the singleton `KomputerRedisConfig`
+1. Resolves the `templateRef` to get the pod spec (checks namespaced template first, then cluster template)
+2. Auto-discovers the singleton `KomputerConfig`
 3. Creates a PVC (`{name}-pvc`) for the agent's persistent workspace
 4. Creates a ConfigMap (`{name}-pod-config`) with Redis config at `/etc/komputer/config.json`
 5. Creates a Pod from the template, injecting:
@@ -141,7 +153,9 @@ komputer-operator/
 ├── api/v1alpha1/                    # CRD type definitions
 │   ├── komputeragent_types.go
 │   ├── komputeragenttemplate_types.go
-│   └── komputerredisconfig_types.go
+│   ├── komputeragentclustertemplate_types.go
+│   ├── komputerconfig_types.go
+│   └── komputerredisconfig_types.go  # Legacy, kept for migration
 ├── internal/controller/
 │   ├── komputeragent_controller.go      # Reconciliation logic
 │   └── komputeragent_controller_test.go # Integration tests

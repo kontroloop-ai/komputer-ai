@@ -28,6 +28,17 @@ Config is stored at `~/.komputer-ai/config.json`. You can override it per-comman
 komputer list --api http://other-cluster:8080
 ```
 
+### Namespace targeting
+
+All commands support namespace selection via `--namespace` (or `-n`):
+
+```bash
+komputer -n production list
+komputer -n staging run my-agent "Deploy the new feature"
+```
+
+If omitted, the server's default namespace is used.
+
 ### Create an agent
 
 ```bash
@@ -133,6 +144,7 @@ komputer delete <name>              Delete agent              (alias: rm)
 | Flag | Description |
 |------|-------------|
 | `--api <url>` | Override the saved API endpoint |
+| `-n, --namespace <ns>` | Target Kubernetes namespace |
 | `--help` | Help for any command |
 
 ## Project Structure

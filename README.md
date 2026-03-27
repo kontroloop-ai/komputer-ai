@@ -17,7 +17,9 @@
 </p>
 
 <p align="center">
-  Create persistent, autonomous agents that execute tasks using Claude's capabilities — bash commands, web search, and more — each in their own isolated workspace.
+  An API-first platform for running persistent Claude AI agents on Kubernetes.<br/>
+  Designed to be driven by external systems — CI/CD pipelines, Slack bots, dashboards, cron jobs, or any HTTP client.<br/>
+  Create agents, send tasks, and stream real-time results via REST + WebSocket.
 </p>
 
 ---
@@ -26,7 +28,8 @@
 
 ```
                     ┌─────────────────┐
-                    │   komputer-cli  │
+                    │  komputer-cli   │
+                    │  (--namespace)  │
                     └────────┬────────┘
                              │
                     ┌────────▼────────┐
@@ -41,7 +44,7 @@
               │              │              │
     ┌─────────▼──────┐  ┌───▼────┐  ┌──────▼──────────┐
     │ AgentTemplate  │  │ Redis  │  │ KomputerAgent   │
-    │ CRD            │  │        │  │ CRD             │
+    │ ClusterTemplate│  │        │  │ (manager/worker)│
     └─────────┬──────┘  └───▲────┘  └──────┬──────────┘
               │              │              │
        ┌──────▼──────────────┼──────────────┘
@@ -73,26 +76,39 @@
 
 Each component is fully self-contained with no shared code, making it easy to extract into separate repositories.
 
+## Documentation
+
+1. [Getting Started](#quick-start) — Prerequisites, installation, and first agent
+2. [Integration Guide](docs/integration-guide.md) — How to connect external systems via HTTP API and WebSocket events
+3. Komputer Components
+   1. [komputer-api](komputer-api/README.md) — REST & WebSocket API reference, Redis event worker, configuration
+   2. [komputer-operator](komputer-operator/README.md) — CRD definitions, reconciliation logic, operator development guide
+   3. [komputer-agent](komputer-agent/README.md) — Agent runtime, Claude SDK integration, manager tools, event format
+   4. [komputer-cli](komputer-cli/README.md) — CLI commands, flags, usage examples
+
 ## Custom Resources
 
-**KomputerRedisConfig** (cluster-scoped, singleton) — Redis connection details used by all agents:
+**KomputerConfig** (cluster-scoped, singleton) — Platform configuration with Redis and API settings:
 ```yaml
 apiVersion: komputer.komputer.ai/v1alpha1
-kind: KomputerRedisConfig
+kind: KomputerConfig
 metadata:
   name: default
 spec:
-  address: "redis:6379"
-  queue: "komputer-events"
-  passwordSecret:
-    name: redis-secret
-    key: password
+  redis:
+    address: "redis.default:6379"
+    db: 0
+    streamPrefix: "komputer-events"
+    passwordSecret:
+      name: redis-secret
+      key: password
+  apiURL: "http://komputer-api.default.svc.cluster.local:8080"
 ```
 
-**KomputerAgentTemplate** — Reusable pod configuration (full PodSpec passthrough):
+**KomputerAgentClusterTemplate** (cluster-scoped) — Reusable pod configuration shared across all namespaces:
 ```yaml
 apiVersion: komputer.komputer.ai/v1alpha1
-kind: KomputerAgentTemplate
+kind: KomputerAgentClusterTemplate
 metadata:
   name: default
 spec:
@@ -108,6 +124,8 @@ spec:
     size: "5Gi"
 ```
 
+**KomputerAgentTemplate** (namespaced) — Namespace-scoped pod configuration. Takes precedence over a cluster template with the same name.
+
 **KomputerAgent** — An agent instance with Claude configuration:
 ```yaml
 apiVersion: komputer.komputer.ai/v1alpha1
@@ -116,8 +134,9 @@ metadata:
   name: my-agent
 spec:
   instructions: "Research quantum computing and write a summary"
-  model: "claude-sonnet-4-20250514"
+  model: "claude-sonnet-4-6"
   templateRef: "default"
+  role: "manager"    # or "worker" — managers get orchestration tools
 ```
 
 ## Quick Start
@@ -150,7 +169,8 @@ kubectl expose pod redis --port=6379 --name=redis
 
 ```bash
 # Redis password (empty for no auth)
-kubectl apply -f komputer-operator/config/samples/redis-secret.yaml
+kubectl create secret generic redis-secret \
+  --from-literal=password=""
 
 # Anthropic API key
 kubectl create secret generic anthropic-api-key \
@@ -160,8 +180,8 @@ kubectl create secret generic anthropic-api-key \
 ### 4. Apply base resources
 
 ```bash
-kubectl apply -f komputer-operator/config/samples/komputer_v1alpha1_komputerredisconfig.yaml
-kubectl apply -f komputer-operator/config/samples/komputer_v1alpha1_komputeragenttemplate.yaml
+kubectl apply -f komputer-operator/config/samples/komputer_v1alpha1_komputerconfig.yaml
+kubectl apply -f komputer-operator/config/samples/komputer_v1alpha1_komputeragentclustertemplate.yaml
 ```
 
 ### 5. Build and load the agent image
@@ -213,6 +233,7 @@ komputer delete <name>              # Delete agent and resources
 # Flags
 --api <url>                         # Override saved endpoint
 --model <model>                     # Override Claude model per task
+-n, --namespace <ns>                # Target Kubernetes namespace
 ```
 
 ## How It Works
@@ -221,7 +242,7 @@ komputer delete <name>              # Delete agent and resources
 2. **Reconcile** — Operator detects the CR, creates a PVC (persistent workspace) and Pod
 3. **Execute** — Agent pod starts, runs Claude with the given instructions
 4. **Stream** — Agent publishes structured events to Redis (tool calls, messages, results)
-5. **Consume** — API worker reads events, updates CR status (`Busy`/`Idle`), broadcasts via WebSocket
+5. **Consume** — API worker reads events, updates CR status (`InProgress`/`Complete`), broadcasts via WebSocket
 6. **Persist** — Agent pod stays running after task completion, accepting new tasks via FastAPI
 
 ### Event Types
@@ -244,7 +265,7 @@ Events published by agents and streamed via WebSocket:
 ```
 komputer-ai/
 ├── komputer-operator/     # K8s operator (Go, operator-sdk)
-│   ├── api/v1alpha1/      # CRD type definitions
+│   ├── api/v1alpha1/      # CRD types (Config, Agent, Templates)
 │   ├── internal/          # Controller logic
 │   └── config/            # RBAC, CRDs, samples
 ├── komputer-api/          # HTTP + WebSocket API (Go, Gin)

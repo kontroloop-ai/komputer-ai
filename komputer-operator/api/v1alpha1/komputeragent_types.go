@@ -36,7 +36,7 @@ type AgentTaskStatus string
 const (
 	AgentTaskComplete   AgentTaskStatus = "Complete"
 	AgentTaskInProgress AgentTaskStatus = "InProgress"
-	AgentTaskError AgentTaskStatus = "Error"
+	AgentTaskError      AgentTaskStatus = "Error"
 )
 
 // KomputerAgentSpec defines the desired state of KomputerAgent.
@@ -56,6 +56,10 @@ type KomputerAgentSpec struct {
 	// +kubebuilder:validation:Enum=worker;manager
 	// +optional
 	Role string `json:"role,omitempty"`
+	// Secrets is a list of K8s Secret names containing agent-specific secrets.
+	// Each key in each secret is injected as an env var into the agent pod.
+	// +optional
+	Secrets []string `json:"secrets,omitempty"`
 }
 
 // KomputerAgentStatus defines the observed state of KomputerAgent.

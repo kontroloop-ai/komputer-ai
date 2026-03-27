@@ -57,8 +57,11 @@ Events are published to a per-agent Redis Stream as JSON:
 | Variable | Description |
 |----------|-------------|
 | `KOMPUTER_INSTRUCTIONS` | Initial task prompt |
-| `KOMPUTER_MODEL` | Claude model (e.g. `claude-sonnet-4-20250514`) |
+| `KOMPUTER_MODEL` | Claude model (e.g. `claude-sonnet-4-6`) |
 | `KOMPUTER_AGENT_NAME` | Agent identifier for events |
+| `KOMPUTER_NAMESPACE` | Kubernetes namespace (included in events) |
+| `KOMPUTER_ROLE` | `manager` or `worker` — managers get MCP orchestration tools |
+| `KOMPUTER_API_URL` | Internal komputer-api URL (used by managers for sub-agent management) |
 | `ANTHROPIC_API_KEY` | Anthropic API key (from template env/secret) |
 
 ### Config File
@@ -85,6 +88,19 @@ Uses the [Claude Agent SDK](https://pypi.org/project/claude-agent-sdk/) which wr
 - **Working directory:** `/workspace` (persistent via PVC)
 
 The SDK requires the `claude` CLI binary, which is installed via `npm install -g @anthropic-ai/claude-code` in the Dockerfile.
+
+### Manager Agents
+
+When `KOMPUTER_ROLE=manager`, the agent additionally registers MCP orchestration tools via the komputer-api:
+
+| Tool | Description |
+|------|-------------|
+| `create_agent` | Create a sub-agent (always a worker) to handle a task |
+| `get_agent_status` | Check the status of a sub-agent |
+| `get_agent_events` | Get recent events/results from a sub-agent |
+| `delete_agent` | Delete a sub-agent and clean up resources |
+
+This allows manager agents to autonomously delegate work to sub-agents.
 
 ## Development
 
@@ -125,6 +141,7 @@ komputer-agent/
 ├── agent.py          # Claude Agent SDK integration
 ├── server.py         # FastAPI endpoints (/task, /cancel, /status)
 ├── events.py         # Redis event publisher
+├── manager_tools.py  # MCP tools for manager agents (sub-agent orchestration)
 ├── requirements.txt  # Python dependencies
 └── Dockerfile        # Python 3.12 + Node.js + Claude CLI
 ```

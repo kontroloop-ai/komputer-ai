@@ -52,7 +52,7 @@ redis:
 redis-ha:
   replicas: 1
   haproxy:
-    enabled: true
+    enabled: false
   image:
     repository: redis
     tag: 7-alpine

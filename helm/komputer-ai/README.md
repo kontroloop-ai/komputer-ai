@@ -73,6 +73,11 @@ templates/
 | `api.image.tag` | API image tag | `latest` |
 | `api.service.type` | API service type | `ClusterIP` |
 | `api.service.port` | API service port | `8080` |
+| `api.ingress.enabled` | Create an Ingress for the API | `false` |
+| `api.ingress.className` | Ingress class name (e.g. `nginx`, `traefik`, `alb`) | `""` |
+| `api.ingress.annotations` | Ingress annotations | `{}` |
+| `api.ingress.hosts` | Ingress host rules | See `values.yaml` |
+| `api.ingress.tls` | Ingress TLS configuration | `[]` |
 | `agent.image.repository` | Agent image used in the default cluster template | `ghcr.io/kontroloop-ai/komputer-agent` |
 | `agent.image.tag` | Agent image tag | `latest` |
 | `agent.defaultModel` | Default Claude model for new agents | `claude-sonnet-4-6` |
@@ -97,6 +102,41 @@ helm install komputer oci://ghcr.io/kontroloop-ai/charts/komputer-ai \
   --set externalRedis.passwordSecret.name=redis-secret \
   --namespace komputer-ai
 ```
+
+### Ingress
+
+Expose the API externally instead of using `kubectl port-forward`:
+
+```yaml
+# values-ingress.yaml
+api:
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      # WebSocket support (required for live streaming)
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+    hosts:
+      - host: komputer.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: komputer-tls
+        hosts:
+          - komputer.example.com
+```
+
+```bash
+helm install komputer oci://ghcr.io/kontroloop-ai/charts/komputer-ai \
+  --set anthropicApiKeySecret.name=anthropic-api-key \
+  -f values-ingress.yaml \
+  --namespace komputer-ai
+```
+
+> **Note:** The API uses WebSockets for live event streaming. Make sure your ingress controller is configured with appropriate timeouts (shown above for nginx).
 
 ### Private Container Registry
 

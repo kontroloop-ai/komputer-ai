@@ -36,6 +36,24 @@ api:
     requests:
       cpu: 50m
       memory: 128Mi
+  ingress:
+    enabled: false
+    # -- Ingress class name (e.g. nginx, traefik, alb)
+    className: ""
+    annotations: {}
+    # Example annotations:
+    #   nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    #   nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    #   cert-manager.io/cluster-issuer: letsencrypt-prod
+    hosts:
+      - host: komputer.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []
+    # - secretName: komputer-tls
+    #   hosts:
+    #     - komputer.example.com
 
 agent:
   image:

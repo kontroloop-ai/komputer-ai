@@ -22,13 +22,25 @@ http://{{ .Release.Name }}-api.{{ .Release.Namespace }}.svc.cluster.local:{{ .Va
 {{/*
 Redis address
 */}}
+{{/*
+Redis fullname — delegates to the redis-ha subchart helper.
+*/}}
+{{- define "komputer.redis.fullname" -}}
+{{- $redisHa := (index .Values "redis-ha") -}}
+{{- $redisHaContext := dict "Chart" (dict "Name" "redis-ha") "Release" .Release "Values" $redisHa -}}
+{{- if $redisHa.haproxy.enabled -}}
+{{- printf "%s-haproxy" (include "redis-ha.fullname" $redisHaContext) | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- include "redis-ha.fullname" $redisHaContext -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Redis address — full service endpoint for KomputerConfig and API.
+*/}}
 {{- define "komputer.redisAddress" -}}
 {{- if .Values.redis.enabled -}}
-{{- if (index .Values "redis-ha" "haproxy" "enabled") -}}
-{{ .Release.Name }}-redis-ha-haproxy.{{ .Release.Namespace }}.svc.cluster.local:6379
-{{- else -}}
-{{ .Release.Name }}-redis-ha-announce-0.{{ .Release.Namespace }}.svc.cluster.local:6379
-{{- end -}}
+{{ include "komputer.redis.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:6379
 {{- else -}}
 {{ .Values.externalRedis.address }}
 {{- end -}}

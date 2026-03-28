@@ -7,5 +7,14 @@
 # OS
 .DS_Store
 .venv
+
+# Secrets & credentials
+*.pem
+*.key
+*.crt
+.env
+.env.*
+
+# Internal
 docs/superpowers/
 local/

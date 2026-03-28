@@ -173,11 +173,13 @@ func StartRedisWorker(ctx context.Context, cfg RedisWorkerConfig, k8s *K8sClient
 					}
 
 					sessionID := ""
+					costUSD := 0.0
 					if event.Type == "task_completed" {
 						sessionID, _ = event.Payload["session_id"].(string)
+						costUSD, _ = event.Payload["cost_usd"].(float64)
 					}
 
-					if err := k8s.PatchAgentTaskStatus(ctx, event.Namespace, event.AgentName, taskStatus, lastMessage, sessionID); err != nil {
+					if err := k8s.PatchAgentTaskStatus(ctx, event.Namespace, event.AgentName, taskStatus, lastMessage, sessionID, costUSD); err != nil {
 						log.Printf("failed to patch task status for %s: %v", event.AgentName, err)
 					}
 				}

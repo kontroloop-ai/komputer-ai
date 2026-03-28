@@ -110,12 +110,19 @@ type KomputerAgentStatus struct {
 	// Set by the API worker when a task completes, read by the agent on startup.
 	// +optional
 	SessionID string `json:"sessionId,omitempty"`
+	// LastTaskCostUSD is the cost of the most recent task in USD.
+	// +optional
+	LastTaskCostUSD string `json:"lastTaskCostUSD,omitempty"`
+	// TotalCostUSD is the cumulative cost of all tasks run by this agent.
+	// +optional
+	TotalCostUSD string `json:"totalCostUSD,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
 // +kubebuilder:printcolumn:name="Task",type=string,JSONPath=`.status.taskStatus`
+// +kubebuilder:printcolumn:name="Cost",type=string,JSONPath=`.status.totalCostUSD`
 // +kubebuilder:printcolumn:name="Model",type=string,JSONPath=`.spec.model`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 

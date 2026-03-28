@@ -343,7 +343,7 @@ func (k *K8sClient) execInPod(ctx context.Context, ns, podName string, command .
 }
 
 // PatchAgentTaskStatus patches only the task-related status fields on a KomputerAgent CR.
-func (k *K8sClient) PatchAgentTaskStatus(ctx context.Context, ns, agentName, taskStatus, lastMessage, sessionID string) error {
+func (k *K8sClient) PatchAgentTaskStatus(ctx context.Context, ns, agentName, taskStatus, lastMessage, sessionID string, costUSD float64) error {
 	agent := &komputerv1alpha1.KomputerAgent{}
 	key := types.NamespacedName{Name: agentName, Namespace: ns}
 	if err := k.client.Get(ctx, key, agent); err != nil {
@@ -355,6 +355,16 @@ func (k *K8sClient) PatchAgentTaskStatus(ctx context.Context, ns, agentName, tas
 	agent.Status.LastTaskMessage = lastMessage
 	if sessionID != "" {
 		agent.Status.SessionID = sessionID
+	}
+	if costUSD > 0 {
+		agent.Status.LastTaskCostUSD = fmt.Sprintf("%.4f", costUSD)
+		// Accumulate total cost.
+		var total float64
+		if agent.Status.TotalCostUSD != "" {
+			fmt.Sscanf(agent.Status.TotalCostUSD, "%f", &total)
+		}
+		total += costUSD
+		agent.Status.TotalCostUSD = fmt.Sprintf("%.4f", total)
 	}
 
 	return k.client.Status().Patch(ctx, agent, client.MergeFrom(original))

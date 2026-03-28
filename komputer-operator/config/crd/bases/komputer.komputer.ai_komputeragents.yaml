@@ -21,6 +21,9 @@ spec:
     - jsonPath: .status.taskStatus
       name: Task
       type: string
+    - jsonPath: .status.totalCostUSD
+      name: Cost
+      type: string
     - jsonPath: .spec.model
       name: Model
       type: string
@@ -101,6 +104,10 @@ spec:
                 description: CompletionTime is when the agent finished.
                 format: date-time
                 type: string
+              lastTaskCostUSD:
+                description: LastTaskCostUSD is the cost of the most recent task in
+                  USD.
+                type: string
               lastTaskMessage:
                 description: |-
                   LastTaskMessage is the most recent event summary from the agent.
@@ -131,6 +138,10 @@ spec:
                 description: |-
                   TaskStatus indicates whether the agent is actively working on a task.
                   Managed by the API worker based on Redis events, not by the operator.
+                type: string
+              totalCostUSD:
+                description: TotalCostUSD is the cumulative cost of all tasks run
+                  by this agent.
                 type: string
             type: object
         type: object

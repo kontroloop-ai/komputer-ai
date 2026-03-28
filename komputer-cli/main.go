@@ -836,6 +836,24 @@ func main() {
 			}
 			defer conn.Close()
 
+			// Catch-up: fetch any events published before WebSocket connected.
+			catchupURL := fmt.Sprintf("%s/api/v1/agents/%s/events?limit=50%s", ep, url.PathEscape(agentName), nsQueryAmp(cmd))
+			if catchupData, catchupStatus, catchupErr := apiRequest("GET", catchupURL, nil); catchupErr == nil && catchupStatus == 200 {
+				var catchupResp struct {
+					Events []AgentEvent `json:"events"`
+				}
+				json.Unmarshal(catchupData, &catchupResp)
+				for _, e := range catchupResp.Events {
+					if formatted := formatEvent(e); formatted != "" {
+						fmt.Println(formatted)
+						fmt.Println()
+					}
+					if e.Type == "task_completed" || e.Type == "error" || e.Type == "task_cancelled" {
+						return
+					}
+				}
+			}
+
 			interrupted := make(chan struct{})
 			sigCh := make(chan os.Signal, 1)
 			signal.Notify(sigCh, os.Interrupt)

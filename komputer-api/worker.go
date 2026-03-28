@@ -243,21 +243,22 @@ func parseStreamMessage(msg redis.XMessage) (AgentEvent, error) {
 	return event, nil
 }
 
-// GetAgentEvents reads the most recent events from an agent's stream in chronological order.
+// GetAgentEvents reads events from the agent's persistent history list.
+// Returns the last `limit` events in chronological order.
 func GetAgentEvents(ctx context.Context, rdb *redis.Client, agentName string, limit int64, streamPrefix string) ([]AgentEvent, error) {
-	streamKey := fmt.Sprintf("%s:%s", streamPrefix, agentName)
+	historyKey := fmt.Sprintf("komputer-history:%s", agentName)
 
-	// XREVRANGE gets most recent first; we reverse to return chronological order.
-	msgs, err := rdb.XRevRangeN(ctx, streamKey, "+", "-", limit).Result()
+	// LRANGE with negative indices gets the last N items.
+	vals, err := rdb.LRange(ctx, historyKey, -limit, -1).Result()
 	if err != nil {
-		return nil, fmt.Errorf("xrevrange: %w", err)
+		return nil, fmt.Errorf("lrange: %w", err)
 	}
 
-	events := make([]AgentEvent, 0, len(msgs))
-	for i := len(msgs) - 1; i >= 0; i-- {
-		ev, err := parseStreamMessage(msgs[i])
-		if err != nil {
-			log.Printf("skipping malformed stream entry: %v", err)
+	events := make([]AgentEvent, 0, len(vals))
+	for _, raw := range vals {
+		var ev AgentEvent
+		if err := json.Unmarshal([]byte(raw), &ev); err != nil {
+			log.Printf("skipping malformed history entry: %v", err)
 			continue
 		}
 		events = append(events, ev)
@@ -265,11 +266,12 @@ func GetAgentEvents(ctx context.Context, rdb *redis.Client, agentName string, li
 	return events, nil
 }
 
-// DeleteAgentStream removes an agent's event stream from Redis.
+// DeleteAgentStream removes an agent's event stream and history from Redis.
 func DeleteAgentStream(ctx context.Context, rdb *redis.Client, agentName string, streamPrefix string) error {
 	streamKey := fmt.Sprintf("%s:%s", streamPrefix, agentName)
-	if err := rdb.Del(ctx, streamKey).Err(); err != nil {
-		return fmt.Errorf("delete stream %s: %w", streamKey, err)
+	historyKey := fmt.Sprintf("komputer-history:%s", agentName)
+	if err := rdb.Del(ctx, streamKey, historyKey).Err(); err != nil {
+		return fmt.Errorf("delete stream/history for %s: %w", agentName, err)
 	}
 	return nil
 }

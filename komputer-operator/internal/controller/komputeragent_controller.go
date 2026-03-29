@@ -359,14 +359,22 @@ func (r *KomputerAgentReconciler) ensureConfigMap(ctx context.Context, agent *ko
 // ensurePod creates a Pod if it does not exist, or deletes it if it is in a terminal state
 // and the agent status has already been persisted as terminal (two-phase deletion).
 func (r *KomputerAgentReconciler) ensurePod(ctx context.Context, agent *komputerv1alpha1.KomputerAgent, template *komputerv1alpha1.KomputerAgentTemplate, pvcName, podName string, config *komputerv1alpha1.KomputerConfig) (*corev1.Pod, error) {
+	log := logf.FromContext(ctx)
 	pod := &corev1.Pod{}
 	err := r.Get(ctx, types.NamespacedName{Name: podName, Namespace: agent.Namespace}, pod)
 	if err == nil {
-		// If pod is in a terminal state (Failed/Succeeded), return it so
-		// reconcileStatus can persist the terminal phase. Don't delete or
-		// recreate — a failed pod stays failed until a new task is sent
-		// via the API (which creates a new agent or wakes a sleeping one).
 		if pod.Status.Phase == corev1.PodFailed || pod.Status.Phase == corev1.PodSucceeded {
+			// If agent status already reflects the terminal state, delete the pod
+			// so a new one can be created on the next task request.
+			if agent.Status.Phase == komputerv1alpha1.AgentPhaseSucceeded ||
+				agent.Status.Phase == komputerv1alpha1.AgentPhaseFailed {
+				log.Info("Deleting terminal pod", "pod", podName, "podPhase", pod.Status.Phase)
+				if err := r.Delete(ctx, pod); err != nil && !errors.IsNotFound(err) {
+					return nil, err
+				}
+				return nil, nil
+			}
+			// First time seeing terminal pod — return it so reconcileStatus persists the phase
 			return pod, nil
 		}
 		return pod, nil

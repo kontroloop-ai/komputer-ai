@@ -116,6 +116,8 @@ anthropicApiKeySecret:
 
 # -- KomputerConfig settings
 config:
+  # -- Default namespace for agents when not specified by the user (default: "default")
+  defaultAgentNamespace: "default"
   # -- Override the API URL (auto-generated from release name if empty)
   apiURL: ""
   redis:

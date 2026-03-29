@@ -42,14 +42,17 @@ async def _request(method: str, path: str, timeout: int = 10, **kwargs) -> dict:
 
 @tool(
     name="create_agent",
-    description="Create a sub-agent to handle a specific task. The agent will start working immediately. Sub-agents are always workers (no orchestration tools). You can pass secrets to sub-agents if they need credentials (e.g. for git clone with auth).",
+    description="Create a sub-agent to handle a task. Default role is 'worker' (Bash+WebSearch only). Set role='manager' for complex tasks that need their own sub-agents. Use lifecycle='AutoDelete' for one-shot tasks.",
     input_schema={
         "type": "object",
         "properties": {
-            "name": {"type": "string", "description": "Unique name for the sub-agent (e.g. 'bitcoin-researcher', 'weather-agent'). Use lowercase with hyphens, no spaces. This exact name is used for all subsequent operations."},
-            "instructions": {"type": "string", "description": "Detailed task instructions for the sub-agent"},
-            "model": {"type": "string", "description": "Claude model to use (optional, defaults to claude-sonnet)"},
-            "secrets": {"type": "object", "description": "Key-value secrets to pass to the sub-agent (e.g. {\"GITHUB\": \"ghp_xxx\"}). They become SECRET_KEY env vars in the sub-agent pod.", "additionalProperties": {"type": "string"}},
+            "name": {"type": "string", "description": "Unique name for the sub-agent (lowercase, hyphens, no spaces). Used for all operations (wait, status, delete)."},
+            "instructions": {"type": "string", "description": "Detailed task instructions for the sub-agent."},
+            "role": {"type": "string", "enum": ["worker", "manager"], "description": "Agent role. 'worker' (default) has Bash+WebSearch only. 'manager' can create its own sub-agents."},
+            "lifecycle": {"type": "string", "enum": ["", "Sleep", "AutoDelete"], "description": "Post-task behavior. Empty=pod stays running, 'Sleep'=pod deleted/PVC kept, 'AutoDelete'=everything deleted."},
+            "model": {"type": "string", "description": "Claude model override (optional)."},
+            "templateRef": {"type": "string", "description": "Pod template name (optional, defaults to 'default')."},
+            "secrets": {"type": "object", "description": "Key-value secrets (e.g. {\"GITHUB\": \"ghp_xxx\"}). Parent secrets are auto-forwarded.", "additionalProperties": {"type": "string"}},
         },
         "required": ["name", "instructions"],
     },
@@ -59,25 +62,27 @@ async def create_agent(args):
     payload = {
         "name": full_name,
         "instructions": args["instructions"],
-        "role": "worker",
+        "role": args.get("role", "worker"),
         "namespace": NAMESPACE,
     }
 
+    if args.get("lifecycle"):
+        payload["lifecycle"] = args["lifecycle"]
+    if args.get("model"):
+        payload["model"] = args["model"]
+    if args.get("templateRef"):
+        payload["templateRef"] = args["templateRef"]
+
     # Auto-forward all SECRET_* env vars from the manager to the sub-agent.
-    # The model doesn't need to explicitly read and pass them.
     inherited_secrets = {}
     for key, value in os.environ.items():
         if key.startswith("SECRET_"):
-            # Strip the SECRET_ prefix — the API will re-add it.
             inherited_secrets[key[7:]] = value
-    # Explicit secrets from the model override inherited ones.
     if args.get("secrets"):
         inherited_secrets.update(args["secrets"])
     if inherited_secrets:
         payload["secrets"] = inherited_secrets
 
-    if args.get("model"):
-        payload["model"] = args["model"]
     return await _request("POST", "/api/v1/agents", timeout=30, json=payload)
 
 

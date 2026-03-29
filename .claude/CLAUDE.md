@@ -31,3 +31,19 @@ Each status field has exactly one writer. No component writes fields it doesn't 
 | **API worker** | TaskStatus, LastTaskMessage, SessionID, LastTaskCostUSD, TotalCostUSD |
 
 When adding new status fields, decide the owner upfront and document it in the field comment.
+
+## 5. Full-Stack Field Consistency
+
+When adding a new field to `KomputerAgentSpec` or `KomputerAgentStatus`, it must be propagated to **all** layers:
+
+| # | Layer | What to update |
+|---|-------|----------------|
+| 1 | **CRD types** | `komputer-operator/api/v1alpha1/komputeragent_types.go` |
+| 2 | **CRD YAML** | Regenerate CRD + copy to `helm/komputer-ai/crds/` |
+| 3 | **API request struct** | `CreateAgentRequest` in `komputer-api/handler.go` |
+| 4 | **API response struct** | `AgentResponse` in `komputer-api/handler.go` |
+| 5 | **API handlers** | All response paths in create, get, list, and wake handlers |
+| 6 | **K8s client** | `komputer-api/k8s.go` — pass field when creating/updating CR |
+| 7 | **CLI** | `komputer-cli/main.go` — add flag + include in request/display |
+
+Do not merge a new field unless all layers are updated. A missing layer means clients can't see or set the field.

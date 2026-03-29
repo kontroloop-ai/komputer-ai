@@ -166,6 +166,9 @@ type AgentResponse struct {
 	Status          string `json:"status"`
 	TaskStatus      string `json:"taskStatus"`
 	LastTaskMessage string `json:"lastTaskMessage"`
+	Lifecycle       string `json:"lifecycle"`
+	LastTaskCostUSD string `json:"lastTaskCostUSD"`
+	TotalCostUSD    string `json:"totalCostUSD"`
 	CreatedAt       string `json:"createdAt"`
 }
 
@@ -219,6 +222,15 @@ func printAgent(a AgentResponse) {
 	row("Task:", taskBadge)
 	row("Model:", a.Model)
 	row("Namespace:", a.Namespace)
+	if a.Lifecycle != "" {
+		row("Lifecycle:", a.Lifecycle)
+	}
+	if a.LastTaskCostUSD != "" {
+		row("Last Task Cost:", "$"+a.LastTaskCostUSD)
+	}
+	if a.TotalCostUSD != "" {
+		row("Total Cost:", "$"+a.TotalCostUSD)
+	}
 	row("Created:", a.CreatedAt)
 	if a.LastTaskMessage != "" {
 		row("Last Message:", a.LastTaskMessage)

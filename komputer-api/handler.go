@@ -148,6 +148,7 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 					Namespace: existing.Namespace,
 					Model:     existing.Spec.Model,
 					Status:    "Pending",
+					Lifecycle: string(existing.Spec.Lifecycle),
 					CreatedAt: existing.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
 				})
 				return
@@ -215,6 +216,7 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 			Namespace: agent.Namespace,
 			Model:     agent.Spec.Model,
 			Status:    "Pending",
+			Lifecycle: string(agent.Spec.Lifecycle),
 			CreatedAt: agent.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
 		})
 	}
@@ -331,6 +333,7 @@ func getAgent(k8s *K8sClient) gin.HandlerFunc {
 			Status:          string(agent.Status.Phase),
 			TaskStatus:      string(agent.Status.TaskStatus),
 			LastTaskMessage: agent.Status.LastTaskMessage,
+			Lifecycle:       string(agent.Spec.Lifecycle),
 			CreatedAt:       agent.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
 		})
 	}
@@ -399,6 +402,7 @@ func listAgents(k8s *K8sClient) gin.HandlerFunc {
 				Status:          string(a.Status.Phase),
 				TaskStatus:      string(a.Status.TaskStatus),
 				LastTaskMessage: a.Status.LastTaskMessage,
+				Lifecycle:       string(a.Spec.Lifecycle),
 				CreatedAt:       a.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
 			})
 		}

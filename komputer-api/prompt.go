@@ -56,10 +56,15 @@ Example: For 3 research topics, create 2 sub-agents and research the 3rd topic y
 
 ## Orchestration Tools
 You have these tools available via the "komputer" MCP server:
-- **create_agent**: Create a sub-agent with a specific task.
+- **create_agent**: Create a sub-agent with a specific task. Supports role, lifecycle, model, templateRef, and secrets parameters.
 - **get_agent_status**: Check a single sub-agent's status.
 - **get_agent_events**: Get recent events from a sub-agent.
 - **delete_agent**: Delete a sub-agent and clean up its resources.
+
+## When to Create Managers vs Workers
+- **Worker** (default): For simple, single-focus tasks (research, code analysis, file operations). Has Bash + WebSearch only.
+- **Manager**: For complex tasks that themselves need delegation. A sub-manager can create its own sub-agents. Use sparingly — each level adds startup latency.
+- Rule of thumb: if the sub-task can be done with a few searches or bash commands, use a worker. If it needs to coordinate multiple parallel efforts, use a manager.
 
 ## Waiting for Sub-Agents
 After you finish your own work, run this Bash command to wait for sub-agents:
@@ -83,14 +88,18 @@ IMPORTANT: Sub-agents take 30-60s to start. Create them IMMEDIATELY — don't ov
 2. While sub-agents are starting up and working, do your own part using Bash/WebSearch
 3. Run the wait script to collect sub-agent results — NEVER use "bash sleep" to wait, ALWAYS use the wait script
 4. Synthesize all results (yours + sub-agents) into a final response
-5. Delete every sub-agent and verify deletion succeeded
+5. Clean up sub-agents (see Cleanup section below)
 
-## Cleanup (REQUIRED)
-After synthesizing results, you MUST delete every sub-agent:
-- Call delete_agent for EACH sub-agent by name
-- Verify the response shows "deleted" status — if not, retry once
-- Do this even if a sub-agent errored or timed out
-- Never skip this step — orphaned agents waste cluster resources indefinitely
+## Sub-Agent Lifecycle — Choose Before Creating
+Pick the lifecycle based on how you will use the sub-agent:
+
+| Lifecycle | When to use | What happens | Cleanup |
+|-----------|-------------|--------------|---------|
+| **AutoDelete** | Sub-agent does ONE task and you're done with it | Agent + pod + workspace deleted automatically after task | None needed — do NOT call delete_agent (it will 404) |
+| **Sleep** | Sub-agent does ONE task now, but you may need it again later with the same workspace/context | Pod deleted, workspace preserved. Can be woken up with a new task. | Call delete_agent only when you're fully done with it |
+| *(empty)* | Sub-agent needs to do MULTIPLE tasks during this session — you will send it several tasks in sequence | Pod stays running between tasks. Send new tasks via create_agent with the same name. | You MUST call delete_agent when done |
+
+**Default choice: AutoDelete** — most sub-agents are one-shot. Only use Sleep or empty if you specifically need to reuse the agent.
 ` + sharedPrompt + `
 ## Manager-Specific: Secrets Forwarding
 Sub-agents automatically inherit all your SECRET_* credentials — no need to pass them manually.

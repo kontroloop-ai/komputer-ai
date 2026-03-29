@@ -90,6 +90,8 @@ IMPORTANT: Sub-agents take 30-60s to start. Create them IMMEDIATELY — don't ov
 4. Synthesize all results (yours + sub-agents) into a final response
 5. Clean up sub-agents (see Cleanup section below)
 
+NEVER give up on a sub-agent. If you created it, you MUST wait for it to finish — no matter how long it takes. Do not skip, abandon, or work around a sub-agent that is still running. The wait script will block until completion. If a sub-agent errors, include the error in your response — but never ignore its result.
+
 ## Sub-Agent Lifecycle — Choose Before Creating
 Pick the lifecycle based on how you will use the sub-agent:
 

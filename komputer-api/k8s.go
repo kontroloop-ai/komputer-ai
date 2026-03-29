@@ -261,10 +261,13 @@ func (k *K8sClient) CancelAgentTask(ctx context.Context, ns, podName, podIP stri
 }
 
 // ForwardTaskToAgent sends a task to an agent's FastAPI endpoint, falling back to kubectl exec.
-func (k *K8sClient) ForwardTaskToAgent(ctx context.Context, ns, podName, podIP, instructions, model string) error {
+func (k *K8sClient) ForwardTaskToAgent(ctx context.Context, ns, podName, podIP, instructions, model, systemPrompt string) error {
 	bodyMap := map[string]string{"instructions": instructions}
 	if model != "" {
 		bodyMap["model"] = model
+	}
+	if systemPrompt != "" {
+		bodyMap["system_prompt"] = systemPrompt
 	}
 	bodyJSON, _ := json.Marshal(bodyMap)
 
@@ -372,6 +375,80 @@ func (k *K8sClient) DeleteOffice(ctx context.Context, ns, name string) error {
 		},
 	}
 	return k.client.Delete(ctx, office)
+}
+
+func (k *K8sClient) CreateSchedule(ctx context.Context, ns string, req *CreateScheduleRequest) (*komputerv1alpha1.KomputerSchedule, error) {
+	schedule := &komputerv1alpha1.KomputerSchedule{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      req.Name,
+			Namespace: ns,
+			Labels: map[string]string{
+				"komputer.ai/schedule-name": req.Name,
+			},
+		},
+		Spec: komputerv1alpha1.KomputerScheduleSpec{
+			Schedule:     req.Schedule,
+			Instructions: req.Instructions,
+			Timezone:     req.Timezone,
+			AutoDelete:   req.AutoDelete,
+			KeepAgents:   req.KeepAgents,
+			AgentName:    req.AgentName,
+		},
+	}
+
+	if req.Agent != nil {
+		lifecycle := komputerv1alpha1.AgentLifecycle(req.Agent.Lifecycle)
+		if lifecycle == "" {
+			lifecycle = komputerv1alpha1.AgentLifecycleSleep
+		}
+		agentSpec := &komputerv1alpha1.ScheduleAgentSpec{
+			Model:       req.Agent.Model,
+			Lifecycle:   lifecycle,
+			Role:        req.Agent.Role,
+			TemplateRef: req.Agent.TemplateRef,
+		}
+		// Create K8s Secrets from key-value pairs and store secret names on agent spec
+		if len(req.Agent.Secrets) > 0 {
+			secretName, err := k.CreateAgentSecrets(ctx, ns, req.Name+"-agent", req.Agent.Secrets)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create secrets: %w", err)
+			}
+			agentSpec.Secrets = []string{secretName}
+		}
+		schedule.Spec.Agent = agentSpec
+	}
+
+	if err := k.client.Create(ctx, schedule); err != nil {
+		return nil, err
+	}
+	return schedule, nil
+}
+
+func (k *K8sClient) GetSchedule(ctx context.Context, ns, name string) (*komputerv1alpha1.KomputerSchedule, error) {
+	schedule := &komputerv1alpha1.KomputerSchedule{}
+	err := k.client.Get(ctx, types.NamespacedName{Name: name, Namespace: ns}, schedule)
+	if err != nil {
+		return nil, err
+	}
+	return schedule, nil
+}
+
+func (k *K8sClient) ListSchedules(ctx context.Context, ns string) ([]komputerv1alpha1.KomputerSchedule, error) {
+	list := &komputerv1alpha1.KomputerScheduleList{}
+	if err := k.client.List(ctx, list, client.InNamespace(ns)); err != nil {
+		return nil, err
+	}
+	return list.Items, nil
+}
+
+func (k *K8sClient) DeleteSchedule(ctx context.Context, ns, name string) error {
+	schedule := &komputerv1alpha1.KomputerSchedule{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+		},
+	}
+	return k.client.Delete(ctx, schedule)
 }
 
 // PatchAgentTaskStatus patches only the task-related status fields on a KomputerAgent CR.

@@ -41,6 +41,7 @@ rules:
   resources:
   - komputeragents
   - komputeroffices
+  - komputerschedules
   verbs:
   - create
   - delete
@@ -54,6 +55,7 @@ rules:
   resources:
   - komputeragents/finalizers
   - komputeroffices/finalizers
+  - komputerschedules/finalizers
   verbs:
   - update
 - apiGroups:
@@ -61,6 +63,7 @@ rules:
   resources:
   - komputeragents/status
   - komputeroffices/status
+  - komputerschedules/status
   verbs:
   - get
   - patch

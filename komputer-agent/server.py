@@ -24,6 +24,7 @@ def configure(publisher, model: str):
 class TaskRequest(BaseModel):
     instructions: str
     model: Optional[str] = None
+    system_prompt: Optional[str] = None
 
 
 @app.get("/status")
@@ -64,7 +65,7 @@ async def create_task(req: TaskRequest, background_tasks: BackgroundTasks):
             loop = asyncio.new_event_loop()
             state.active_loop = loop
             _current_loop = loop
-            _current_task = loop.create_task(run_agent(req.instructions, task_model, _publisher))
+            _current_task = loop.create_task(run_agent(req.instructions, task_model, _publisher, system_prompt=req.system_prompt))
             try:
                 loop.run_until_complete(_current_task)
             except asyncio.CancelledError:

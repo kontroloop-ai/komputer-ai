@@ -92,6 +92,67 @@ async def create_agent(args):
 
 
 @tool(
+    name="schedule_agent",
+    description="Schedule a recurring or one-time agent task on a cron schedule. Creates a KomputerSchedule that triggers an agent at scheduled times. Use for reminders, periodic reports, monitoring, etc.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "Unique name for the schedule (lowercase, hyphens, no spaces)."},
+            "schedule": {"type": "string", "description": "Cron expression (5-field: min hour dom month dow). Examples: '0 9 * * MON-FRI' (weekday 9am), '*/30 * * * *' (every 30min), '0 0 1 * *' (monthly)."},
+            "instructions": {"type": "string", "description": "Task instructions for the agent on each scheduled run."},
+            "timezone": {"type": "string", "description": "IANA timezone (e.g. 'America/New_York', 'Asia/Jerusalem'). Defaults to UTC."},
+            "auto_delete": {"type": "boolean", "description": "If true, the schedule deletes itself after the first successful run. Use for one-time future tasks."},
+            "keep_agents": {"type": "boolean", "description": "When auto_delete is true, keep managed agents alive after the schedule deletes itself."},
+            "agent_name": {"type": "string", "description": "Reference an existing agent instead of creating a new one. Use your own agent name to schedule a task for yourself."},
+            "lifecycle": {"type": "string", "enum": ["", "Sleep", "AutoDelete"], "description": "Agent lifecycle. Defaults to 'Sleep' (recommended for schedules)."},
+            "role": {"type": "string", "enum": ["worker", "manager"], "description": "Agent role. Default: 'worker'."},
+            "model": {"type": "string", "description": "Claude model override."},
+        },
+        "required": ["name", "schedule", "instructions"],
+    },
+)
+async def schedule_agent(args):
+    sanitized = _sanitize_name(args["name"])
+    payload = {
+        "name": sanitized,
+        "schedule": args["schedule"],
+        "namespace": NAMESPACE,
+    }
+
+    if args.get("timezone"):
+        payload["timezone"] = args["timezone"]
+    if args.get("auto_delete") is not None:
+        payload["autoDelete"] = args["auto_delete"]
+    if args.get("keep_agents") is not None:
+        payload["keepAgents"] = args["keep_agents"]
+
+    if args.get("agent_name"):
+        # Reference an existing agent.
+        payload["agentName"] = _sanitize_name(args["agent_name"])
+    else:
+        # Build an agent spec for a new agent.
+        agent_spec = {
+            "lifecycle": args.get("lifecycle", "Sleep"),
+            "role": args.get("role", "worker"),
+        }
+        if args.get("model"):
+            agent_spec["model"] = args["model"]
+        # Auto-forward all SECRET_* env vars from the manager to the scheduled agent.
+        inherited_secrets = {}
+        for key, value in os.environ.items():
+            if key.startswith("SECRET_"):
+                inherited_secrets[key[7:]] = value
+        if inherited_secrets:
+            agent_spec["secrets"] = inherited_secrets
+        payload["agent"] = agent_spec
+
+    # Instructions live at top level on the schedule.
+    payload["instructions"] = args["instructions"]
+
+    return await _request("POST", "/api/v1/schedules", timeout=30, json=payload)
+
+
+@tool(
     name="get_agent_status",
     description="Get the current status of a sub-agent. Returns taskStatus ('Busy', 'Idle', 'Error') and other details.",
     input_schema={
@@ -141,9 +202,25 @@ async def delete_agent(args):
     return await _request("DELETE", f"/api/v1/agents/{full_name}")
 
 
+@tool(
+    name="delete_schedule",
+    description="Delete a schedule and its managed agents. Use to stop recurring tasks.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "The schedule name (as passed to schedule_agent)"},
+        },
+        "required": ["name"],
+    },
+)
+async def delete_schedule(args):
+    full_name = _sanitize_name(args["name"])
+    return await _request("DELETE", f"/api/v1/schedules/{full_name}")
+
+
 def create_manager_server():
     """Create the MCP server with manager orchestration tools."""
     return create_sdk_mcp_server(
         name="komputer",
-        tools=[create_agent, get_agent_status, get_agent_events, delete_agent],
+        tools=[create_agent, schedule_agent, get_agent_status, get_agent_events, delete_agent, delete_schedule],
     )

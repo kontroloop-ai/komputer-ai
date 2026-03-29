@@ -33,12 +33,12 @@ def _save_session_id(session_id: str):
     SESSION_FILE.write_text(session_id)
 
 
-async def run_agent(instructions: str, model: str, publisher):
+async def run_agent(instructions: str, model: str, publisher, system_prompt: str = None):
     """Run a Claude agent with the given instructions using the Claude Agent SDK."""
     import state
     session_id = _load_session_id()
 
-    # Extract just the user's task for the event (strip system prompt).
+    # Strip system prompt from the event — only show the user's task
     user_task = instructions
     task_marker = "## Your Task\n"
     if task_marker in instructions:
@@ -72,6 +72,10 @@ async def run_agent(instructions: str, model: str, publisher):
         },
     )
 
+    # Set system prompt via SDK (replaces previous system prompt, doesn't accumulate in history)
+    if system_prompt:
+        options.system_prompt = system_prompt
+
     # Conditionally register manager orchestration tools
     if os.environ.get("KOMPUTER_ROLE") == "manager":
         from manager_tools import create_manager_server
@@ -91,6 +95,7 @@ async def run_agent(instructions: str, model: str, publisher):
         state.set_active_client(client)
 
         await client.query(full_prompt)
+
 
         async for message in client.receive_response():
             if isinstance(message, AssistantMessage):

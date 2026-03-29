@@ -1,0 +1,150 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: komputerschedules.komputer.komputer.ai
+spec:
+  group: komputer.komputer.ai
+  names:
+    kind: KomputerSchedule
+    listKind: KomputerScheduleList
+    plural: komputerschedules
+    singular: komputerschedule
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.schedule
+      name: Schedule
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.agentName
+      name: Agent
+      type: string
+    - jsonPath: .status.runCount
+      name: Runs
+      type: integer
+    - jsonPath: .status.totalCostUSD
+      name: Cost
+      type: string
+    - jsonPath: .status.nextRunTime
+      name: Next
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              agent:
+                description: Agent defines the template for creating a new agent.
+                  Used when AgentName is empty.
+                properties:
+                  lifecycle:
+                    default: Sleep
+                    description: AgentLifecycle controls what happens after task completion.
+                    enum:
+                    - ""
+                    - Sleep
+                    - AutoDelete
+                    type: string
+                  model:
+                    default: claude-sonnet-4-6
+                    type: string
+                  role:
+                    default: worker
+                    type: string
+                  secrets:
+                    items:
+                      type: string
+                    type: array
+                  templateRef:
+                    default: default
+                    type: string
+                type: object
+              agentName:
+                description: AgentName references an existing KomputerAgent to trigger
+                  on schedule.
+                type: string
+              autoDelete:
+                description: AutoDelete deletes this schedule CR after the first successful
+                  run.
+                type: boolean
+              instructions:
+                description: Instructions is the task to run on each scheduled tick.
+                  Required.
+                type: string
+              keepAgents:
+                description: KeepAgents, when true, removes the ownerReference before
+                  auto-deleting so agents survive.
+                type: boolean
+              schedule:
+                description: 'Schedule is a cron expression (5-field: min hour dom
+                  month dow).'
+                type: string
+              suspended:
+                description: Suspended pauses the schedule without deleting it.
+                type: boolean
+              timezone:
+                description: Timezone is an IANA timezone for interpreting the cron
+                  schedule. Defaults to UTC.
+                type: string
+            required:
+            - instructions
+            - schedule
+            type: object
+          status:
+            properties:
+              agentName:
+                type: string
+              failedRuns:
+                type: integer
+              lastRunCostUSD:
+                type: string
+              lastRunStatus:
+                type: string
+              lastRunTime:
+                format: date-time
+                type: string
+              message:
+                type: string
+              nextRunTime:
+                format: date-time
+                type: string
+              phase:
+                type: string
+              runCount:
+                type: integer
+              successfulRuns:
+                type: integer
+              totalCostUSD:
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -16,6 +15,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/chzyer/readline"
 	"github.com/gorilla/websocket"
 	"github.com/spf13/cobra"
 )
@@ -210,6 +210,30 @@ type OfficeMemberResponse struct {
 
 type OfficeListResponse struct {
 	Offices []OfficeResponse `json:"offices"`
+}
+
+type ScheduleResponse struct {
+	Name           string `json:"name"`
+	Namespace      string `json:"namespace"`
+	Schedule       string `json:"schedule"`
+	Timezone       string `json:"timezone"`
+	AutoDelete     bool   `json:"autoDelete"`
+	KeepAgents     bool   `json:"keepAgents"`
+	Phase          string `json:"phase"`
+	AgentName      string `json:"agentName"`
+	NextRunTime    string `json:"nextRunTime"`
+	LastRunTime    string `json:"lastRunTime"`
+	RunCount       int    `json:"runCount"`
+	SuccessfulRuns int    `json:"successfulRuns"`
+	FailedRuns     int    `json:"failedRuns"`
+	TotalCostUSD   string `json:"totalCostUSD"`
+	LastRunCostUSD string `json:"lastRunCostUSD"`
+	LastRunStatus  string `json:"lastRunStatus"`
+	CreatedAt      string `json:"createdAt"`
+}
+
+type ScheduleListResponse struct {
+	Schedules []ScheduleResponse `json:"schedules"`
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -1067,8 +1091,18 @@ func main() {
 			}
 
 			// 5. Input loop
-			scanner := bufio.NewScanner(os.Stdin)
+			rl, rlErr := readline.NewEx(&readline.Config{
+				Prompt:          "\033[1;34m> \033[0m", // bold blue prompt via ANSI (readline doesn't support lipgloss)
+				InterruptPrompt: "^C",
+				EOFPrompt:       "exit",
+			})
+			if rlErr != nil {
+				fmt.Println(errorStyle.Render("Failed to initialize input: " + rlErr.Error()))
+				os.Exit(1)
+			}
+			defer rl.Close()
 			chatPromptStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#3B82F6")).Inline(true)
+			_ = chatPromptStyle // prompt handled by readline
 			agentLabelStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#10B981")).Inline(true)
 			chatDimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280")).Inline(true)
 			chatWarnStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#F59E0B")).Inline(true)
@@ -1078,17 +1112,15 @@ func main() {
 			toolIconStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#A78BFA")).Inline(true)               // purple
 
 			for {
-				// Prompt for input
-				fmt.Print(chatPromptStyle.Render("> "))
-
-				if !scanner.Scan() {
-					// EOF or Ctrl+D
+				line, rlReadErr := rl.Readline()
+				if rlReadErr != nil {
+					// EOF (Ctrl+D) or interrupt
 					fmt.Println()
 					fmt.Println(dimStyle.Render(fmt.Sprintf("  Chat ended. Agent %s is still running.", agentName)))
 					return
 				}
 
-				input := strings.TrimSpace(scanner.Text())
+				input := strings.TrimSpace(line)
 				if input == "" {
 					continue
 				}
@@ -1116,17 +1148,42 @@ func main() {
 					body["lifecycle"] = lc
 				}
 
-				data, status, err = apiRequest("POST", ep+"/api/v1/agents", body)
+				// Retry on 409 (pod may still be starting)
+				for attempt := 0; attempt < 10; attempt++ {
+					data, status, err = apiRequest("POST", ep+"/api/v1/agents", body)
+					if err != nil {
+						thinkSpinner.Stop()
+						fmt.Println(errorStyle.Render("  Failed to send message: " + err.Error()))
+						break
+					}
+					if status == 409 {
+						var errResp ErrorResponse
+						json.Unmarshal(data, &errResp)
+						// If agent is busy with a real task, don't retry
+						if strings.Contains(errResp.Error, "busy") {
+							thinkSpinner.Stop()
+							fmt.Println(warnStyle.Render("  ⚠ " + errResp.Error))
+							break
+						}
+						// Pod not ready yet — wait and retry
+						thinkSpinner.SetMessage(fmt.Sprintf("Waiting for agent pod... (%ds)", attempt+1))
+						time.Sleep(1 * time.Second)
+						continue
+					}
+					break
+				}
 				if err != nil {
-					thinkSpinner.Stop()
-					fmt.Println(errorStyle.Render("  Failed to send message: " + err.Error()))
 					continue
 				}
 				if status == 409 {
-					thinkSpinner.Stop()
 					var errResp ErrorResponse
 					json.Unmarshal(data, &errResp)
-					fmt.Println(warnStyle.Render("  ⚠ " + errResp.Error))
+					if strings.Contains(errResp.Error, "busy") {
+						// Already printed above
+					} else {
+						thinkSpinner.Stop()
+						fmt.Println(warnStyle.Render("  ⚠ Agent is not ready. Try again in a few seconds."))
+					}
 					continue
 				}
 				if status != 200 && status != 201 && status != 202 {
@@ -1231,11 +1288,15 @@ func main() {
 
 					case "tool_result":
 						tool, _ := event.Payload["tool"].(string)
+						displayName := tool
+						// Clean up MCP tool names: mcp__komputer__create_agent → create_agent
+						if strings.HasPrefix(tool, "mcp__komputer__") {
+							displayName = strings.TrimPrefix(tool, "mcp__komputer__")
+						}
 						detail := ""
 						if tool == "Bash" {
 							if inputMap, ok := event.Payload["input"].(map[string]interface{}); ok {
 								if cmdStr, ok := inputMap["command"].(string); ok {
-									// Collapse whitespace and newlines into a single line
 									collapsed := strings.Join(strings.Fields(cmdStr), " ")
 									detail = "$ " + truncate(collapsed, 200)
 								}
@@ -1246,11 +1307,27 @@ func main() {
 									detail = q
 								}
 							}
+						} else if inputMap, ok := event.Payload["input"].(map[string]interface{}); ok {
+							// For MCP and other tools, show key params
+							var parts []string
+							for _, key := range []string{"name", "instructions", "schedule", "query"} {
+								if v, ok := inputMap[key].(string); ok && v != "" {
+									parts = append(parts, key+"="+truncate(v, 60))
+								}
+							}
+							if len(parts) > 0 {
+								detail = strings.Join(parts, ", ")
+							}
 						}
+						// Also show output snippet for MCP tools
+						output, _ := event.Payload["output"].(string)
 						if detail != "" {
-							fmt.Printf("  %s %s %s\n", toolIconStyle.Render("⚙"), toolNameStyle.Render(tool), toolDetailStyle.Render(detail))
+							fmt.Printf("  %s %s %s\n", toolIconStyle.Render("⚙"), toolNameStyle.Render(displayName), toolDetailStyle.Render(detail))
 						} else {
-							fmt.Printf("  %s %s\n", toolIconStyle.Render("⚙"), toolNameStyle.Render(tool))
+							fmt.Printf("  %s %s\n", toolIconStyle.Render("⚙"), toolNameStyle.Render(displayName))
+						}
+						if output != "" && strings.HasPrefix(tool, "mcp__") {
+							fmt.Printf("    %s\n", toolDetailStyle.Render(truncate(output, 200)))
 						}
 						// Show working spinner while waiting for next event
 						thinkSpinner = NewSpinner("Working...")
@@ -1621,6 +1698,321 @@ func main() {
 	})
 
 	root.AddCommand(officeCmd)
+
+	// ── schedule (parent) ──────────────────────────────────────────────
+	scheduleCmd := &cobra.Command{
+		Use:   "schedule",
+		Short: "Manage scheduled agent runs",
+	}
+
+	// ── schedule list ──────────────────────────────────────────────────
+	scheduleCmd.AddCommand(&cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List all schedules",
+		Run: func(cmd *cobra.Command, args []string) {
+			ep := resolveEndpoint(cmd)
+			data, status, err := apiRequest("GET", ep+"/api/v1/schedules"+nsQuery(cmd), nil)
+			if err != nil {
+				fmt.Println(errorStyle.Render("Request failed: " + err.Error()))
+				os.Exit(1)
+			}
+			if status != 200 {
+				fmt.Println(errorStyle.Render(fmt.Sprintf("API error (%d): %s", status, string(data))))
+				os.Exit(1)
+			}
+
+			var resp ScheduleListResponse
+			json.Unmarshal(data, &resp)
+
+			if len(resp.Schedules) == 0 {
+				fmt.Println(dimStyle.Render("No schedules found."))
+				return
+			}
+
+			fmt.Println(titleStyle.Render(fmt.Sprintf("  %d schedule(s)  ", len(resp.Schedules))))
+			fmt.Println()
+
+			// Compute dynamic column widths.
+			nameW := len("NAME")
+			schedW := len("SCHEDULE")
+			agentW := len("AGENT")
+			for _, s := range resp.Schedules {
+				if len(s.Name) > nameW {
+					nameW = len(s.Name)
+				}
+				if len(s.Schedule) > schedW {
+					schedW = len(s.Schedule)
+				}
+				if len(s.AgentName) > agentW {
+					agentW = len(s.AgentName)
+				}
+			}
+			nameW += 2
+			schedW += 2
+			agentW += 2
+			totalW := nameW + schedW + 14 + agentW + 8 + 10 + 22
+
+			// Table header
+			fmt.Printf("  %s  %s  %s  %s  %s  %s  %s\n",
+				labelStyle.Render(fmt.Sprintf("%-*s", nameW, "NAME")),
+				labelStyle.Render(fmt.Sprintf("%-*s", schedW, "SCHEDULE")),
+				labelStyle.Render(fmt.Sprintf("%-12s", "PHASE")),
+				labelStyle.Render(fmt.Sprintf("%-*s", agentW, "AGENT")),
+				labelStyle.Render(fmt.Sprintf("%-6s", "RUNS")),
+				labelStyle.Render(fmt.Sprintf("%-8s", "COST")),
+				labelStyle.Render(fmt.Sprintf("%-20s", "NEXT RUN")),
+			)
+			fmt.Println(dimStyle.Render("  " + strings.Repeat("─", totalW)))
+
+			for _, s := range resp.Schedules {
+				phase := s.Phase
+				switch phase {
+				case "Active":
+					phase = successStyle.Render(fmt.Sprintf("%-12s", "● Active"))
+				case "Suspended":
+					phase = warnStyle.Render(fmt.Sprintf("%-12s", "● Suspended"))
+				case "Error":
+					phase = errorStyle.Render(fmt.Sprintf("%-12s", "● Error"))
+				default:
+					phase = dimStyle.Render(fmt.Sprintf("%-12s", phase))
+				}
+
+				cost := "—"
+				if s.TotalCostUSD != "" {
+					cost = "$" + s.TotalCostUSD
+				}
+
+				nextRun := s.NextRunTime
+				if nextRun == "" {
+					nextRun = "—"
+				}
+				if s.AutoDelete {
+					nextRun = nextRun + " (one-time)"
+				}
+
+				fmt.Printf("  %s  %s  %s  %s  %s  %s  %s\n",
+					valueStyle.Render(fmt.Sprintf("%-*s", nameW, s.Name)),
+					dimStyle.Render(fmt.Sprintf("%-*s", schedW, s.Schedule)),
+					phase,
+					dimStyle.Render(fmt.Sprintf("%-*s", agentW, s.AgentName)),
+					valueStyle.Render(fmt.Sprintf("%-6d", s.RunCount)),
+					valueStyle.Render(fmt.Sprintf("%-8s", cost)),
+					dimStyle.Render(fmt.Sprintf("%-20s", nextRun)),
+				)
+			}
+			fmt.Println()
+		},
+	})
+
+	// ── schedule get ───────────────────────────────────────────────────
+	scheduleCmd.AddCommand(&cobra.Command{
+		Use:   "get <name>",
+		Short: "Get schedule details",
+		Args:  cobra.ExactArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			ep := resolveEndpoint(cmd)
+			scheduleName := args[0]
+
+			data, status, err := apiRequest("GET", fmt.Sprintf("%s/api/v1/schedules/%s%s", ep, url.PathEscape(scheduleName), nsQuery(cmd)), nil)
+			if err != nil {
+				fmt.Println(errorStyle.Render("Request failed: " + err.Error()))
+				os.Exit(1)
+			}
+			if status == 404 {
+				fmt.Println(errorStyle.Render(fmt.Sprintf("Schedule %q not found", scheduleName)))
+				os.Exit(1)
+			}
+			if status != 200 {
+				fmt.Println(errorStyle.Render(fmt.Sprintf("API error (%d): %s", status, string(data))))
+				os.Exit(1)
+			}
+
+			var sched ScheduleResponse
+			json.Unmarshal(data, &sched)
+
+			// Schedule header
+			fmt.Println(headerStyle.Render(fmt.Sprintf("  %s  ", sched.Name)))
+
+			phaseBadge := dimStyle.Render(sched.Phase)
+			switch sched.Phase {
+			case "Active":
+				phaseBadge = successStyle.Render("● Active")
+			case "Suspended":
+				phaseBadge = warnStyle.Render("● Suspended")
+			case "Error":
+				phaseBadge = errorStyle.Render("● Error")
+			}
+
+			row := func(label, value string) {
+				fmt.Printf("  %s %s\n", labelStyle.Render(fmt.Sprintf("%-16s", label)), valueStyle.Render(value))
+			}
+
+			row("Schedule:", sched.Schedule)
+			row("Timezone:", sched.Timezone)
+			row("Phase:", phaseBadge)
+			row("Agent:", sched.AgentName)
+
+			if sched.NextRunTime != "" {
+				row("Next Run:", sched.NextRunTime)
+			}
+
+			if sched.LastRunTime != "" {
+				lastRunDisplay := sched.LastRunTime
+				if sched.LastRunStatus != "" {
+					lastRunDisplay = fmt.Sprintf("%s (%s)", sched.LastRunTime, sched.LastRunStatus)
+				}
+				row("Last Run:", lastRunDisplay)
+			}
+
+			row("Runs:", fmt.Sprintf("%d total, %d successful, %d failed", sched.RunCount, sched.SuccessfulRuns, sched.FailedRuns))
+
+			if sched.TotalCostUSD != "" {
+				row("Total Cost:", "$"+sched.TotalCostUSD)
+			}
+			if sched.LastRunCostUSD != "" {
+				row("Last Cost:", "$"+sched.LastRunCostUSD)
+			}
+
+			if sched.AutoDelete {
+				row("One-time:", "yes")
+			}
+			if sched.KeepAgents {
+				row("Keep Agents:", "yes")
+			}
+
+			row("Created:", sched.CreatedAt)
+			fmt.Println()
+		},
+	})
+
+	// ── schedule create ────────────────────────────────────────────────
+	scheduleCreateCmd := &cobra.Command{
+		Use:   "create <name> <instructions>",
+		Short: "Create a new schedule",
+		Args:  cobra.ExactArgs(2),
+		Run: func(cmd *cobra.Command, args []string) {
+			ep := resolveEndpoint(cmd)
+			cron, _ := cmd.Flags().GetString("cron")
+			if cron == "" {
+				fmt.Println(errorStyle.Render("--cron flag is required"))
+				os.Exit(1)
+			}
+
+			timezone, _ := cmd.Flags().GetString("timezone")
+			autoDelete, _ := cmd.Flags().GetBool("auto-delete")
+			keepAgents, _ := cmd.Flags().GetBool("keep-agents")
+			agent, _ := cmd.Flags().GetString("agent")
+			model, _ := cmd.Flags().GetString("model")
+			lifecycle, _ := cmd.Flags().GetString("lifecycle")
+			ns, _ := cmd.Flags().GetString("namespace")
+
+			body := map[string]interface{}{
+				"name":         args[0],
+				"instructions": args[1],
+				"schedule":     cron,
+			}
+			if timezone != "" {
+				body["timezone"] = timezone
+			}
+			if autoDelete {
+				body["autoDelete"] = true
+			}
+			if keepAgents {
+				body["keepAgents"] = true
+			}
+			if agent != "" {
+				// Reference existing agent
+				body["agentName"] = agent
+			} else {
+				// Create agent from template
+				agentSpec := map[string]interface{}{
+					"lifecycle": lifecycle,
+				}
+				if model != "" {
+					agentSpec["model"] = model
+				}
+				body["agent"] = agentSpec
+			}
+			if ns != "" {
+				body["namespace"] = ns
+			}
+
+			data, status, err := apiRequest("POST", ep+"/api/v1/schedules", body)
+			if err != nil {
+				fmt.Println(errorStyle.Render("Request failed: " + err.Error()))
+				os.Exit(1)
+			}
+			if status == 409 {
+				var errResp ErrorResponse
+				json.Unmarshal(data, &errResp)
+				fmt.Println(warnStyle.Render("⚠ " + errResp.Error))
+				os.Exit(1)
+			}
+			if status != 200 && status != 201 {
+				fmt.Println(errorStyle.Render(fmt.Sprintf("API error (%d): %s", status, string(data))))
+				os.Exit(1)
+			}
+
+			var sched ScheduleResponse
+			json.Unmarshal(data, &sched)
+
+			fmt.Println(successStyle.Render("✔ Schedule created"))
+
+			row := func(label, value string) {
+				fmt.Printf("  %s %s\n", labelStyle.Render(fmt.Sprintf("%-16s", label)), valueStyle.Render(value))
+			}
+
+			row("Name:", sched.Name)
+			row("Schedule:", sched.Schedule)
+			row("Timezone:", sched.Timezone)
+			row("Agent:", sched.AgentName)
+			if sched.NextRunTime != "" {
+				row("Next Run:", sched.NextRunTime)
+			}
+			if sched.AutoDelete {
+				row("One-time:", "yes")
+			}
+			fmt.Println()
+		},
+	}
+	scheduleCreateCmd.Flags().String("cron", "", "Cron expression (required, e.g. '0 9 * * MON-FRI')")
+	scheduleCreateCmd.Flags().String("timezone", "UTC", "IANA timezone")
+	scheduleCreateCmd.Flags().Bool("auto-delete", false, "Delete schedule after first successful run")
+	scheduleCreateCmd.Flags().Bool("keep-agents", false, "Keep agents alive when schedule auto-deletes")
+	scheduleCreateCmd.Flags().String("agent", "", "Reference existing agent instead of creating one")
+	scheduleCreateCmd.Flags().String("model", "", "Claude model")
+	scheduleCreateCmd.Flags().String("lifecycle", "Sleep", "Agent lifecycle (default: Sleep)")
+	scheduleCmd.AddCommand(scheduleCreateCmd)
+
+	// ── schedule delete ────────────────────────────────────────────────
+	scheduleCmd.AddCommand(&cobra.Command{
+		Use:     "delete <name>",
+		Aliases: []string{"rm"},
+		Short:   "Delete a schedule and its managed agents",
+		Args:    cobra.ExactArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			ep := resolveEndpoint(cmd)
+			scheduleName := args[0]
+
+			data, status, err := apiRequest("DELETE", fmt.Sprintf("%s/api/v1/schedules/%s%s", ep, url.PathEscape(scheduleName), nsQuery(cmd)), nil)
+			if err != nil {
+				fmt.Println(errorStyle.Render("Request failed: " + err.Error()))
+				os.Exit(1)
+			}
+			if status == 404 {
+				fmt.Println(errorStyle.Render(fmt.Sprintf("Schedule %q not found", scheduleName)))
+				os.Exit(1)
+			}
+			if status != 200 {
+				fmt.Println(errorStyle.Render(fmt.Sprintf("API error (%d): %s", status, string(data))))
+				os.Exit(1)
+			}
+			fmt.Println(successStyle.Render(fmt.Sprintf("✔ Schedule %q deleted", scheduleName)))
+		},
+	})
+
+	root.AddCommand(scheduleCmd)
 
 	root.Execute()
 }

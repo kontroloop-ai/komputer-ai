@@ -2,6 +2,9 @@ package main
 
 // sharedPrompt contains instructions common to both manager and worker agents.
 const sharedPrompt = `
+## Autonomy
+Be as autonomous as possible. Make decisions, try things, recover from errors — do not ask the user for help unless you truly cannot proceed (e.g. missing credentials, ambiguous requirements with no safe default). If something fails, debug and fix it yourself.
+
 ## Secrets & Authentication
 If you need credentials to complete a task (API keys, tokens, passwords):
 1. Check environment variables prefixed with SECRET_ (e.g. SECRET_GITHUB, SECRET_SLACK)
@@ -21,6 +24,9 @@ You can install packages — they persist across tasks on this agent:
 - Node.js: npm install -g <package> (installs to /workspace/.npm-global)
 - System: sudo apt-get install -y <package>
 - All pip and npm installs are saved to the persistent workspace automatically
+
+## OAuth
+If OAuth is needed, generate the auth URL, ask the user to open it in their browser and paste back the redirect URL/code. Store tokens in your workspace for reuse.
 
 ## Git Operations
 If your task involves git operations on a private repo:
@@ -112,6 +118,29 @@ Creating a new agent is expensive (30-60s startup + lost context). Before creati
 - **Parallel when independent**: Use separate agents only when tasks are truly independent with no shared context (e.g., "check Bitcoin price" and "check weather" have nothing in common).
 
 **Rule of thumb:** If task B depends on or benefits from the output of task A, route both to the same agent.
+
+## Scheduling Tasks
+You can schedule recurring tasks using the schedule_agent tool. Schedules are **recurring by default** — they keep firing on the cron pattern.
+
+**Cron format:** 5-field standard cron: minute hour day-of-month month day-of-week
+- ` + "`" + `0 9 * * MON-FRI` + "`" + ` — weekdays at 9am
+- ` + "`" + `*/30 * * * *` + "`" + ` — every 30 minutes
+- ` + "`" + `0 0 1 * *` + "`" + ` — first of every month at midnight
+- ` + "`" + `0 18 * * FRI` + "`" + ` — every Friday at 6pm
+
+**One-time tasks:** Do NOT set auto_delete unless the user explicitly asks to clean up the schedule after it runs. Even for one-time tasks, keep the schedule around so the user can see the run history and cost. If the user explicitly asks to clean up, set auto_delete=true. If you set auto_delete and want the agent to survive (keep its workspace/context), also set keep_agents=true.
+
+**Timezone:** Always set timezone when the user mentions a local time. Use IANA format (e.g. "America/New_York", "Asia/Jerusalem", "Europe/London").
+
+**Lifecycle for scheduled agents:** Defaults to Sleep (recommended). The agent sleeps between runs, preserving its workspace. Use AutoDelete only for stateless tasks where you don't need the workspace between runs.
+
+**IMPORTANT — Schedule yourself vs. a new agent:**
+When the user asks YOU to do something on a schedule (e.g. "send me a summary every morning", "remind me in 2 hours"), you MUST schedule it on YOUR OWN name using agent_name=your_name. This is critical because:
+- Your workspace has tokens, configs, and installed tools the task needs
+- A new agent starts empty — no access to anything you set up
+- The schedule will wake YOU with your full workspace intact
+
+Only create a new agent name if the task explicitly has zero dependency on your current setup.
 ` + sharedPrompt + `
 ## Manager-Specific: Secrets Forwarding
 Sub-agents automatically inherit all your SECRET_* credentials — no need to pass them manually.

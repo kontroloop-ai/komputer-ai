@@ -22,7 +22,7 @@ kubectl create secret generic anthropic-api-key \
 ### 2. Install the chart
 
 ```bash
-helm install komputer oci://ghcr.io/kontroloop-ai/charts/komputer-ai \
+helm install komputer-ai oci://ghcr.io/kontroloop-ai/charts/komputer-ai \
   --set anthropicApiKeySecret.name=anthropic-api-key \
   --namespace komputer-ai
 ```
@@ -95,7 +95,7 @@ See [`values.yaml`](values.yaml) for all options.
 ### External Redis
 
 ```bash
-helm install komputer oci://ghcr.io/kontroloop-ai/charts/komputer-ai \
+helm install komputer-ai oci://ghcr.io/kontroloop-ai/charts/komputer-ai \
   --set anthropicApiKeySecret.name=anthropic-api-key \
   --set redis.enabled=false \
   --set externalRedis.address=redis.prod:6379 \
@@ -130,7 +130,7 @@ api:
 ```
 
 ```bash
-helm install komputer oci://ghcr.io/kontroloop-ai/charts/komputer-ai \
+helm install komputer-ai oci://ghcr.io/kontroloop-ai/charts/komputer-ai \
   --set anthropicApiKeySecret.name=anthropic-api-key \
   -f values-ingress.yaml \
   --namespace komputer-ai
@@ -147,7 +147,7 @@ kubectl create secret docker-registry ghcr-pull-secret \
   --docker-password=<pat> \
   -n komputer-ai
 
-helm install komputer oci://ghcr.io/kontroloop-ai/charts/komputer-ai \
+helm install komputer-ai oci://ghcr.io/kontroloop-ai/charts/komputer-ai \
   --set anthropicApiKeySecret.name=anthropic-api-key \
   --set imagePullSecrets[0].name=ghcr-pull-secret \
   --namespace komputer-ai
@@ -178,7 +178,7 @@ agent:
 ```
 
 ```bash
-helm install komputer oci://ghcr.io/kontroloop-ai/charts/komputer-ai \
+helm install komputer-ai oci://ghcr.io/kontroloop-ai/charts/komputer-ai \
   --set anthropicApiKeySecret.name=anthropic-api-key \
   -f values-with-kubectl.yaml \
   --namespace komputer-ai

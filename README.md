@@ -73,7 +73,7 @@ kubectl create secret generic anthropic-api-key \
 ### 2. Install with Helm
 
 ```bash
-helm install komputer oci://ghcr.io/kontroloop-ai/charts/komputer-ai \
+helm install komputer-ai oci://ghcr.io/kontroloop-ai/charts/komputer-ai \
   --set anthropicApiKeySecret.name=anthropic-api-key \
   --namespace komputer-ai
 ```
@@ -110,7 +110,7 @@ For external Redis, custom resource limits, or other configuration:
 
 ```bash
 # Use external Redis
-helm install komputer oci://ghcr.io/kontroloop-ai/charts/komputer-ai \
+helm install komputer-ai oci://ghcr.io/kontroloop-ai/charts/komputer-ai \
   --set anthropicApiKeySecret.name=anthropic-api-key \
   --set redis.enabled=false \
   --set externalRedis.address=redis.prod:6379 \
@@ -121,27 +121,39 @@ helm show values oci://ghcr.io/kontroloop-ai/charts/komputer-ai
 ```
 
 <details>
-<summary><b>Development setup (building from source)</b></summary>
+<summary><b>Local development setup (building from source)</b></summary>
+
+Requires: Go 1.22+, Docker, a local Kubernetes cluster (Docker Desktop, kind, minikube), and an Anthropic API key.
 
 ```bash
-# Build agent image
-docker build -t komputer-agent:latest komputer-agent/
-
-# Install CRDs
+# 1. Install CRDs
 cd komputer-operator && make install
 
-# Apply config and template
+# 2. Apply local infrastructure (Redis, API service, secrets)
+kubectl apply -f komputer-operator/config/samples/local-setup.yaml
+
+# 3. Create the Anthropic API key secret
+kubectl create secret generic anthropic-api-key \
+  --from-literal=api-key=sk-ant-...
+
+# 4. Apply platform config and default agent template
 kubectl apply -f komputer-operator/config/samples/komputer_v1alpha1_komputerconfig.yaml
 kubectl apply -f komputer-operator/config/samples/komputer_v1alpha1_komputeragentclustertemplate.yaml
 
-# Run operator (terminal 1)
-cd komputer-operator && make run
+# 5. Build the agent image
+docker build -t komputer-agent:latest komputer-agent/
+# For kind: kind load docker-image komputer-agent:latest --name <cluster-name>
 
-# Run API (terminal 2)
-kubectl port-forward svc/redis 6379:6379 &
+# 6. Port-forward Redis (terminal 1)
+kubectl port-forward svc/redis 6379:6379
+
+# 7. Run the API (terminal 2)
 cd komputer-api && REDIS_ADDRESS=localhost:6379 go run .
 
-# Build and use CLI (terminal 3)
+# 8. Run the operator (terminal 3)
+cd komputer-operator && make run
+
+# 9. Build and use the CLI (terminal 4)
 cd komputer-cli && go build -o komputer .
 ./komputer login http://localhost:8080
 ./komputer run my-agent "Hello world"

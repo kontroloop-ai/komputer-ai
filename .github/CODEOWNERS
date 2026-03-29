@@ -1,0 +1,9 @@
+# Default owners for everything in the repo
+* @amitde69 @itayvolo
+
+# Component-specific ownership
+/komputer-operator/ @amitde69
+/komputer-api/      @amitde69
+/komputer-agent/    @amitde69
+/komputer-cli/      @amitde69
+/helm/              @amitde69

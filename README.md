@@ -198,9 +198,14 @@ spec:
   model: "claude-sonnet-4-6"
   templateRef: "default"
   role: "manager"    # or "worker" — managers get orchestration tools
+  lifecycle: "Sleep" # "", "Sleep", or "AutoDelete"
   secrets:           # optional list of K8s Secret names
     - my-agent-secrets
 ```
+
+**KomputerOffice** — Tracks a group of agents under a manager. Created automatically when managers create sub-agents.
+
+**KomputerSchedule** — Runs agent tasks on a cron schedule with timezone support, auto-delete, and cost tracking.
 
 ## CLI Usage
 

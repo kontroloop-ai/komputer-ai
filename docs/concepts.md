@@ -18,6 +18,16 @@ When you create an agent, you give it a name, a task (instructions), and optiona
 
 Agents are **persistent**. After completing a task, the pod stays running and the workspace is preserved. You can send the same agent new tasks, and it picks up where it left off — same files, same environment. Claude also maintains conversation continuity across tasks via session IDs.
 
+### Lifecycle Modes
+
+By default, agent pods stay running after task completion. You can change this behavior with the `lifecycle` field:
+
+- **Default (`""`)** — Pod stays running, ready for the next task immediately. Best for interactive use and agents that receive frequent tasks.
+- **Sleep** — Pod is deleted after task completion, but the PVC (workspace) is preserved. When a new task is sent, the operator creates a fresh pod that reconnects to the same workspace. Saves compute costs for infrequent tasks.
+- **AutoDelete** — The entire agent (CR, pod, PVC, secrets) is deleted after task completion. Best for one-shot tasks where nothing needs to persist.
+
+Sleeping agents show a `Sleeping` phase in `kubectl get komputeragents`. When you send a new task to a sleeping agent, the API wakes it up automatically.
+
 ### Roles
 
 Agents have one of two roles:
@@ -72,6 +82,46 @@ When creating an agent, the namespace is auto-created if it doesn't exist. The d
 
 All API endpoints and CLI commands support namespace selection. If no namespace is specified, the server's default namespace is used.
 
+## Cost Tracking
+
+Every agent tracks its Anthropic API usage in the CR status:
+
+- **`lastTaskCostUSD`** — Cost of the most recent task
+- **`totalCostUSD`** — Cumulative cost of all tasks run by this agent
+
+These fields are updated by the API worker when a `task_completed` event arrives. You can see costs via `kubectl get komputeragents` (the Cost column), the CLI (`komputer get <name>`), or the API response fields.
+
+Offices and schedules also aggregate costs across all their agents.
+
+## Offices
+
+A **KomputerOffice** represents a group of agents working together under a manager. When a manager agent creates sub-agents, the system tracks them as an office — providing a single view of the group's progress, active agents, and total cost.
+
+Offices are created automatically when a manager agent creates its first sub-agent. The office status tracks:
+
+- The manager agent and all its members
+- Per-member task status and cost
+- Aggregate counts (total, active, completed agents)
+- Total cost across all members
+
+This is primarily a status/observability resource — you don't create offices directly, they emerge from manager-worker interactions.
+
+## Schedules
+
+A **KomputerSchedule** runs agent tasks on a cron schedule. Use it for recurring work — nightly reports, periodic monitoring, scheduled analysis.
+
+Key features:
+
+- **Cron expression** — Standard 5-field cron (`min hour dom month dow`)
+- **Timezone** — IANA timezone support (defaults to UTC)
+- **Suspend/resume** — Pause schedules without deleting them
+- **Auto-delete** — Optionally delete the schedule after the first successful run
+- **Keep agents** — When auto-deleting, optionally keep the created agents alive
+- **Agent configuration** — Specify model, role, lifecycle, template, and secrets for created agents
+- **Cost tracking** — Tracks total cost and per-run cost across all scheduled runs
+
+Schedules default to `Sleep` lifecycle for their agents, so compute is only used during the actual task execution.
+
 ## How They Fit Together
 
 ```
@@ -90,15 +140,22 @@ KomputerAgent (per namespace)
     │
     ├── references ──▶ Template (by name)
     ├── owns ──▶ Pod, PVC, ConfigMap, Secrets
+    ├── lifecycle ──▶ Default (running) / Sleep (PVC only) / AutoDelete
     ├── role: manager ──▶ gets MCP tools to create sub-agents
+    │                      └── creates ──▶ KomputerOffice (tracks the group)
     └── role: worker ──▶ gets bash + web search only
+
+KomputerSchedule (per namespace)
+    │
+    ├── cron expression + timezone
+    └── creates/triggers ──▶ KomputerAgent on schedule
 ```
 
 The typical flow:
 
 1. Platform admin sets up **KomputerConfig** (Redis, API URL) and a **KomputerAgentClusterTemplate** (default pod configuration)
-2. External system creates a **KomputerAgent** via the API, optionally with secrets
+2. External system creates a **KomputerAgent** via the API, optionally with secrets and a lifecycle mode
 3. The operator resolves the template, creates a pod and workspace, and starts the agent
 4. The agent executes the task, streaming events through Redis to the API
 5. The external system consumes events via WebSocket or polls the events endpoint
-6. The agent stays alive for future tasks, or is deleted when no longer needed
+6. Based on lifecycle: agent stays alive (default), sleeps (pod deleted, PVC kept), or auto-deletes

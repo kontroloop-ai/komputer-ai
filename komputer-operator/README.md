@@ -75,27 +75,76 @@ spec:
   instructions: "Research AI news"
   model: "claude-sonnet-4-6"     # optional, has default
   role: "manager"                 # "manager" or "worker"
+  lifecycle: "Sleep"              # "", "Sleep", or "AutoDelete"
   secrets:                        # optional list of K8s Secret names
     - my-agent-secrets
 ```
 
 - `role`: `manager` agents get orchestration tools (MCP) to create and manage sub-agents, while `worker` agents only have bash and web search tools.
+- `lifecycle`: Controls what happens after task completion. Default (`""`) keeps the pod running. `Sleep` deletes the pod but keeps the PVC — the agent wakes up on the next task. `AutoDelete` deletes the entire agent.
 - `secrets`: List of K8s Secret names. Each key in each secret is injected as an env var into the agent pod. The operator deduplicates env vars — agent secrets override template env vars with the same name.
 
 **Status fields:**
 
 ```
 kubectl get komputeragents
-NAME       PHASE     TASK         MODEL              AGE
-my-agent   Running   InProgress   claude-sonnet-4-6  5m
+NAME       PHASE      TASK         COST     MODEL              AGE
+my-agent   Running    InProgress   0.0842   claude-sonnet-4-6  5m
+sleepy     Sleeping   Complete     0.0231   claude-sonnet-4-6  1h
 ```
 
-- `phase` — Pod lifecycle: Pending, Running, Succeeded, Failed
+- `phase` — Pod lifecycle: Pending, Running, Sleeping, Succeeded, Failed
 - `taskStatus` — Agent activity: Complete, InProgress, Error (managed by the API worker)
+- `lastTaskCostUSD` — Cost of the most recent task
+- `totalCostUSD` — Cumulative cost of all tasks (shown as Cost column)
 - `podName`, `pvcName` — Names of created resources
 - `startTime`, `completionTime` — Timestamps
 - `lastTaskMessage` — Latest event summary
 - `sessionId` — Claude session ID for conversation continuity
+
+### KomputerOffice
+
+Tracks a group of agents working under a manager. Created automatically when a manager agent creates sub-agents.
+
+```
+kubectl get komputeroffices
+NAME         PHASE        MANAGER      AGENTS   ACTIVE   COST     AGE
+research     InProgress   researcher   4        2        0.3210   10m
+```
+
+- `phase` — InProgress, Complete, Error
+- `members` — Per-agent status (name, role, task status, cost)
+- `totalCostUSD` — Aggregate cost across all members
+
+### KomputerSchedule
+
+Runs agent tasks on a cron schedule.
+
+```yaml
+apiVersion: komputer.komputer.ai/v1alpha1
+kind: KomputerSchedule
+metadata:
+  name: nightly-report
+spec:
+  schedule: "0 2 * * *"           # 2:00 AM daily
+  timezone: "America/New_York"
+  instructions: "Generate the daily performance report"
+  agent:
+    model: "claude-sonnet-4-6"
+    lifecycle: "Sleep"             # default for schedules
+    role: "worker"
+```
+
+```
+kubectl get komputerschedules
+NAME             SCHEDULE      PHASE    AGENT            RUNS   COST     NEXT                   AGE
+nightly-report   0 2 * * *     Active   nightly-report   7      0.5600   2026-03-30T06:00:00Z   7d
+```
+
+- `suspended` — Pause without deleting
+- `autoDelete` — Delete the schedule after first successful run
+- `keepAgents` — When auto-deleting, keep the created agents alive
+- Tracks run count, success/fail counts, per-run and total cost
 
 ## Reconciliation Logic
 
@@ -111,7 +160,10 @@ When a `KomputerAgent` CR is created:
    - Env vars from `spec.secrets` (each key in each referenced K8s Secret)
    - Workspace PVC at `/workspace`
    - Config at `/etc/komputer`
-6. Keeps the pod alive — recreates on termination
+6. Manages pod lifecycle based on `spec.lifecycle`:
+   - Default: keeps the pod alive, recreates on termination
+   - Sleep: deletes the pod after task completion, preserves PVC
+   - AutoDelete: deletes the entire agent after task completion
 7. Updates CR status based on pod state
 
 ## Development
@@ -141,6 +193,12 @@ make install     # Uses server-side apply (required for large PodSpec CRD)
 
 ```bash
 make run         # Runs against current kubeconfig cluster
+```
+
+For HA deployments, enable leader election:
+
+```bash
+make run ARGS="--leader-elect"
 ```
 
 ### Deploy to cluster

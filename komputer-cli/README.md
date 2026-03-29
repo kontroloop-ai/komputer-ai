@@ -162,16 +162,33 @@ komputer rm my-agent
 
 ## All Commands
 
+### Agents
 ```
 komputer login <endpoint>           Save API endpoint
-komputer create <name> <prompt>     Create agent or send task [--model, --template]
-komputer run <name> <prompt>        Create + stream output    [--model]
+komputer create <name> <prompt>     Create agent or send task [--model, --template, --lifecycle]
+komputer run <name> <prompt>        Create + stream output    [--model, --lifecycle]
 komputer chat <name>                Interactive conversation   [--model, --lifecycle]
 komputer list                       List all agents           (alias: ls)
 komputer get <name>                 Get agent details
 komputer watch <name>               Stream live events (WS)
 komputer cancel <name>              Cancel running task
 komputer delete <name> [name...]    Delete one or more agents (alias: rm)
+```
+
+### Offices
+```
+komputer office list                List all offices
+komputer office get <name>          Get office details + members
+komputer office events <name>       Get office event history
+komputer office delete <name>       Delete office and its agents
+```
+
+### Schedules
+```
+komputer schedule list              List all schedules
+komputer schedule get <name>        Get schedule details
+komputer schedule create <name> <cron> <prompt>  Create a schedule [--model, --lifecycle, --timezone]
+komputer schedule delete <name>     Delete a schedule
 ```
 
 ### Passing Secrets
@@ -198,6 +215,7 @@ Secrets are stored as K8s Secrets and injected as `SECRET_*` env vars into the a
 | `--api <url>` | Override the saved API endpoint |
 | `-n, --namespace <ns>` | Target Kubernetes namespace |
 | `--secret KEY=VALUE` | Pass secrets to the agent (repeatable, on create/run) |
+| `--lifecycle <mode>` | Agent lifecycle: `Sleep` or `AutoDelete` (on create/run/chat) |
 | `--help` | Help for any command |
 
 ## Project Structure

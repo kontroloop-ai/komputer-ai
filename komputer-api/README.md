@@ -21,6 +21,21 @@ All endpoints support namespace selection via the `?namespace=` query parameter.
 | `DELETE` | `/agents/:name` | Delete agent and all its resources |
 | `POST` | `/agents/:name/cancel` | Cancel the running task |
 | `GET` | `/agents/:name/ws` | WebSocket — stream real-time events |
+| `GET` | `/offices` | List all offices |
+| `GET` | `/offices/:name` | Get office details |
+| `DELETE` | `/offices/:name` | Delete office and its agents |
+| `GET` | `/offices/:name/events` | Get office event history |
+| `POST` | `/schedules` | Create a schedule |
+| `GET` | `/schedules` | List all schedules |
+| `GET` | `/schedules/:name` | Get schedule details |
+| `DELETE` | `/schedules/:name` | Delete a schedule |
+
+### Health Checks (outside `/api/v1`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/healthz` | Liveness probe — always returns `{"status": "ok"}` |
+| `GET` | `/readyz` | Readiness probe — checks Redis connectivity, returns 503 if unhealthy |
 
 ---
 
@@ -37,6 +52,7 @@ Create a new agent or send a task to an existing one (upsert by name).
 | `model` | string | no | `claude-sonnet-4-6` | Claude model to use |
 | `templateRef` | string | no | `default` | Pod template name |
 | `role` | string | no | `manager` | `manager` (gets orchestration tools) or `worker` |
+| `lifecycle` | string | no | `""` | `""` (pod stays running), `Sleep` (delete pod, keep PVC), `AutoDelete` (delete everything) |
 | `namespace` | string | no | server default | Target Kubernetes namespace |
 | `secrets` | object | no | — | Key-value pairs (e.g. `{"GITHUB": "ghp_xxx"}`) |
 
@@ -118,8 +134,9 @@ List all agents in a namespace.
 | `name` | Agent identifier |
 | `namespace` | Kubernetes namespace |
 | `model` | Claude model |
-| `status` | Pod phase: `Pending`, `Running`, `Succeeded`, `Failed` |
+| `status` | Pod phase: `Pending`, `Running`, `Sleeping`, `Succeeded`, `Failed` |
 | `taskStatus` | Agent activity: `InProgress`, `Complete`, `Error`, or empty |
+| `lifecycle` | Lifecycle mode: `""`, `Sleep`, or `AutoDelete` |
 | `lastTaskMessage` | Most recent event summary (e.g. "Calling Bash", "Task completed") |
 | `createdAt` | ISO 8601 creation timestamp |
 

@@ -208,6 +208,7 @@ spec:
 komputer login <endpoint>           # Save API endpoint
 komputer create <name> <prompt>     # Create agent or send task
 komputer run <name> <prompt>        # Create + stream output live
+komputer chat <name>                # Interactive turn-by-turn conversation
 komputer list                       # List all agents
 komputer get <name>                 # Get agent details + recent events
 komputer watch <name>               # Stream live events (WebSocket)

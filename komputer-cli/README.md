@@ -116,6 +116,40 @@ komputer watch my-agent
 komputer cancel my-agent
 ```
 
+### Chat (interactive)
+
+Start a turn-by-turn conversation with an agent. The agent is auto-created on your first message if it doesn't exist yet. The agent persists between turns, keeping its workspace and conversation history.
+
+```bash
+komputer chat my-agent
+```
+
+```
+  Chat with my-agent
+  Type a message and press Enter. Ctrl+C to interrupt or exit.
+
+> What files are in /workspace?
+  ⚙ Bash $ ls -la /workspace
+
+my-agent:
+The workspace contains the following files...
+
+✔ Cost: $0.0042  Duration: 3.2s
+
+> Now create a Python script that prints hello world
+  ⚙ Bash $ cat > /workspace/hello.py << 'EOF' ...
+
+my-agent:
+I've created hello.py in your workspace.
+
+✔ Cost: $0.0031  Duration: 2.1s
+```
+
+- **Ctrl+C during a response** — cancels the current turn (agent stays alive)
+- **Ctrl+C at the prompt** — exits the chat session (agent stays alive)
+- Shows text responses and tool summaries, hides thinking and raw events
+- Supports `--model` and `--lifecycle` flags
+
 ### Delete an agent
 
 Deletes the agent CR — the operator cleans up the pod, PVC, and ConfigMap:
@@ -132,6 +166,7 @@ komputer rm my-agent
 komputer login <endpoint>           Save API endpoint
 komputer create <name> <prompt>     Create agent or send task [--model, --template]
 komputer run <name> <prompt>        Create + stream output    [--model]
+komputer chat <name>                Interactive conversation   [--model, --lifecycle]
 komputer list                       List all agents           (alias: ls)
 komputer get <name>                 Get agent details
 komputer watch <name>               Stream live events (WS)

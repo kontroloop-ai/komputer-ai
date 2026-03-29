@@ -22,6 +22,10 @@
   Designed to be driven by external systems. Create agents, send tasks, and stream real-time results via REST + WebSocket.
 </p>
 
+<p align="center">
+  <img src="docs/demo.gif" alt="komputer.ai CLI demo" width="800" />
+</p>
+
 ---
 
 ## Components
@@ -38,7 +42,7 @@ Each component is fully self-contained with no shared code, making it easy to ex
 ## Documentation
 
 1. [Concepts](docs/concepts.md) — Agents, templates, config, secrets, namespaces — how the system fits together
-2. [Getting Started](#quick-start) — Prerequisites, installation, and first agent
+2. [Installation](#installation) — Deploy to any Kubernetes cluster in minutes
 3. [Integration Guide](docs/integration-guide.md) — How to connect external systems via HTTP API and WebSocket events
 4. [Custom Agent Images](docs/custom-agent-image.md) — Build custom agent images with your own packages and tools
 5. [Architecture](#architecture) — System diagram and component interactions
@@ -48,7 +52,7 @@ Each component is fully self-contained with no shared code, making it easy to ex
    3. [komputer-agent](komputer-agent/README.md) — Agent runtime, Claude SDK integration, manager tools, event format
    4. [komputer-cli](komputer-cli/README.md) — CLI commands, flags, usage examples
 
-## Quick Start
+## Installation
 
 ### Prerequisites
 

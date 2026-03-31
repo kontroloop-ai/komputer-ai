@@ -29,6 +29,9 @@ type AgentChatProps = {
   events: AgentEvent[];
   taskStatus?: string;
   initialPending?: string;
+  hasMoreEvents?: boolean;
+  loadingOlder?: boolean;
+  onLoadOlder?: () => void;
 };
 
 // --- Message types derived from events ---
@@ -395,6 +398,9 @@ export function AgentChat({
   events,
   taskStatus,
   initialPending,
+  hasMoreEvents,
+  loadingOlder,
+  onLoadOlder,
 }: AgentChatProps) {
   const [input, setInput] = useState("");
   const [lifecycle, setLifecycle] = useState<"" | "Sleep" | "AutoDelete">("");
@@ -420,8 +426,11 @@ export function AgentChat({
       : []
   );
   const bottomRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const eventCountAtSend = useRef(events.length);
+  const prevMessagesLenRef = useRef(0);
 
   const serverMessages = eventsToChatMessages(events);
 
@@ -473,10 +482,66 @@ export function AgentChat({
     return all.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   })();
 
-  // Auto-scroll on new messages
+  // Preserve scroll position when older messages are prepended
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const prevLen = prevMessagesLenRef.current;
+    const curLen = messages.length;
+    // If messages were added at the top (prepended), restore scroll position
+    if (prevLen > 0 && curLen > prevLen) {
+      const delta = curLen - prevLen;
+      // Check if scroll was near the top (user was scrolling up to load more)
+      // We use a threshold to avoid interfering with normal bottom-scroll
+      if (container.scrollTop < 200) {
+        // Defer to after DOM paint
+        requestAnimationFrame(() => {
+          // Measure the height of newly prepended items
+          const children = container.querySelector("[data-messages]")?.children;
+          if (children) {
+            let addedHeight = 0;
+            for (let i = 0; i < delta && i < children.length; i++) {
+              addedHeight += (children[i] as HTMLElement).offsetHeight + 12; // 12 = gap-3
+            }
+            container.scrollTop = addedHeight;
+          }
+        });
+      }
+    }
+    prevMessagesLenRef.current = curLen;
   }, [messages.length]);
+
+  // Auto-scroll on new messages (only when user is near the bottom)
+  const prevMsgCountRef = useRef(0);
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const prevCount = prevMsgCountRef.current;
+    prevMsgCountRef.current = messages.length;
+    if (prevCount === 0 || messages.length <= prevCount) return;
+    // Only auto-scroll if user is near the bottom
+    const distFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    if (distFromBottom < 150) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages.length]);
+
+  // IntersectionObserver to trigger loading older events when sentinel is visible
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    const container = scrollContainerRef.current;
+    if (!sentinel || !container || !onLoadOlder) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMoreEvents && !loadingOlder) {
+          onLoadOlder();
+        }
+      },
+      { root: container, threshold: 0.1 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMoreEvents, loadingOlder, onLoadOlder]);
 
   const handleSend = useCallback(async () => {
     const text = input.trim();
@@ -510,7 +575,7 @@ export function AgentChat({
   return (
     <div className="flex h-full flex-col">
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto px-4 pt-4 pb-4">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 pt-4 pb-4">
         {messages.length === 0 && !showThinking ? (
           <div className="flex h-full items-center justify-center text-sm text-[var(--color-text-secondary)]">
             {agentStatus === "Sleeping"
@@ -518,7 +583,28 @@ export function AgentChat({
               : "No messages yet. Waiting for events..."}
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div data-messages className="flex flex-col gap-3">
+            {/* Sentinel for infinite scroll */}
+            <div ref={sentinelRef} className="h-1 shrink-0" />
+            {loadingOlder && (
+              <div className="flex justify-center py-2">
+                <div className="flex items-center gap-2">
+                  {[0, 1, 2].map((i) => (
+                    <motion.span
+                      key={i}
+                      className="size-1.5 rounded-full bg-[var(--color-text-secondary)]"
+                      animate={{ opacity: [0.3, 1, 0.3] }}
+                      transition={{
+                        duration: 1,
+                        repeat: Infinity,
+                        delay: i * 0.15,
+                        ease: "easeInOut",
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
             <AnimatePresence initial={false}>
             {messages.map((msg, i) => {
               switch (msg.kind) {

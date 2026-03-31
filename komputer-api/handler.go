@@ -483,7 +483,8 @@ func getAgentEvents(worker *RedisWorker) gin.HandlerFunc {
 			}
 			limit = parsed
 		}
-		events, err := GetAgentEvents(c.Request.Context(), worker.Rdb, name, limit, worker.StreamPrefix)
+		before := c.Query("before") // RFC-3339 cursor for pagination
+		events, err := GetAgentEventsBefore(c.Request.Context(), worker.Rdb, name, limit, before, worker.StreamPrefix)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get agent events: " + err.Error()})
 			return

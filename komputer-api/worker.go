@@ -433,10 +433,36 @@ func parseStreamMessage(msg redis.XMessage) (AgentEvent, error) {
 // GetAgentEvents reads events from the agent's persistent history list.
 // Returns the last `limit` events in chronological order.
 func GetAgentEvents(ctx context.Context, rdb *redis.Client, agentName string, limit int64, streamPrefix string) ([]AgentEvent, error) {
+	return GetAgentEventsBefore(ctx, rdb, agentName, limit, "", streamPrefix)
+}
+
+// GetAgentEventsBefore returns up to `limit` events for the agent. When `before`
+// is non-empty it must be an RFC-3339 timestamp; only events with a timestamp
+// strictly before that value are returned. Because the backing store is a Redis
+// list (not an indexed DB), we over-fetch and filter in Go — the list is bounded
+// at ~200 entries per task so this is fine.
+func GetAgentEventsBefore(ctx context.Context, rdb *redis.Client, agentName string, limit int64, before string, streamPrefix string) ([]AgentEvent, error) {
 	historyKey := fmt.Sprintf("komputer-history:%s", agentName)
 
+	var beforeTime time.Time
+	hasBefore := before != ""
+	if hasBefore {
+		var err error
+		beforeTime, err = time.Parse(time.RFC3339Nano, before)
+		if err != nil {
+			return nil, fmt.Errorf("invalid before timestamp: %w", err)
+		}
+	}
+
+	// When filtering by `before` we need to fetch more than `limit` items because
+	// some will be filtered out. Fetch the entire list (bounded at ~200).
+	fetchCount := limit
+	if hasBefore {
+		fetchCount = 200
+	}
+
 	// LRANGE with negative indices gets the last N items.
-	vals, err := rdb.LRange(ctx, historyKey, -limit, -1).Result()
+	vals, err := rdb.LRange(ctx, historyKey, -fetchCount, -1).Result()
 	if err != nil {
 		return nil, fmt.Errorf("lrange: %w", err)
 	}
@@ -448,8 +474,24 @@ func GetAgentEvents(ctx context.Context, rdb *redis.Client, agentName string, li
 			log.Printf("skipping malformed history entry: %v", err)
 			continue
 		}
+		if hasBefore {
+			evTime, err := time.Parse(time.RFC3339Nano, ev.Timestamp)
+			if err != nil {
+				continue
+			}
+			if !evTime.Before(beforeTime) {
+				continue
+			}
+		}
 		events = append(events, ev)
 	}
+
+	// When filtering by before, we want the *last* `limit` events that matched
+	// (i.e. the ones closest to the cursor).
+	if hasBefore && int64(len(events)) > limit {
+		events = events[len(events)-int(limit):]
+	}
+
 	return events, nil
 }
 

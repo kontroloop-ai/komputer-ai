@@ -35,17 +35,46 @@ export default function AgentDetailPage() {
 
   const { events: wsEvents } = useWebSocket(agentName);
   const [historyEvents, setHistoryEvents] = useState<AgentEvent[]>([]);
+  const [hasMoreEvents, setHasMoreEvents] = useState(true);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+
+  const parseEventsResponse = useCallback((data: unknown): AgentEvent[] => {
+    return Array.isArray(data) ? data : (data as { events?: AgentEvent[] })?.events ?? [];
+  }, []);
 
   // Fetch event history on mount
   useEffect(() => {
     if (!agentName) return;
     getAgentEvents(agentName, 50, agentNs)
       .then((data: unknown) => {
-        const arr = Array.isArray(data) ? data : (data as { events?: AgentEvent[] })?.events ?? [];
+        const arr = parseEventsResponse(data);
         setHistoryEvents(arr);
+        if (arr.length < 50) setHasMoreEvents(false);
       })
       .catch(() => {});
-  }, [agentName, agentNs]);
+  }, [agentName, agentNs, parseEventsResponse]);
+
+  // Load older events (called when user scrolls to top)
+  const loadOlderEvents = useCallback(async () => {
+    if (!agentName || loadingOlder || !hasMoreEvents) return;
+    const oldestTimestamp = historyEvents.length > 0 ? historyEvents[0].timestamp : undefined;
+    if (!oldestTimestamp) return;
+    setLoadingOlder(true);
+    try {
+      const data = await getAgentEvents(agentName, 50, agentNs, oldestTimestamp);
+      const older = parseEventsResponse(data);
+      if (older.length === 0) {
+        setHasMoreEvents(false);
+      } else {
+        setHistoryEvents((prev) => [...older, ...prev]);
+        if (older.length < 50) setHasMoreEvents(false);
+      }
+    } catch {
+      // Silently fail, user can scroll up again to retry
+    } finally {
+      setLoadingOlder(false);
+    }
+  }, [agentName, agentNs, historyEvents, loadingOlder, hasMoreEvents, parseEventsResponse]);
 
   // Merge history + WS events, deduplicating by full fingerprint
   const events = useMemo(() => {
@@ -264,6 +293,9 @@ export default function AgentDetailPage() {
             events={events}
             taskStatus={agent.taskStatus}
             initialPending={agent.taskStatus === "InProgress" ? initialPending : undefined}
+            hasMoreEvents={hasMoreEvents}
+            loadingOlder={loadingOlder}
+            onLoadOlder={loadOlderEvents}
           />
         </TabsContent>
 

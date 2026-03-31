@@ -36,8 +36,8 @@
 | [komputer-api](komputer-api/) | Go | REST + WebSocket API for creating agents, listing status, and streaming real-time events |
 | [komputer-agent](komputer-agent/) | Python | The agent runtime — runs Claude with bash/web tools in a persistent workspace |
 | [komputer-cli](komputer-cli/) | Go | Beautiful CLI for interacting with the platform |
+| [komputer-ui](komputer-ui/) | TypeScript | Web dashboard for managing and interacting with agents, offices, schedules, and costs |
 
-Each component is fully self-contained with no shared code, making it easy to extract into separate repositories.
 
 ## Documentation
 
@@ -52,6 +52,7 @@ Each component is fully self-contained with no shared code, making it easy to ex
    2. [komputer-operator](komputer-operator/README.md) — CRD definitions, reconciliation logic, operator development guide
    3. [komputer-agent](komputer-agent/README.md) — Agent runtime, Claude SDK integration, manager tools, event format
    4. [komputer-cli](komputer-cli/README.md) — CLI commands, flags, usage examples
+   5. [komputer-ui](komputer-ui/README.md) — Web dashboard, pages, configuration, development
 
 ## Installation
 
@@ -251,12 +252,12 @@ Events published by agents and streamed via WebSocket:
 ## Architecture
 
 ```
-                    ┌─────────────────┐
-                    │  komputer-cli   │
-                    │  (--namespace)  │
-                    └────────┬────────┘
-                             │
-                    ┌────────▼────────┐
+              ┌──────────────┐  ┌──────────────┐
+              │ komputer-cli │  │ komputer-ui  │
+              └──────┬───────┘  └──────┬───────┘
+                     └────────┬────────┘
+                              │
+                    ┌─────────▼───────┐
                     │  komputer-api   │
                     │  (Go / Gin)     │
                     │                 │

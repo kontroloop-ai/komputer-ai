@@ -4,14 +4,20 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useDelayedLoading } from "@/hooks/use-delayed-loading";
-import { Bot, DollarSign, Building2, CalendarClock } from "lucide-react";
+import {
+  Bot,
+  DollarSign,
+  Building2,
+  CalendarClock,
+  ArrowRight,
+} from "lucide-react";
 
 import { Card, CardContent } from "@/components/kit/card";
-import { Button } from "@/components/kit/button";
-import { StatusBadge } from "@/components/shared/status-badge";
-import { listAgents, listOffices, listSchedules, checkHealth } from "@/lib/api";
+import { listAgents, listOffices, listSchedules } from "@/lib/api";
 import { formatCost, formatRelativeTime } from "@/lib/utils";
 import type { AgentResponse, OfficeResponse, ScheduleResponse } from "@/lib/types";
+
+// --- Animated number ---
 
 function AnimatedNumber({ value }: { value: number | string }) {
   const [display, setDisplay] = useState(0);
@@ -26,7 +32,6 @@ function AnimatedNumber({ value }: { value: number | string }) {
     function tick(now: number) {
       const elapsed = now - start;
       const progress = Math.min(elapsed / duration, 1);
-      // ease-out cubic
       const eased = 1 - Math.pow(1 - progress, 3);
       setDisplay(eased * target);
       if (progress < 1) {
@@ -44,15 +49,23 @@ function AnimatedNumber({ value }: { value: number | string }) {
   return <span>{Math.round(display)}</span>;
 }
 
-interface StatCardProps {
+// --- Stat card ---
+
+function StatCard({
+  icon,
+  label,
+  value,
+  delay = 0,
+  iconClassName,
+  breakdown,
+}: {
   icon: React.ReactNode;
   label: string;
   value: number | string;
   delay?: number;
   iconClassName?: string;
-}
-
-function StatCard({ icon, label, value, delay = 0, iconClassName }: StatCardProps) {
+  breakdown?: { color: string; count: number; label: string }[];
+}) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -63,16 +76,30 @@ function StatCard({ icon, label, value, delay = 0, iconClassName }: StatCardProp
     >
       <Card className="bg-[var(--color-surface)] border-[var(--color-border)] ring-0 hover:shadow-[0_4px_16px_rgba(0,0,0,0.2),inset_0_1px_0_var(--color-border-light)] hover:border-[var(--color-border-hover)]">
         <CardContent className="flex items-center gap-4 py-4">
-          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${iconClassName ?? "bg-[var(--color-brand-blue)]/10 text-[var(--color-brand-blue)]"}`}>
+          <div
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${iconClassName ?? "bg-[var(--color-brand-blue)]/10 text-[var(--color-brand-blue)]"}`}
+          >
             {icon}
           </div>
           <div className="min-w-0">
-            <p className="text-xs text-[var(--color-text-secondary)]">
-              {label}
-            </p>
-            <p className="text-2xl font-semibold text-[var(--color-text)] tabular-nums">
-              <AnimatedNumber value={value} />
-            </p>
+            <p className="text-xs text-[var(--color-text-secondary)]">{label}</p>
+            <div className="flex items-baseline gap-3">
+              <p className="text-2xl font-semibold text-[var(--color-text)] tabular-nums">
+                <AnimatedNumber value={value} />
+              </p>
+              {breakdown && breakdown.some((b) => b.count > 0) && (
+                <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+                  {breakdown.map((b) =>
+                    b.count > 0 ? (
+                      <span key={b.label} className="inline-flex items-center gap-1 text-xs text-[var(--color-text)]">
+                        <span className="size-1.5 rounded-full" style={{ backgroundColor: b.color }} />
+                        {b.count} {b.label}
+                      </span>
+                    ) : null
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -80,11 +107,12 @@ function StatCard({ icon, label, value, delay = 0, iconClassName }: StatCardProp
   );
 }
 
+// --- Main ---
+
 export default function DashboardPage() {
   const [agents, setAgents] = useState<AgentResponse[]>([]);
   const [offices, setOffices] = useState<OfficeResponse[]>([]);
   const [schedules, setSchedules] = useState<ScheduleResponse[]>([]);
-  const [healthy, setHealthy] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const showLoading = useDelayedLoading(loading);
 
@@ -99,50 +127,58 @@ export default function DashboardPage() {
       setOffices(officesRes.offices ?? []);
       setSchedules(schedulesRes.schedules ?? []);
     } catch {
-      // silently fail, health check will show API status
+      // silently fail
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const pollHealth = useCallback(async () => {
-    try {
-      const ok = await checkHealth();
-      setHealthy(ok);
-    } catch {
-      setHealthy(false);
-    }
-  }, []);
-
-  // initial load + 10s activity refresh
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 10_000);
-    return () => clearInterval(interval);
   }, [fetchData]);
 
-  // health poll every 30s
-  useEffect(() => {
-    pollHealth();
-    const interval = setInterval(pollHealth, 30_000);
-    return () => clearInterval(interval);
-  }, [pollHealth]);
+  // --- Computed stats ---
 
-  // computed stats
-  const activeAgents = agents.filter((a) => a.status === "Running").length;
   const totalCost = agents
     .reduce((sum, a) => sum + (parseFloat(a.totalCostUSD ?? "0") || 0), 0)
     .toFixed(4);
-  const officesInProgress = offices.filter((o) => o.phase === "InProgress").length;
-  const activeSchedules = schedules.filter((s) => s.phase === "Active").length;
 
-  // 10 most recent agents
+  // Agent status breakdown
+  const agentsByStatus = {
+    Running: agents.filter((a) => a.status === "Running").length,
+    Sleeping: agents.filter((a) => a.status === "Sleeping").length,
+    Pending: agents.filter((a) => a.status === "Pending").length,
+    Failed: agents.filter((a) => a.status === "Failed").length,
+    Succeeded: agents.filter((a) => a.status === "Succeeded").length,
+  };
+
+  // Office status breakdown
+  const officesByPhase = {
+    InProgress: offices.filter((o) => o.phase === "InProgress").length,
+    Complete: offices.filter((o) => o.phase === "Complete").length,
+    Error: offices.filter((o) => o.phase === "Error").length,
+  };
+
+  // Schedule status breakdown
+  const schedulesByPhase = {
+    Active: schedules.filter((s) => s.phase === "Active").length,
+    Suspended: schedules.filter((s) => s.phase === "Suspended").length,
+    Error: schedules.filter((s) => s.phase === "Error").length,
+  };
+
+  // Running tasks (agents with InProgress task)
+  const runningTasks = agents.filter((a) => a.taskStatus === "InProgress");
+
+  // Recent agents (10 most recent)
   const recentAgents = [...agents]
-    .sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    )
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 10);
+
+  // Top cost agents (sorted by total cost, top 5)
+  const topCostAgents = [...agents]
+    .filter((a) => parseFloat(a.totalCostUSD ?? "0") > 0)
+    .sort((a, b) => parseFloat(b.totalCostUSD ?? "0") - parseFloat(a.totalCostUSD ?? "0"))
+    .slice(0, 5);
 
   return (
     <div className="flex flex-col h-full">
@@ -152,29 +188,35 @@ export default function DashboardPage() {
         transition={{ duration: 0.3, ease: "easeOut" }}
         className="flex-1 overflow-y-auto p-6 space-y-6"
       >
-        {/* Health indicator */}
-        <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2">
-          <span
-            className={`inline-block h-2.5 w-2.5 rounded-full ${
-              healthy === true
-                ? "bg-green-400"
-                : healthy === false
-                ? "bg-red-400"
-                : "bg-[var(--color-text-secondary)]"
-            }`}
-          />
-          <span className="text-[10px] text-[var(--color-text-secondary)]">
-            API
-          </span>
-        </div>
+        {/* Hero */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          className="text-center py-2"
+        >
+          <h1 className="text-xl font-semibold text-[var(--color-text)]">
+            Welcome to <span className="bg-gradient-to-r from-[#9ca3af] via-[#ffffff] to-[#9ca3af] bg-clip-text text-transparent animate-shine">Komputer.AI</span>
+          </h1>
+          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+            Your AI agent fleet management at scale.
+          </p>
+        </motion.div>
 
         {/* Stats row */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
             icon={<Bot className="size-5" />}
-            label="Active Agents"
-            value={activeAgents}
+            label="Total Agents"
+            value={agents.length}
             delay={0}
+            breakdown={[
+              { color: "#34D399", count: agentsByStatus.Running, label: "Running" },
+              { color: "#FBBF24", count: agentsByStatus.Sleeping, label: "Sleeping" },
+              { color: "#FBBF24", count: agentsByStatus.Pending, label: "Pending" },
+              { color: "#F87171", count: agentsByStatus.Failed, label: "Failed" },
+              { color: "#34D399", count: agentsByStatus.Succeeded, label: "Succeeded" },
+            ]}
           />
           <StatCard
             icon={<DollarSign className="size-5" />}
@@ -185,41 +227,51 @@ export default function DashboardPage() {
           />
           <StatCard
             icon={<Building2 className="size-5" />}
-            label="Offices In Progress"
-            value={officesInProgress}
+            label="Offices"
+            value={offices.length}
             delay={0.1}
+            breakdown={[
+              { color: "#34D399", count: officesByPhase.InProgress, label: "In Progress" },
+              { color: "#34D399", count: officesByPhase.Complete, label: "Complete" },
+              { color: "#F87171", count: officesByPhase.Error, label: "Error" },
+            ]}
           />
           <StatCard
             icon={<CalendarClock className="size-5" />}
-            label="Active Schedules"
-            value={activeSchedules}
+            label="Schedules"
+            value={schedules.length}
             delay={0.15}
             iconClassName="bg-[var(--color-brand-violet)]/10 text-[var(--color-brand-violet)]"
+            breakdown={[
+              { color: "#34D399", count: schedulesByPhase.Active, label: "Active" },
+              { color: "#FBBF24", count: schedulesByPhase.Suspended, label: "Suspended" },
+              { color: "#F87171", count: schedulesByPhase.Error, label: "Error" },
+            ]}
           />
         </div>
 
         {/* Recent Agents */}
-        <div>
-          <h2 className="text-sm font-medium text-[var(--color-text-secondary)] mb-3">
-            Recent Agents
-          </h2>
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.25 }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Recent Agents</h3>
+            <Link href="/agents" className="text-[10px] text-[var(--color-brand-blue)] hover:underline flex items-center gap-0.5">
+              View all <ArrowRight className="size-2.5" />
+            </Link>
+          </div>
           {showLoading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2.5">
-              {Array.from({ length: 10 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="h-[150px] rounded-[var(--radius-md)] bg-[var(--color-surface)] animate-pulse"
-                />
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-[130px] rounded-[var(--radius-md)] bg-[var(--color-surface)] animate-pulse" />
               ))}
             </div>
-          ) : loading ? (
-            null
           ) : recentAgents.length === 0 ? (
-            <Card className="bg-[var(--color-surface)] border-[var(--color-border)] ring-0">
-              <CardContent className="py-8 text-center text-sm text-[var(--color-text-secondary)]">
-                No agents yet. Create one to get started.
-              </CardContent>
-            </Card>
+            <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] py-8 text-center text-sm text-[var(--color-text-muted)]">
+              No agents yet. Create one to get started.
+            </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2.5">
               {recentAgents.map((agent, i) => {
@@ -233,9 +285,9 @@ export default function DashboardPage() {
                     key={agent.name}
                     initial={{ opacity: 0, scale: 0.97 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.2, delay: i * 0.03 }}
+                    transition={{ duration: 0.2, delay: 0.25 + i * 0.03 }}
                   >
-                    <Link href={`/agents/${agent.name}`} className="block group">
+                    <Link href={`/agents/${agent.name}?namespace=${agent.namespace}`} className="block group">
                       <div className="relative overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] transition-all duration-200 group-hover:border-[var(--color-border-hover)] group-hover:shadow-[0_0_20px_rgba(63,133,217,0.06),0_0_40px_rgba(139,92,246,0.04)]">
                         <span className="absolute top-2.5 right-2.5 block w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
                         <div className="h-full flex flex-col p-3">
@@ -244,10 +296,6 @@ export default function DashboardPage() {
                             <div className="flex items-center justify-between">
                               <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">status</span>
                               <span className="text-[11px] font-medium text-[var(--color-text-secondary)]">{agent.status}</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">model</span>
-                              <span className="text-[11px] font-[family-name:var(--font-mono)] text-[var(--color-text-secondary)] truncate ml-2">{agent.model?.replace("claude-", "")}</span>
                             </div>
                             <div className="flex items-center justify-between">
                               <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">cost</span>
@@ -266,6 +314,118 @@ export default function DashboardPage() {
               })}
             </div>
           )}
+        </motion.div>
+
+        {/* Running tasks + Top cost — side by side, fill remaining space */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Running tasks */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.3 }}
+            className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
+          >
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-3">
+              Running Tasks
+            </h3>
+            {showLoading ? (
+              <div className="space-y-2">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="h-12 rounded-md bg-[var(--color-bg)] animate-pulse" />
+                ))}
+              </div>
+            ) : runningTasks.length === 0 ? (
+              <p className="text-sm text-[var(--color-text-muted)] py-4 text-center">
+                No tasks running right now
+              </p>
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {runningTasks.map((agent) => (
+                  <Link
+                    key={agent.name}
+                    href={`/agents/${agent.name}?namespace=${agent.namespace}`}
+                    className="flex items-start gap-3 rounded-md bg-[var(--color-bg)] p-3 transition-colors hover:bg-[var(--color-bg-subtle)] group"
+                  >
+                    <span className="mt-1 size-2 shrink-0 rounded-full bg-[#34D399] animate-pulse" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-[var(--color-text)] truncate group-hover:text-[var(--color-brand-blue-light)]">
+                        {agent.name}
+                      </p>
+                      {agent.lastTaskMessage && (
+                        <p className="text-xs text-[var(--color-text-secondary)] truncate mt-0.5">
+                          {agent.lastTaskMessage}
+                        </p>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-[var(--color-text-muted)] shrink-0">
+                      {agent.namespace}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </motion.div>
+
+          {/* Top cost agents */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.35 }}
+            className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
+          >
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-3">
+              Top Cost Agents
+            </h3>
+            {showLoading ? (
+              <div className="space-y-2">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="h-10 rounded-md bg-[var(--color-bg)] animate-pulse" />
+                ))}
+              </div>
+            ) : topCostAgents.length === 0 ? (
+              <p className="text-sm text-[var(--color-text-muted)] py-4 text-center">
+                No cost data yet
+              </p>
+            ) : (
+              <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                {topCostAgents.map((agent, i) => {
+                  const cost = parseFloat(agent.totalCostUSD ?? "0");
+                  const maxCost = parseFloat(topCostAgents[0].totalCostUSD ?? "1");
+                  const pct = maxCost > 0 ? (cost / maxCost) * 100 : 0;
+
+                  return (
+                    <Link
+                      key={agent.name}
+                      href={`/agents/${agent.name}?namespace=${agent.namespace}`}
+                      className="flex items-center gap-3 rounded-md bg-[var(--color-bg)] p-2.5 transition-colors hover:bg-[var(--color-bg-subtle)] group"
+                    >
+                      <span className="text-xs font-mono text-[var(--color-text-muted)] w-4 text-right shrink-0">
+                        {i + 1}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm font-medium text-[var(--color-text)] truncate group-hover:text-[var(--color-brand-blue-light)]">
+                            {agent.name}
+                          </span>
+                          <span className="text-xs font-mono text-[var(--color-text)] shrink-0 ml-2">
+                            {formatCost(agent.totalCostUSD)}
+                          </span>
+                        </div>
+                        <div className="h-1 rounded-full bg-[var(--color-border)] overflow-hidden">
+                          <motion.div
+                            className="h-full rounded-full bg-gradient-to-r from-[var(--color-brand-blue)] to-[var(--color-brand-violet)]"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${pct}%` }}
+                            transition={{ duration: 0.6, delay: 0.4 + i * 0.1, ease: "easeOut" }}
+                          />
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </motion.div>
         </div>
       </motion.div>
     </div>

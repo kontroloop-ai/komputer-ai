@@ -278,6 +278,13 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 				return
 			}
 
+			// Update lifecycle if changed
+			if req.Lifecycle != "" && req.Lifecycle != string(existing.Spec.Lifecycle) {
+				if err := k8s.PatchAgentLifecycle(c.Request.Context(), ns, req.Name, req.Lifecycle); err != nil {
+					log.Printf("warning: failed to patch lifecycle for %s: %v", req.Name, err)
+				}
+			}
+
 			log.Printf("forwarded task to existing agent %s/%s", ns, req.Name)
 			c.JSON(http.StatusOK, AgentResponse{
 				Name:            existing.Name,

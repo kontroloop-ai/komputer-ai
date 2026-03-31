@@ -39,7 +39,7 @@ If you need to store agent activity — for audit logs, user-facing chat history
 
 ### Your system owns the user experience
 
-komputer.ai ships with a CLI ([komputer-cli](../komputer-cli/README.md)) for direct interaction with the API, but it has no authentication and no graphical UI (though both may come in the future). For production use, your wrapper application provides the user-facing interface — whether that's a web dashboard, a Slack bot, or an API for other services. komputer.ai provides the raw agent infrastructure; you shape it into a product.
+komputer.ai ships with a CLI ([komputer-cli](../komputer-cli/README.md)) and a web dashboard ([komputer-ui](../komputer-ui/README.md)) for direct interaction with the platform, but neither implements authentication. For production use, your wrapper application should handle auth and sit in front of komputer.ai. You can use the built-in UI as an internal operations dashboard, or build your own user-facing interface on top of the API.
 
 ## Base URL
 

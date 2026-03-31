@@ -8,15 +8,18 @@ import type { AgentEvent } from "@/lib/types";
 import { createAgent } from "@/lib/api";
 import { CostBadge } from "@/components/shared/cost-badge";
 import { CopyButton } from "@/components/shared/copy-button";
-import { Button } from "@/components/kit/button";
 import { cn } from "@/lib/utils";
 import {
   ChevronRight,
-  Send,
+  ArrowUp,
   Terminal,
   FileText,
   Globe,
   Wrench,
+  Settings2,
+  Moon,
+  Trash2,
+  Play,
 } from "lucide-react";
 
 type AgentChatProps = {
@@ -394,6 +397,20 @@ export function AgentChat({
   initialPending,
 }: AgentChatProps) {
   const [input, setInput] = useState("");
+  const [lifecycle, setLifecycle] = useState<"" | "Sleep" | "AutoDelete">("");
+  const [lifecycleOpen, setLifecycleOpen] = useState(false);
+  const lifecycleRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!lifecycleOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (lifecycleRef.current && !lifecycleRef.current.contains(e.target as Node)) {
+        setLifecycleOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [lifecycleOpen]);
   const [pendingText, setPendingText] = useState<string | null>(initialPending ?? null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -450,11 +467,11 @@ export function AgentChat({
     eventCountAtSend.current = events.length;
     setPendingText(text);
     try {
-      await createAgent({ name: agentName, instructions: text, namespace: agentNamespace });
+      await createAgent({ name: agentName, instructions: text, namespace: agentNamespace, lifecycle });
     } catch {
       setPendingText(null);
     }
-  }, [input, isWorking, agentName, agentNamespace, events.length]);
+  }, [input, isWorking, agentName, agentNamespace, lifecycle, events.length]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -568,7 +585,7 @@ export function AgentChat({
 
       {/* Input area */}
       <div className="shrink-0 border-t border-[var(--color-border)] bg-[var(--color-bg)] p-4">
-        <div className="flex items-end gap-2">
+        <div className="flex items-center gap-2">
           <textarea
             ref={textareaRef}
             value={input}
@@ -577,16 +594,97 @@ export function AgentChat({
             placeholder="Send a message..."
             disabled={isWorking}
             rows={1}
-            className="field-sizing-content max-h-24 min-h-9 flex-1 resize-none rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:border-[var(--color-brand-blue)] focus:outline-none disabled:opacity-50"
+            className="field-sizing-content max-h-24 min-h-10 flex-1 resize-none rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:border-[var(--color-brand-blue)] focus:outline-none disabled:opacity-50"
           />
-          <Button
-            size="icon"
+          <button
+            type="button"
             onClick={handleSend}
             disabled={!input.trim() || isWorking}
-            className="shrink-0 bg-[var(--color-brand-blue)] text-white hover:bg-[var(--color-brand-blue)]/80"
+            className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-brand-blue)] text-white transition-opacity hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            <Send className="size-4" />
-          </Button>
+            <ArrowUp className="size-4" />
+          </button>
+          {/* Lifecycle menu */}
+          <div className="relative" ref={lifecycleRef}>
+            <motion.button
+              type="button"
+              onClick={() => setLifecycleOpen(!lifecycleOpen)}
+              whileTap={{ scale: 0.9 }}
+              animate={{
+                borderColor: lifecycle === "" ? "var(--color-border)" : lifecycle === "Sleep" ? "rgba(234,179,8,0.4)" : "rgba(239,68,68,0.4)",
+                backgroundColor: lifecycle === "" ? "rgba(0,0,0,0)" : lifecycle === "Sleep" ? "rgba(234,179,8,0.1)" : "rgba(239,68,68,0.1)",
+                color: lifecycle === "" ? "var(--color-text-secondary)" : lifecycle === "Sleep" ? "#facc15" : "#f87171",
+              }}
+              transition={{ duration: 0.3 }}
+              className="flex size-9 shrink-0 items-center justify-center rounded-xl border hover:opacity-80"
+              title={`Lifecycle: ${lifecycle || "Default (keep running)"}`}
+            >
+              <Settings2 className="size-4" />
+            </motion.button>
+            <AnimatePresence>
+              {lifecycleOpen && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9, y: 4 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, y: 4 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute bottom-12 right-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-[0_8px_32px_rgba(0,0,0,0.4)]"
+                >
+                  <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] text-center">Lifecycle Mode</p>
+                  <div className="flex gap-2 p-2 pt-0">
+                  <motion.button
+                    type="button"
+                    onClick={() => { setLifecycle(""); }}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{
+                      opacity: 1, y: 0,
+                      backgroundColor: lifecycle === "" ? "rgba(63,133,217,0.15)" : "rgba(0,0,0,0)",
+                      color: lifecycle === "" ? "#3f85d9" : "#7c7c98",
+                    }}
+                    transition={{ backgroundColor: { duration: 0.2 }, color: { duration: 0.2 }, opacity: { duration: 0.15 }, y: { duration: 0.15 } }}
+                    className="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-[10px] font-medium hover:bg-[var(--color-surface-hover)]"
+                    title="Keep running after task"
+                  >
+                    <Play className="size-4" />
+                    Default
+                  </motion.button>
+                  <motion.button
+                    type="button"
+                    onClick={() => { setLifecycle("Sleep"); }}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{
+                      opacity: 1, y: 0,
+                      backgroundColor: lifecycle === "Sleep" ? "rgba(234,179,8,0.15)" : "rgba(0,0,0,0)",
+                      color: lifecycle === "Sleep" ? "#facc15" : "#7c7c98",
+                    }}
+                    transition={{ backgroundColor: { duration: 0.2 }, color: { duration: 0.2 }, opacity: { duration: 0.15, delay: 0.05 }, y: { duration: 0.15, delay: 0.05 } }}
+                    className="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-[10px] font-medium hover:bg-[var(--color-surface-hover)]"
+                    title="Sleep after task (preserve workspace)"
+                  >
+                    <Moon className="size-4" />
+                    Sleep
+                  </motion.button>
+                  <motion.button
+                    type="button"
+                    onClick={() => { setLifecycle("AutoDelete"); }}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{
+                      opacity: 1, y: 0,
+                      backgroundColor: lifecycle === "AutoDelete" ? "rgba(239,68,68,0.15)" : "rgba(0,0,0,0)",
+                      color: lifecycle === "AutoDelete" ? "#f87171" : "#7c7c98",
+                    }}
+                    transition={{ backgroundColor: { duration: 0.2 }, color: { duration: 0.2 }, opacity: { duration: 0.15, delay: 0.1 }, y: { duration: 0.15, delay: 0.1 } }}
+                    className="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-[10px] font-medium hover:bg-[var(--color-surface-hover)]"
+                    title="Delete agent after task"
+                  >
+                    <Trash2 className="size-4" />
+                    AutoDelete
+                  </motion.button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
     </div>

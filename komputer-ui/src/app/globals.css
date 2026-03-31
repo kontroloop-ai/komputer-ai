@@ -82,6 +82,27 @@
     color: white;
   }
 
+  @keyframes gradient-shift {
+    0% { background-position: 0% 0%; }
+    50% { background-position: 100% 100%; }
+    100% { background-position: 0% 0%; }
+  }
+
+  .animate-gradient {
+    background-size: 200% 200%;
+    animation: gradient-shift 4s ease infinite;
+  }
+
+  @keyframes shine {
+    0% { background-position: 200% center; }
+    100% { background-position: -200% center; }
+  }
+
+  .animate-shine {
+    background-size: 200% 100%;
+    animation: shine 6s linear infinite;
+  }
+
   .glow-magic:hover {
     box-shadow: 0 0 20px rgba(63, 133, 217, 0.06), 0 0 40px rgba(139, 92, 246, 0.04);
   }

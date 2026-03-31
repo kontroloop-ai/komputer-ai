@@ -26,8 +26,8 @@ const navItems = [
   { label: "Cost", icon: DollarSign, href: "/costs" },
 ];
 
-const bottomItems = [
-  { label: "Settings", icon: Settings, href: "/settings" },
+const bottomItems: typeof navItems = [
+  // { label: "Settings", icon: Settings, href: "/settings" },
 ];
 
 function NavItem({
@@ -54,12 +54,12 @@ function NavItem({
       `}
     >
       {isActive && (
-        <span className="absolute left-0 top-0 bottom-0 w-[3px] rounded-r-full bg-gradient-to-b from-[var(--color-brand-blue-light)] to-[var(--color-brand-violet)] shadow-[0_0_8px_var(--color-brand-blue),0_0_16px_rgba(63,133,217,0.3)]" />
+        <span className="absolute left-0 top-0 bottom-0 w-[3px] rounded-r-full bg-gradient-to-b from-[var(--color-brand-blue-light)] via-[var(--color-brand-violet)] to-[var(--color-brand-blue-light)] shadow-[0_0_8px_var(--color-brand-blue),0_0_16px_rgba(63,133,217,0.3)] animate-gradient" />
       )}
       <Icon className="h-5 w-5 shrink-0" style={isActive ? { color: "#5a9be6", filter: "drop-shadow(0 0 4px rgba(63,133,217,0.6))" } : undefined} />
       {!collapsed && (
         <motion.span
-          className={isActive ? "bg-gradient-to-r from-[#5a9be6] to-[#A78BFA] bg-clip-text text-transparent" : ""}
+          className={isActive ? "bg-gradient-to-r from-[#5a9be6] via-[#A78BFA] to-[#5a9be6] bg-clip-text text-transparent animate-gradient" : ""}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

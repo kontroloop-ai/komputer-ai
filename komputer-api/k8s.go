@@ -477,6 +477,21 @@ func (k *K8sClient) DeleteSchedule(ctx context.Context, ns, name string) error {
 }
 
 // PatchAgentTaskStatus patches only the task-related status fields on a KomputerAgent CR.
+// PatchAgentLifecycle updates the lifecycle field on an agent's spec.
+func (k *K8sClient) PatchAgentLifecycle(ctx context.Context, ns, agentName, lifecycle string) error {
+	agent := &komputerv1alpha1.KomputerAgent{}
+	key := types.NamespacedName{Name: agentName, Namespace: ns}
+	if err := k.client.Get(ctx, key, agent); err != nil {
+		return fmt.Errorf("failed to get agent %s: %w", agentName, err)
+	}
+	if string(agent.Spec.Lifecycle) == lifecycle {
+		return nil // no change needed
+	}
+	original := agent.DeepCopy()
+	agent.Spec.Lifecycle = komputerv1alpha1.AgentLifecycle(lifecycle)
+	return k.client.Patch(ctx, agent, client.MergeFrom(original))
+}
+
 func (k *K8sClient) PatchAgentTaskStatus(ctx context.Context, ns, agentName, taskStatus, lastMessage, sessionID string, costUSD float64) error {
 	agent := &komputerv1alpha1.KomputerAgent{}
 	key := types.NamespacedName{Name: agentName, Namespace: ns}

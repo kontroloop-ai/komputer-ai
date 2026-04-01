@@ -136,7 +136,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             )}
           </div>
         </header>
-        <main className="flex-1 overflow-clip">
+        <main className="flex-1 overflow-y-auto">
           <RefreshContext.Provider value={refreshCtx}>
             {children}
           </RefreshContext.Provider>

@@ -303,7 +303,7 @@ export default function AgentDetailPage() {
             agentStatus={agent.status}
             events={events}
             taskStatus={agent.taskStatus}
-            initialPending={agent.taskStatus === "InProgress" ? initialPending : undefined}
+            initialPending={agent.taskStatus === "Complete" || agent.taskStatus === "Error" ? undefined : initialPending}
             hasMoreEvents={hasMoreEvents}
             loadingOlder={loadingOlder}
             onLoadOlder={loadOlderEvents}

@@ -765,14 +765,20 @@ export function AgentChat({
                   );
                 case "tool":
                   return (
-                    <ToolCard
+                    <motion.div
                       key={key}
-                      toolName={msg.toolName}
-                      description={msg.description}
-                      command={msg.command}
-                      input={msg.input}
-                      output={msg.output}
-                    />
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2, ease: "easeOut" }}
+                    >
+                      <ToolCard
+                        toolName={msg.toolName}
+                        description={msg.description}
+                        command={msg.command}
+                        input={msg.input}
+                        output={msg.output}
+                      />
+                    </motion.div>
                   );
                 case "completed":
                   return (

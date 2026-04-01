@@ -10,6 +10,9 @@ import type {
   AgentEvent,
   PatchAgentRequest,
   TemplateListResponse,
+  MemoryListResponse,
+  CreateMemoryRequest,
+  MemoryResponse,
 } from './types';
 import { getConfig } from './config';
 
@@ -88,6 +91,19 @@ export const patchAgent = (name: string, data: PatchAgentRequest, ns?: string) =
   request<AgentResponse>(`/agents/${name}${ns ? `?namespace=${ns}` : ''}`, {
     method: 'PATCH', body: JSON.stringify(data),
   });
+
+// Memories
+export const listMemories = (ns?: string) =>
+  request<MemoryListResponse>(`/memories${ns ? `?namespace=${ns}` : ''}`);
+
+export const getMemory = (name: string, ns?: string) =>
+  request<MemoryResponse>(`/memories/${name}${ns ? `?namespace=${ns}` : ''}`);
+
+export const createMemory = (data: CreateMemoryRequest) =>
+  request<MemoryResponse>('/memories', { method: 'POST', body: JSON.stringify(data) });
+
+export const deleteMemory = (name: string, ns?: string) =>
+  request<void>(`/memories/${name}${ns ? `?namespace=${ns}` : ''}`, { method: 'DELETE' });
 
 // Templates
 export const listTemplates = (ns?: string) =>

@@ -11,6 +11,7 @@ import {
   Clock,
   Network,
   DollarSign,
+  Brain,
   Settings,
   PanelLeftClose,
   PanelLeftOpen,
@@ -20,6 +21,7 @@ import { Tooltip, TooltipProvider } from "@/components/kit/tooltip";
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/" },
   { label: "Agents", icon: Bot, href: "/agents" },
+  { label: "Memories", icon: Brain, href: "/memories" },
   { label: "Offices", icon: Building2, href: "/offices" },
   { label: "Schedules", icon: Clock, href: "/schedules" },
   { label: "Topology", icon: Network, href: "/topology" },

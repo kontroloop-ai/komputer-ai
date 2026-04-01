@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/kit/select";
 import { Plus, Trash2, ChevronRight, Check } from "lucide-react";
-import { createAgent, listAgents, listTemplates } from "@/lib/api";
+import { createAgent, listAgents, listTemplates, listMemories } from "@/lib/api";
 import type { CreateAgentRequest, TemplateResponse } from "@/lib/types";
 import type { AgentTemplate } from "@/lib/create-agent-modal-context";
 
@@ -50,6 +50,8 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
   const [role, setRole] = useState<"manager" | "worker" | undefined>(undefined);
   const [templateRef, setTemplateRef] = useState("default");
   const [templates, setTemplates] = useState<TemplateResponse[]>([]);
+  const [selectedMemories, setSelectedMemories] = useState<string[]>([]);
+  const [availableMemories, setAvailableMemories] = useState<{ name: string }[]>([]);
   const [secrets, setSecrets] = useState<SecretEntry[]>([]);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -70,6 +72,7 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
     setTemplateRef("default");
     setRole(undefined);
     setSecrets([]);
+    setSelectedMemories([]);
     setAdvancedOpen(false);
     setError(null);
     setAddingNamespace(false);
@@ -95,6 +98,9 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
     listTemplates(namespace || undefined)
       .then((res) => setTemplates(res.templates ?? []))
       .catch(() => setTemplates([]));
+    listMemories(namespace || undefined)
+      .then((res) => setAvailableMemories((res.memories ?? []).map((m) => ({ name: m.name }))))
+      .catch(() => setAvailableMemories([]));
   }, [open, namespace]);
 
   // Close namespace dropdown on click outside
@@ -173,6 +179,7 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
         role: role || undefined,
         templateRef: templateRef !== "default" ? templateRef : undefined,
         secrets: Object.keys(secretsMap).length > 0 ? secretsMap : undefined,
+        memories: selectedMemories.length > 0 ? selectedMemories : undefined,
       };
       await createAgent(req);
       const agentName = name.trim();
@@ -453,6 +460,36 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
                             ))}
                           </SelectContent>
                         </Select>
+                      </div>
+
+                      {/* Memories */}
+                      <div className="flex flex-col gap-1.5">
+                        <Label>Memories</Label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {availableMemories.map((m) => {
+                            const selected = selectedMemories.includes(m.name);
+                            return (
+                              <button
+                                key={m.name}
+                                type="button"
+                                onClick={() => setSelectedMemories(prev =>
+                                  selected ? prev.filter(n => n !== m.name) : [...prev, m.name]
+                                )}
+                                className={`text-xs px-2.5 py-1 rounded-full border transition-colors cursor-pointer ${
+                                  selected
+                                    ? "border-[var(--color-brand-violet)] bg-[var(--color-brand-violet)]/10 text-[var(--color-brand-violet)]"
+                                    : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)]"
+                                }`}
+                              >
+                                {selected && <Check className="inline size-2.5 mr-1" />}
+                                {m.name}
+                              </button>
+                            );
+                          })}
+                          {availableMemories.length === 0 && (
+                            <p className="text-xs text-[var(--color-text-muted)]">No memories available</p>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </motion.div>

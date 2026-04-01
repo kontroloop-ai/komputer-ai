@@ -17,7 +17,7 @@ import { Tooltip } from "@/components/kit/tooltip";
 import { AgentChat } from "@/components/agents/agent-chat";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { useDelayedLoading } from "@/hooks/use-delayed-loading";
-import { getAgent, deleteAgent, cancelAgent, createAgent, getAgentEvents, patchAgent } from "@/lib/api";
+import { getAgent, deleteAgent, cancelAgent, createAgent, getAgentEvents, patchAgent, listMemories } from "@/lib/api";
 import { SubAgentPanel } from "@/components/agents/sub-agent-panel";
 import { MODELS, LIFECYCLES } from "@/lib/constants";
 import { Input } from "@/components/kit/input";
@@ -420,12 +420,21 @@ function SettingsCard({ agent, agentNs, onSaved }: {
   const [lifecycle, setLifecycle] = useState<string>(agent.lifecycle || "default");
   const [instructions, setInstructions] = useState(agent.instructions ?? "");
   const [newSecrets, setNewSecrets] = useState<{ key: string; value: string }[]>([]);
+  const [agentMemories, setAgentMemories] = useState<string[]>(agent.memories ?? []);
+  const [availableMemories, setAvailableMemories] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    listMemories(agentNs).then((res) => {
+      setAvailableMemories((res.memories ?? []).map((m) => m.name));
+    }).catch(() => {});
+  }, [agentNs]);
+
   const agentLifecycle = agent.lifecycle || "default";
-  const hasChanges = model !== agent.model || lifecycle !== agentLifecycle || newSecrets.some(s => s.key.trim() && s.value.trim());
+  const memoriesChanged = JSON.stringify(agentMemories.sort()) !== JSON.stringify((agent.memories ?? []).sort());
+  const hasChanges = model !== agent.model || lifecycle !== agentLifecycle || newSecrets.some(s => s.key.trim() && s.value.trim()) || memoriesChanged;
 
   async function handleSave() {
     setSaving(true);
@@ -442,6 +451,7 @@ function SettingsCard({ agent, agentNs, onSaved }: {
         if (k && v) secretsMap[k] = v;
       }
       if (Object.keys(secretsMap).length > 0) patch.secrets = secretsMap;
+      if (memoriesChanged) patch.memories = agentMemories;
       await patchAgent(agent.name, patch, agentNs);
       setNewSecrets([]);
       setSaved(true);
@@ -540,6 +550,35 @@ function SettingsCard({ agent, agentNs, onSaved }: {
           <Plus className="mr-1 h-4 w-4" />
           Add Secret
         </Button>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label>Memories</Label>
+        <div className="flex flex-wrap gap-1.5">
+          {availableMemories.map((name) => {
+            const attached = agentMemories.includes(name);
+            return (
+              <button
+                key={name}
+                type="button"
+                onClick={() => setAgentMemories(prev =>
+                  attached ? prev.filter(n => n !== name) : [...prev, name]
+                )}
+                className={`text-xs px-2.5 py-1 rounded-full border transition-colors cursor-pointer ${
+                  attached
+                    ? "border-[var(--color-brand-violet)] bg-[var(--color-brand-violet)]/10 text-[var(--color-brand-violet)]"
+                    : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)]"
+                }`}
+              >
+                {attached && <Check className="inline size-2.5 mr-1" />}
+                {name}
+              </button>
+            );
+          })}
+          {availableMemories.length === 0 && (
+            <p className="text-xs text-[var(--color-text-muted)]">No memories available</p>
+          )}
+        </div>
       </div>
 
       {error && <p className="text-sm text-red-400">{error}</p>}

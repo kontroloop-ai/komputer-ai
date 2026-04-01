@@ -33,6 +33,7 @@ export function usePageRefresh(refreshFn: () => void) {
 const pageTitles: Record<string, string> = {
   "/": "Dashboard",
   "/agents": "Agents",
+  "/memories": "Memories",
   "/offices": "Offices",
   "/schedules": "Schedules",
   "/topology": "Topology",

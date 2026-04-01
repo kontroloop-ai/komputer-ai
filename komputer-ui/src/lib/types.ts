@@ -82,6 +82,7 @@ export interface CreateAgentRequest {
   role?: 'manager' | 'worker';
   namespace?: string;
   secrets?: Record<string, string>;
+  memories?: string[];
   lifecycle?: '' | 'Sleep' | 'AutoDelete';
 }
 
@@ -106,6 +107,7 @@ export interface PatchAgentRequest {
   lifecycle?: string;
   instructions?: string;
   templateRef?: string;
+  memories?: string[];
 }
 
 export interface TemplateResponse {

@@ -82,3 +82,12 @@ When modifying agent system prompts (`komputer-api/prompt.go`, `komputer-agent/p
 ## 10. Surgical Changes, Cloud-Native Mindset
 
 When implementing a feature or fix, make the smallest clean change that solves the problem. Do not bundle refactors, renames, or "improvements" unless the problem specifically requires them. Default to cloud-native patterns (CRDs, controllers, reconciliation loops, declarative config) — avoid inventing custom state machines or orchestration when Kubernetes primitives already handle it.
+
+## 11. Opus for Planning, Sonnet for Implementation
+
+When tackling a complex feature or task, use a two-tier model strategy to balance quality and cost:
+
+- **Orchestrator / planner** → use Opus (e.g. `claude-opus-4-5`). It handles reasoning, architecture decisions, task breakdown, and synthesis.
+- **Sub-agents / implementers** → use Sonnet (e.g. `claude-sonnet-4-5`). They execute focused, well-defined tasks (coding, file edits, research).
+
+This keeps expensive Opus tokens reserved for high-level thinking and delegates the bulk of token-heavy execution to the cheaper Sonnet model.

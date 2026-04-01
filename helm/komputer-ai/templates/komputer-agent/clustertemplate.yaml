@@ -18,11 +18,18 @@ spec:
       image: {{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag }}
       imagePullPolicy: {{ .Values.agent.image.pullPolicy }}
       env:
+      {{- if .Values.bedrock.enabled }}
+      - name: CLAUDE_CODE_USE_BEDROCK
+        value: "1"
+      - name: AWS_REGION
+        value: {{ .Values.bedrock.region | quote }}
+      {{- else }}
       - name: ANTHROPIC_API_KEY
         valueFrom:
           secretKeyRef:
             name: {{ .Values.anthropicApiKeySecret.name }}
             key: {{ .Values.anthropicApiKeySecret.key }}
+      {{- end }}
       resources:
         {{- toYaml .Values.clusterTemplate.resources | nindent 8 }}
   storage:

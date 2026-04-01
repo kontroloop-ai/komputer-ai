@@ -140,11 +140,17 @@ externalRedis:
     name: ""
     key: password
 
-# -- Anthropic API key secret reference (REQUIRED — must exist in the release namespace)
+# -- Anthropic API key secret reference (REQUIRED when not using Bedrock)
 # Create it first: kubectl create secret generic anthropic-api-key --from-literal=api-key=sk-ant-...
 anthropicApiKeySecret:
   name: ""
   key: api-key
+
+# -- AWS Bedrock configuration. When enabled, agents use Bedrock instead of the Anthropic API.
+# Auth: use IRSA on EKS (recommended) or provide AWS credentials via a secret.
+bedrock:
+  enabled: false
+  region: "us-east-1"
 
 # -- KomputerConfig settings
 config:

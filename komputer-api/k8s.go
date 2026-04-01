@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -140,8 +141,10 @@ func (k *K8sClient) WakeAgent(ctx context.Context, ns, name, instructions, model
 func (k *K8sClient) CreateAgentSecrets(ctx context.Context, ns, agentName string, secrets map[string]string) (string, error) {
 	secretName := agentName + "-secrets"
 	data := make(map[string][]byte, len(secrets))
+	sanitize := regexp.MustCompile(`[^A-Za-z0-9]`)
 	for key, value := range secrets {
-		data["SECRET_"+strings.ToUpper(key)] = []byte(value)
+		safe := strings.ToUpper(sanitize.ReplaceAllString(key, "_"))
+		data["SECRET_"+safe] = []byte(value)
 	}
 
 	secret := &corev1.Secret{
@@ -506,6 +509,62 @@ func (k *K8sClient) DeleteSchedule(ctx context.Context, ns, name string) error {
 		},
 	}
 	return k.client.Delete(ctx, schedule)
+}
+
+// PatchAgentSpec patches mutable spec fields on a KomputerAgent CR.
+func (k *K8sClient) PatchAgentSpec(ctx context.Context, ns, agentName string, model, lifecycle, instructions, templateRef *string) error {
+	agent := &komputerv1alpha1.KomputerAgent{}
+	key := types.NamespacedName{Name: agentName, Namespace: ns}
+	if err := k.client.Get(ctx, key, agent); err != nil {
+		return fmt.Errorf("failed to get agent %s: %w", agentName, err)
+	}
+	original := agent.DeepCopy()
+	changed := false
+	if model != nil && *model != agent.Spec.Model {
+		agent.Spec.Model = *model
+		changed = true
+	}
+	if lifecycle != nil && string(agent.Spec.Lifecycle) != *lifecycle {
+		agent.Spec.Lifecycle = komputerv1alpha1.AgentLifecycle(*lifecycle)
+		changed = true
+	}
+	if instructions != nil && *instructions != agent.Spec.Instructions {
+		agent.Spec.Instructions = *instructions
+		changed = true
+	}
+	if templateRef != nil && *templateRef != agent.Spec.TemplateRef {
+		agent.Spec.TemplateRef = *templateRef
+		changed = true
+	}
+	if !changed {
+		return nil
+	}
+	return k.client.Patch(ctx, agent, client.MergeFrom(original))
+}
+
+// ApplyAgentConfig sends a config update to the agent's FastAPI /config endpoint.
+func (k *K8sClient) ApplyAgentConfig(ctx context.Context, ns, podName, podIP string, configPayload string) error {
+	err := k.postToAgent(ctx, podIP, "/config", configPayload)
+	if err != nil {
+		// Fallback: kubectl exec curl inside the pod
+		return k.execInPod(ctx, ns, podName, "curl", "-s", "-X", "POST",
+			"-H", "Content-Type: application/json",
+			"-d", configPayload,
+			"http://localhost:8000/config")
+	}
+	return nil
+}
+
+// PatchAgentSecretsList updates the secrets list on an agent's spec.
+func (k *K8sClient) PatchAgentSecretsList(ctx context.Context, ns, agentName string, secrets []string) error {
+	agent := &komputerv1alpha1.KomputerAgent{}
+	key := types.NamespacedName{Name: agentName, Namespace: ns}
+	if err := k.client.Get(ctx, key, agent); err != nil {
+		return fmt.Errorf("failed to get agent %s: %w", agentName, err)
+	}
+	original := agent.DeepCopy()
+	agent.Spec.Secrets = secrets
+	return k.client.Patch(ctx, agent, client.MergeFrom(original))
 }
 
 // PatchAgentTaskStatus patches only the task-related status fields on a KomputerAgent CR.

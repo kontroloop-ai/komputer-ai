@@ -8,6 +8,7 @@ import uvicorn
 
 from agent import run_agent
 from events import EventPublisher
+import config
 import state
 
 
@@ -65,8 +66,12 @@ async def _interrupt_client():
 
 def main():
     instructions = os.getenv("KOMPUTER_INSTRUCTIONS", "")
-    model = os.getenv("KOMPUTER_MODEL", "claude-sonnet-4-6")
     agent_name = os.getenv("KOMPUTER_AGENT_NAME", "unknown")
+
+    # Initialize runtime config from env vars.
+    config.init()
+    cfg = config.load()
+    model = cfg["model"]
 
     redis_config = load_redis_config()
 

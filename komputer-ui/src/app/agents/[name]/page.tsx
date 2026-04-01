@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { Ban, Trash2, Zap, KeyRound, ChevronRight, FileText } from "lucide-react";
+import { Ban, Trash2, Zap, KeyRound, ChevronRight, FileText, Save, Check, Plus } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/kit/button";
@@ -17,7 +17,18 @@ import { Tooltip } from "@/components/kit/tooltip";
 import { AgentChat } from "@/components/agents/agent-chat";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { useDelayedLoading } from "@/hooks/use-delayed-loading";
-import { getAgent, deleteAgent, cancelAgent, createAgent, getAgentEvents } from "@/lib/api";
+import { getAgent, deleteAgent, cancelAgent, createAgent, getAgentEvents, patchAgent } from "@/lib/api";
+import { MODELS, LIFECYCLES } from "@/lib/constants";
+import { Input } from "@/components/kit/input";
+import { Textarea } from "@/components/kit/textarea";
+import { Label } from "@/components/kit/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/kit/select";
 import type { AgentResponse, AgentEvent } from "@/lib/types";
 
 export default function AgentDetailPage() {
@@ -281,7 +292,7 @@ export default function AgentDetailPage() {
         <div className="shrink-0 border-b border-[var(--color-border)] px-6">
           <TabsList>
             <TabsTrigger value="chat">Chat</TabsTrigger>
-            <TabsTrigger value="info">Info</TabsTrigger>
+            <TabsTrigger value="info">Settings</TabsTrigger>
           </TabsList>
         </div>
 
@@ -324,64 +335,21 @@ export default function AgentDetailPage() {
               <StatCard label="Last Task" value={agent.lastTaskCostUSD ? `$${agent.lastTaskCostUSD}` : "—"} />
             </motion.div>
 
-            {/* Details grid */}
+            {/* Settings */}
+            <SettingsCard agent={agent} agentNs={agentNs} onSaved={fetchAgent} />
+
+            {/* Agent info */}
             <motion.div
-              className="grid grid-cols-1 md:grid-cols-2 gap-4"
+              className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 space-y-3 transition-colors duration-150 hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-hover)]"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, ease: "easeOut", delay: 0.1 }}
             >
-              {/* Configuration */}
-              <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 space-y-3 transition-colors duration-150 hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-hover)]">
-                <h3 className="text-[11px] uppercase tracking-wider font-semibold text-[var(--color-text-muted)]">Configuration</h3>
-                <InfoRow label="Name" value={agent.name} />
-                <InfoRow label="Namespace" value={agent.namespace} />
-                <InfoRow label="Model" value={agent.model} mono />
-                <InfoRow label="Lifecycle" value={
-                  agent.lifecycle === "AutoDelete" ? "Auto Delete" :
-                  agent.lifecycle === "Sleep" ? "Sleep" : "Default"
-                } />
-                <InfoRow label="Created" value={new Date(agent.createdAt).toLocaleString()} />
-              </div>
-
-              {/* Secrets */}
-              <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 space-y-3 transition-colors duration-150 hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-hover)]">
-                <div className="flex items-center gap-2">
-                  <KeyRound className="size-3.5 text-[var(--color-text-muted)]" />
-                  <h3 className="text-[11px] uppercase tracking-wider font-semibold text-[var(--color-text-muted)]">Secrets</h3>
-                </div>
-                {agent.secrets && agent.secrets.length > 0 ? (
-                  <div className="space-y-1.5">
-                    {agent.secrets.map((key) => (
-                      <div key={key} className="flex items-center gap-3 rounded-[var(--radius-sm)] bg-[var(--color-bg)] px-3 py-2 transition-colors duration-150 hover:bg-[var(--color-bg-subtle)]">
-                        <span className="text-[12px] font-[family-name:var(--font-mono)] text-[var(--color-text-secondary)]">{key}</span>
-                        <span className="ml-auto font-[family-name:var(--font-mono)] text-[11px] tracking-widest text-[var(--color-text-muted)]">••••••</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-[var(--color-text-muted)]">No secrets configured</p>
-                )}
-              </div>
+              <h3 className="text-[11px] uppercase tracking-wider font-semibold text-[var(--color-text-muted)]">Agent Info</h3>
+              <InfoRow label="Name" value={agent.name} />
+              <InfoRow label="Namespace" value={agent.namespace} />
+              <InfoRow label="Created" value={new Date(agent.createdAt).toLocaleString()} />
             </motion.div>
-
-            {/* Instructions */}
-            {agent.instructions && (
-              <InstructionsCard instructions={agent.instructions} />
-            )}
-
-            {/* Last message */}
-            {agent.lastTaskMessage && (
-              <motion.div
-                className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 space-y-2 transition-colors duration-150 hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-hover)]"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, ease: "easeOut", delay: 0.2 }}
-              >
-                <h3 className="text-[11px] uppercase tracking-wider font-semibold text-[var(--color-text-muted)]">Last Task Message</h3>
-                <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">{agent.lastTaskMessage}</p>
-              </motion.div>
-            )}
           </div>
         </TabsContent>
       </Tabs>
@@ -436,6 +404,154 @@ function InstructionsCard({ instructions }: { instructions: string }) {
           <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed whitespace-pre-wrap">{instructions}</p>
         </div>
       )}
+    </motion.div>
+  );
+}
+
+function SettingsCard({ agent, agentNs, onSaved }: {
+  agent: AgentResponse;
+  agentNs?: string;
+  onSaved: () => void;
+}) {
+  const [model, setModel] = useState(agent.model);
+  const [lifecycle, setLifecycle] = useState<string>(agent.lifecycle || "default");
+  const [instructions, setInstructions] = useState(agent.instructions ?? "");
+  const [newSecrets, setNewSecrets] = useState<{ key: string; value: string }[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const agentLifecycle = agent.lifecycle || "default";
+  const hasChanges = model !== agent.model || lifecycle !== agentLifecycle || newSecrets.some(s => s.key.trim() && s.value.trim());
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      const patch: Record<string, unknown> = {};
+      if (model !== agent.model) patch.model = model;
+      if (lifecycle !== agentLifecycle) patch.lifecycle = lifecycle === "default" ? "" : lifecycle;
+      const secretsMap: Record<string, string> = {};
+      for (const s of newSecrets) {
+        const k = s.key.trim();
+        const v = s.value.trim();
+        if (k && v) secretsMap[k] = v;
+      }
+      if (Object.keys(secretsMap).length > 0) patch.secrets = secretsMap;
+      await patchAgent(agent.name, patch, agentNs);
+      setNewSecrets([]);
+      setSaved(true);
+      onSaved();
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <motion.div
+      className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 space-y-4 transition-colors duration-150 hover:border-[var(--color-border-hover)]"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: "easeOut", delay: 0.2 }}
+    >
+      <h3 className="text-[11px] uppercase tracking-wider font-semibold text-[var(--color-text-muted)]">Settings</h3>
+
+      <div className="flex flex-col gap-1.5">
+        <Label>Instructions</Label>
+        <Textarea
+          value={instructions}
+          disabled
+          placeholder="No instructions set"
+          style={{ minHeight: 100 }}
+          className="opacity-60 cursor-not-allowed"
+        />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label>Model</Label>
+        <Select value={model} onValueChange={(v) => v && setModel(v)}>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {MODELS.map((m) => (
+              <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label>Lifecycle</Label>
+        <Select value={lifecycle} onValueChange={(v) => v && setLifecycle(v)}>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {LIFECYCLES.map((l) => (
+              <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label>Secrets</Label>
+        {agent.secrets && agent.secrets.length > 0 && (
+          <div className="space-y-1.5 mb-1">
+            {agent.secrets.map((key) => (
+              <div key={key} className="flex items-center gap-3 rounded-[var(--radius-sm)] bg-[var(--color-bg)] px-3 py-2">
+                <span className="text-[12px] font-[family-name:var(--font-mono)] text-[var(--color-text-secondary)]">{key}</span>
+                <span className="ml-auto font-[family-name:var(--font-mono)] text-[11px] tracking-widest text-[var(--color-text-muted)]">••••••</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {newSecrets.map((secret, index) => (
+          <div key={index} className="flex items-center gap-2">
+            <Input
+              placeholder="KEY"
+              value={secret.key}
+              onChange={(e) => setNewSecrets(prev => prev.map((s, i) => i === index ? { ...s, key: e.target.value } : s))}
+              autoComplete="off"
+              className="flex-1"
+            />
+            <Input
+              type="password"
+              placeholder="value"
+              value={secret.value}
+              onChange={(e) => setNewSecrets(prev => prev.map((s, i) => i === index ? { ...s, value: e.target.value } : s))}
+              autoComplete="off"
+              className="flex-1"
+            />
+            <Button type="button" variant="ghost" size="icon" onClick={() => setNewSecrets(prev => prev.filter((_, i) => i !== index))} className="shrink-0">
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        ))}
+        <Button type="button" variant="secondary" size="sm" onClick={() => setNewSecrets(prev => [...prev, { key: "", value: "" }])} className="w-fit">
+          <Plus className="mr-1 h-4 w-4" />
+          Add Secret
+        </Button>
+      </div>
+
+      {error && <p className="text-sm text-red-400">{error}</p>}
+
+      <div className="flex items-center gap-2">
+        <Button size="sm" onClick={handleSave} disabled={!hasChanges || saving}>
+          {saved ? (
+            <><Check className="size-3 mr-1" /> Saved</>
+          ) : saving ? (
+            "Saving..."
+          ) : (
+            <><Save className="size-3 mr-1" /> Save Changes</>
+          )}
+        </Button>
+      </div>
     </motion.div>
   );
 }

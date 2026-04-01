@@ -36,19 +36,9 @@ type CreateAgentModalProps = {
   initialValues?: AgentTemplate | null;
 };
 
+import { MODELS, LIFECYCLES } from "@/lib/constants";
+
 const NAME_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-
-const MODELS = [
-  { value: "claude-sonnet-4-6", label: "claude-sonnet-4-6" },
-  { value: "claude-opus-4-6", label: "claude-opus-4-6" },
-  { value: "claude-haiku-4-5", label: "claude-haiku-4-5" },
-];
-
-const LIFECYCLES = [
-  { value: "default", label: "Default — keep running" },
-  { value: "Sleep", label: "Sleep — preserve workspace" },
-  { value: "AutoDelete", label: "Auto Delete — one-shot" },
-];
 
 export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues }: CreateAgentModalProps) {
   const router = useRouter();

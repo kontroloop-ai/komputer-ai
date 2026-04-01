@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -174,6 +175,7 @@ func SetupRoutes(r *gin.Engine, k8s *K8sClient, hub *Hub, worker *RedisWorker) {
 		v1.GET("/agents/:name", getAgent(k8s))
 		v1.GET("/agents/:name/events", getAgentEvents(worker))
 		v1.DELETE("/agents/:name", deleteAgent(k8s, worker))
+		v1.PATCH("/agents/:name", patchAgent(k8s))
 		v1.POST("/agents/:name/cancel", cancelAgentTask(k8s))
 		v1.GET("/agents/:name/ws", HandleAgentWS(hub))
 
@@ -863,5 +865,92 @@ func listTemplates(k8s *K8sClient) gin.HandlerFunc {
 			resp = append(resp, TemplateResponse{Name: t.Name, Scope: t.Scope, Namespace: t.Namespace})
 		}
 		c.JSON(http.StatusOK, gin.H{"templates": resp})
+	}
+}
+
+type PatchAgentRequest struct {
+	Model        *string           `json:"model,omitempty"`
+	Lifecycle    *string           `json:"lifecycle,omitempty"`
+	Instructions *string           `json:"instructions,omitempty"`
+	TemplateRef  *string           `json:"templateRef,omitempty"`
+	Secrets      map[string]string `json:"secrets,omitempty"` // key-value pairs to set/update
+}
+
+func patchAgent(k8s *K8sClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		name := c.Param("name")
+		ns := resolveNamespace(c, k8s)
+
+		var req PatchAgentRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: " + err.Error()})
+			return
+		}
+		if req.Model == nil && req.Lifecycle == nil && req.Instructions == nil && req.TemplateRef == nil && len(req.Secrets) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "no fields to update"})
+			return
+		}
+
+		// 1. Patch CR spec first — this is the source of truth.
+		if err := k8s.PatchAgentSpec(c.Request.Context(), ns, name, req.Model, req.Lifecycle, req.Instructions, req.TemplateRef); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to patch agent: " + err.Error()})
+			return
+		}
+
+		// 1b. Update secrets if provided.
+		if len(req.Secrets) > 0 {
+			secretName, err := k8s.CreateAgentSecrets(c.Request.Context(), ns, name, req.Secrets)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update secrets: " + err.Error()})
+				return
+			}
+			// Ensure the secret name is on the CR's spec.secrets list.
+			agent, err := k8s.GetAgent(c.Request.Context(), ns, name)
+			if err == nil {
+				hasSecret := false
+				for _, s := range agent.Spec.Secrets {
+					if s == secretName {
+						hasSecret = true
+						break
+					}
+				}
+				if !hasSecret {
+					k8s.PatchAgentSecretsList(c.Request.Context(), ns, name, append(agent.Spec.Secrets, secretName))
+				}
+			}
+		}
+
+		// 2. If pod is running, forward config to the agent so it takes effect immediately.
+		agent, err := k8s.GetAgent(c.Request.Context(), ns, name)
+		if err == nil && agent.Status.PodName != "" && agent.Status.Phase == "Running" {
+			configPayload, _ := json.Marshal(req)
+			podIP, ipErr := k8s.GetAgentPodIP(c.Request.Context(), ns, agent.Status.PodName)
+			if ipErr == nil {
+				if applyErr := k8s.ApplyAgentConfig(c.Request.Context(), ns, agent.Status.PodName, podIP, string(configPayload)); applyErr != nil {
+					log.Printf("warning: CR patched but config apply to pod failed for %s: %v", name, applyErr)
+				}
+			}
+		}
+
+		// 3. Return updated agent.
+		updated, err := k8s.GetAgent(c.Request.Context(), ns, name)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "agent patched but failed to read back: " + err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, AgentResponse{
+			Name:            updated.Name,
+			Namespace:       updated.Namespace,
+			Model:           updated.Spec.Model,
+			Status:          string(updated.Status.Phase),
+			TaskStatus:      string(updated.Status.TaskStatus),
+			LastTaskMessage: updated.Status.LastTaskMessage,
+			Lifecycle:       string(updated.Spec.Lifecycle),
+			LastTaskCostUSD: updated.Status.LastTaskCostUSD,
+			TotalCostUSD:    updated.Status.TotalCostUSD,
+			Secrets:         updated.Spec.Secrets,
+			Instructions:    extractUserTask(updated.Spec.Instructions),
+			CreatedAt:       updated.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
+		})
 	}
 }

@@ -100,6 +100,13 @@ export interface CreateScheduleRequest {
   namespace?: string;
 }
 
+export interface PatchAgentRequest {
+  model?: string;
+  lifecycle?: string;
+  instructions?: string;
+  templateRef?: string;
+}
+
 export interface TemplateResponse {
   name: string;
   scope: 'namespace' | 'cluster';

@@ -5,26 +5,35 @@ from typing import Optional
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from pydantic import BaseModel
 
+import config as agent_config
 import state
 
 app = FastAPI()
 
 _publisher = None
-_model = None
 _current_task: Optional[asyncio.Task] = None
 _current_loop: Optional[asyncio.AbstractEventLoop] = None
 
 
 def configure(publisher, model: str):
-    global _publisher, _model
+    global _publisher
     _publisher = publisher
-    _model = model
 
 
 class TaskRequest(BaseModel):
     instructions: str
     model: Optional[str] = None
+    lifecycle: Optional[str] = None
     system_prompt: Optional[str] = None
+
+
+class ConfigRequest(BaseModel):
+    model: Optional[str] = None
+    lifecycle: Optional[str] = None
+    role: Optional[str] = None
+    instructions: Optional[str] = None
+    templateRef: Optional[str] = None
+    secrets: Optional[dict[str, str]] = None
 
 
 @app.get("/status")
@@ -50,14 +59,41 @@ async def readyz():
     return {"status": "ready"}
 
 
+@app.post("/config")
+async def apply_config(req: ConfigRequest):
+    import os as _os
+    import re as _re
+    # Handle secrets separately — set as env vars, not written to config file.
+    if req.secrets:
+        for key, value in req.secrets.items():
+            sanitized = _re.sub(r"[^A-Za-z0-9]", "_", key).upper()
+            env_key = f"SECRET_{sanitized}"
+            _os.environ[env_key] = value
+
+    updates = {k: v for k, v in req.model_dump(exclude={"secrets"}).items() if v is not None}
+    if updates:
+        agent_config.apply(updates)
+
+    if not updates and not req.secrets:
+        raise HTTPException(status_code=400, detail="No config fields provided")
+
+    return {"status": "applied", "config": agent_config.load()}
+
+
 @app.post("/task")
 async def create_task(req: TaskRequest, background_tasks: BackgroundTasks):
     if state.busy.locked():
         raise HTTPException(status_code=409, detail="Agent is busy with another task")
 
+    # Apply any config overrides from the task request before starting.
+    config_updates = {k: v for k, v in {"model": req.model, "lifecycle": req.lifecycle}.items() if v is not None}
+    if config_updates:
+        agent_config.apply(config_updates)
+
     from agent import run_agent
 
-    task_model = req.model or _model
+    cfg = agent_config.load()
+    task_model = cfg["model"]
 
     def run_with_lock():
         global _current_task, _current_loop

@@ -8,6 +8,7 @@ import type {
   CreateAgentRequest,
   CreateScheduleRequest,
   AgentEvent,
+  TemplateListResponse,
 } from './types';
 import { getConfig } from './config';
 
@@ -80,6 +81,10 @@ export const createSchedule = (data: CreateScheduleRequest) =>
 
 export const deleteSchedule = (name: string, ns?: string) =>
   request<void>(`/schedules/${name}${ns ? `?namespace=${ns}` : ''}`, { method: 'DELETE' });
+
+// Templates
+export const listTemplates = (ns?: string) =>
+  request<TemplateListResponse>(`/templates${ns ? `?namespace=${ns}` : ''}`);
 
 // Health
 export const checkHealth = async () => {

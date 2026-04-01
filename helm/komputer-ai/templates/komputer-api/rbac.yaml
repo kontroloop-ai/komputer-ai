@@ -78,6 +78,14 @@ rules:
   - komputerschedules/status
   verbs:
   - get
+- apiGroups:
+  - komputer.komputer.ai
+  resources:
+  - komputeragenttemplates
+  - komputeragentclustertemplates
+  verbs:
+  - get
+  - list
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

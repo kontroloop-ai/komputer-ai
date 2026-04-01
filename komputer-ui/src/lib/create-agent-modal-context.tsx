@@ -9,6 +9,7 @@ export interface AgentTemplate {
   lifecycle: string;
   role?: "manager" | "worker";
   secrets?: Record<string, string>;
+  templateRef?: string;
 }
 
 export interface CreateAgentModalContextValue {

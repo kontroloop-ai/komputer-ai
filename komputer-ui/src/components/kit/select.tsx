@@ -205,6 +205,15 @@ interface SelectContentProps extends HTMLAttributes<HTMLDivElement> {}
 export function SelectContent({ className, children }: SelectContentProps) {
   const { open, setOpen, triggerRef } = useSelectContext();
   const contentRef = useRef<HTMLDivElement>(null);
+  const [openUpward, setOpenUpward] = useState(false);
+
+  // Determine if dropdown should open upward
+  useEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    setOpenUpward(spaceBelow < 260); // 260 = max-h-60 (240px) + margin
+  }, [open, triggerRef]);
 
   // Close on click outside
   useEffect(() => {
@@ -234,27 +243,32 @@ export function SelectContent({ className, children }: SelectContentProps) {
   }, [open, setOpen]);
 
   return (
+    <>
+    {/* Render items hidden when closed so labels register eagerly */}
+    {!open && <div className="hidden">{children}</div>}
     <AnimatePresence>
       {open && (
         <motion.div
           ref={contentRef}
           role="listbox"
           className={cn(
-            "absolute z-50 w-full mt-1 py-1 rounded-[var(--radius-md)]",
+            "absolute z-50 w-full py-1 rounded-[var(--radius-md)]",
             "bg-[var(--color-surface-raised)] border border-[var(--color-border)]",
             "shadow-[0_8px_32px_rgba(0,0,0,0.4),0_2px_8px_rgba(0,0,0,0.2)]",
-            "overflow-hidden",
+            "overflow-y-auto max-h-60",
+            openUpward ? "bottom-full mb-1" : "mt-1",
             className
           )}
-          initial={{ opacity: 0, y: -4, scale: 0.98 }}
+          initial={{ opacity: 0, y: openUpward ? 4 : -4, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -4, scale: 0.98 }}
+          exit={{ opacity: 0, y: openUpward ? 4 : -4, scale: 0.98 }}
           transition={{ duration: 0.12, ease: "easeOut" }}
         >
           {children}
         </motion.div>
       )}
     </AnimatePresence>
+    </>
   );
 }
 

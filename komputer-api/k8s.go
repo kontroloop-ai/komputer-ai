@@ -244,6 +244,38 @@ func (k *K8sClient) ListAgents(ctx context.Context, ns string) ([]komputerv1alph
 	return list.Items, nil
 }
 
+type TemplateInfo struct {
+	Name      string
+	Scope     string // "cluster" or "namespace"
+	Namespace string // populated for namespaced templates
+}
+
+func (k *K8sClient) ListTemplates(ctx context.Context, ns string) ([]TemplateInfo, error) {
+	var templates []TemplateInfo
+
+	// Cluster-scoped templates
+	clusterList := &komputerv1alpha1.KomputerAgentClusterTemplateList{}
+	if err := k.client.List(ctx, clusterList); err != nil {
+		return nil, fmt.Errorf("failed to list cluster templates: %w", err)
+	}
+	for _, t := range clusterList.Items {
+		templates = append(templates, TemplateInfo{Name: t.Name, Scope: "cluster"})
+	}
+
+	// Namespaced templates (if namespace provided)
+	if ns != "" {
+		nsList := &komputerv1alpha1.KomputerAgentTemplateList{}
+		if err := k.client.List(ctx, nsList, client.InNamespace(ns)); err != nil {
+			return nil, fmt.Errorf("failed to list namespace templates: %w", err)
+		}
+		for _, t := range nsList.Items {
+			templates = append(templates, TemplateInfo{Name: t.Name, Scope: "namespace", Namespace: t.Namespace})
+		}
+	}
+
+	return templates, nil
+}
+
 func (k *K8sClient) GetAgentPodIP(ctx context.Context, ns, podName string) (string, error) {
 	pod := &corev1.Pod{}
 	err := k.client.Get(ctx, types.NamespacedName{Name: podName, Namespace: ns}, pod)

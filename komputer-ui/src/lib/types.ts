@@ -99,3 +99,13 @@ export interface CreateScheduleRequest {
   };
   namespace?: string;
 }
+
+export interface TemplateResponse {
+  name: string;
+  scope: 'namespace' | 'cluster';
+  namespace?: string;
+}
+
+export interface TemplateListResponse {
+  templates: TemplateResponse[];
+}

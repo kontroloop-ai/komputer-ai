@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Dialog,
   DialogContent,
@@ -21,9 +22,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/kit/select";
-import { Plus, Trash2 } from "lucide-react";
-import { createAgent } from "@/lib/api";
-import type { CreateAgentRequest } from "@/lib/types";
+import { Plus, Trash2, ChevronRight } from "lucide-react";
+import { createAgent, listTemplates } from "@/lib/api";
+import type { CreateAgentRequest, TemplateResponse } from "@/lib/types";
 import type { AgentTemplate } from "@/lib/create-agent-modal-context";
 
 type SecretEntry = { key: string; value: string };
@@ -44,9 +45,9 @@ const MODELS = [
 ];
 
 const LIFECYCLES = [
-  { value: "default", label: "Default (keep running)" },
-  { value: "Sleep", label: "Sleep (preserve workspace)" },
-  { value: "AutoDelete", label: "Auto Delete (one-shot)" },
+  { value: "default", label: "Default — keep running" },
+  { value: "Sleep", label: "Sleep — preserve workspace" },
+  { value: "AutoDelete", label: "Auto Delete — one-shot" },
 ];
 
 export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues }: CreateAgentModalProps) {
@@ -57,7 +58,10 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
   const [model, setModel] = useState("claude-sonnet-4-6");
   const [lifecycle, setLifecycle] = useState("default");
   const [role, setRole] = useState<"manager" | "worker" | undefined>(undefined);
+  const [templateRef, setTemplateRef] = useState("default");
+  const [templates, setTemplates] = useState<TemplateResponse[]>([]);
   const [secrets, setSecrets] = useState<SecretEntry[]>([]);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,10 +71,20 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
     setInstructions("");
     setModel("claude-sonnet-4-6");
     setLifecycle("default");
+    setTemplateRef("default");
     setRole(undefined);
     setSecrets([]);
+    setAdvancedOpen(false);
     setError(null);
   }
+
+  // Fetch templates when modal opens or namespace changes
+  useEffect(() => {
+    if (!open) return;
+    listTemplates(namespace || undefined)
+      .then((res) => setTemplates(res.templates ?? []))
+      .catch(() => setTemplates([]));
+  }, [open, namespace]);
 
   useEffect(() => {
     if (open && initialValues) {
@@ -79,6 +93,7 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
       setModel(initialValues.model);
       setLifecycle(initialValues.lifecycle);
       setRole(initialValues.role);
+      if (initialValues.templateRef) setTemplateRef(initialValues.templateRef);
       if (initialValues.secrets) {
         setSecrets(
           Object.entries(initialValues.secrets).map(([key, value]) => ({ key, value }))
@@ -124,6 +139,7 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
         namespace: namespace.trim() || undefined,
         lifecycle: lifecycle === "default" ? "" : (lifecycle as "" | "Sleep" | "AutoDelete"),
         role: role || undefined,
+        templateRef: templateRef !== "default" ? templateRef : undefined,
         secrets: Object.keys(secretsMap).length > 0 ? secretsMap : undefined,
       };
       await createAgent(req);
@@ -286,6 +302,53 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
                   Add Secret
                 </Button>
               </div>
+            </div>
+
+            {/* Advanced section */}
+            <div className="rounded-md border border-[var(--color-border)]">
+              <button
+                type="button"
+                onClick={() => setAdvancedOpen(!advancedOpen)}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left cursor-pointer hover:bg-[var(--color-surface-hover)] transition-colors"
+              >
+                <ChevronRight
+                  className={`size-3.5 shrink-0 text-[var(--color-text-secondary)] transition-transform duration-200 ${advancedOpen ? "rotate-90" : ""}`}
+                />
+                <span className="text-xs font-medium text-[var(--color-text-secondary)]">Advanced</span>
+              </button>
+              <AnimatePresence initial={false}>
+                {advancedOpen && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0, overflow: "hidden" }}
+                    animate={{ height: "auto", opacity: 1, overflow: "visible", transitionEnd: { overflow: "visible" } }}
+                    exit={{ height: 0, opacity: 0, overflow: "hidden" }}
+                    transition={{ duration: 0.2, ease: "easeOut" }}
+                  >
+                    <div className="border-t border-[var(--color-border)] px-3 py-3 flex flex-col gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <Label>Template</Label>
+                        <Select value={templateRef} onValueChange={(v) => v && setTemplateRef(v)}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {templates.map((t) => (
+                              <SelectItem key={`${t.scope}-${t.name}`} value={t.name}>
+                                <span className="flex items-center gap-2">
+                                  {t.name}
+                                  <span className={`text-[10px] tracking-wider px-1.5 py-0.5 rounded ${t.scope === "cluster" ? "bg-[var(--color-brand-violet)]/10 text-[var(--color-brand-violet)]" : "bg-emerald-500/10 text-emerald-400"}`}>
+                                    {t.scope === "cluster" ? "cluster" : t.namespace}
+                                  </span>
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             {error && (

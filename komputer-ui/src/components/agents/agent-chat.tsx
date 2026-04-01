@@ -432,6 +432,7 @@ export function AgentChat({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const eventCountAtSend = useRef(events.length);
   const prevMessagesLenRef = useRef(0);
+  const forceScrollToBottom = useRef(false);
 
   const serverMessages = eventsToChatMessages(events);
 
@@ -529,7 +530,12 @@ export function AgentChat({
     }
 
     if (messages.length <= prevCount) return;
-    // Only auto-scroll if user is near the bottom
+    // Force scroll after user sends a message, otherwise only when near bottom
+    if (forceScrollToBottom.current) {
+      forceScrollToBottom.current = false;
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      return;
+    }
     const distFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
     if (distFromBottom < 150) {
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -568,6 +574,7 @@ export function AgentChat({
       ...prev,
       { kind: "user" as const, text, timestamp: ts },
     ]);
+    forceScrollToBottom.current = true;
     try {
       await createAgent({ name: agentName, instructions: text, namespace: agentNamespace, lifecycle });
     } catch {

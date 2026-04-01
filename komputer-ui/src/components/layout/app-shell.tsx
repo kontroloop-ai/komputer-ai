@@ -218,7 +218,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -4, scale: 0.96 }}
                         transition={{ duration: 0.12 }}
-                        className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-lg"
+                        className="absolute left-1/2 -translate-x-1/2 top-full z-20 mt-1 w-40 overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-lg"
                       >
                         <button type="button" onClick={() => fileInputRef.current?.click()} className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-xs text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface-hover)]">
                           <Upload className="size-3" /> Upload files

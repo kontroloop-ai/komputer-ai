@@ -579,7 +579,7 @@ function SettingsCard({ agent, agentNs, onSaved }: {
                 )}
                 className={`text-xs px-2.5 py-1 rounded-full border transition-colors cursor-pointer ${
                   attached
-                    ? "border-violet-400 bg-violet-400/10 text-violet-300"
+                    ? "border-[var(--color-text)] bg-white/10 text-[var(--color-text)]"
                     : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)]"
                 }`}
               >

@@ -525,7 +525,7 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
                                 )}
                                 className={`text-xs px-2.5 py-1 rounded-full border transition-colors cursor-pointer ${
                                   selected
-                                    ? "border-violet-400 bg-violet-400/10 text-violet-300"
+                                    ? "border-[var(--color-text)] bg-white/10 text-[var(--color-text)]"
                                     : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)]"
                                 }`}
                               >

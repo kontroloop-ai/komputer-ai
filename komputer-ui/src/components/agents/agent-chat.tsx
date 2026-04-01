@@ -498,14 +498,15 @@ export function AgentChat({
     return taskStatus === "InProgress";
   })();
 
-  // pendingText is set on send, cleared when new events arrive for this task
+  // Clear pendingText only when the task finishes — not when the server echoes the message
+  // (the memo already dedupes, so clearing on echo would just cause an unnecessary re-render)
   const hasPending = pendingText != null;
   useEffect(() => {
     if (!hasPending) return;
-    if (events.length > eventCountAtSend.current) {
+    if (!eventBasedWorking && events.length > eventCountAtSend.current) {
       setPendingText(null);
     }
-  }, [hasPending, events.length]);
+  }, [hasPending, eventBasedWorking, events.length]);
 
   const [cancelling, setCancelling] = useState(false);
 
@@ -513,21 +514,26 @@ export function AgentChat({
   const isWorking = hasPending || eventBasedWorking;
 
   // Build messages: merge server messages with local user messages that server didn't echo.
-  // Pending message (the one just sent) is always included to ensure instant display.
+  // Pending message is shown instantly, then replaced by the server echo (same render, no duplicate).
   const messages: ChatMessage[] = (() => {
     const serverUserTexts = new Set(
       serverMessages.filter((m) => m.kind === "user").map((m) => m.text.trim())
     );
     const missingUserMessages = localUserMessages.filter(
-      (m) => m.kind === "user" && !serverUserTexts.has(m.text.trim())
+      (m) => m.kind === "user"
+        && !serverUserTexts.has(m.text.trim())
+        && !(pendingText && m.text.trim() === pendingText.trim() && m.timestamp === pendingTimestamp)
     );
 
     const all = [...serverMessages, ...missingUserMessages];
 
-    // Always add the pending message — it's the one the user just sent and must appear instantly.
-    // It will be deduped away once the server echoes it back (pendingText gets cleared).
+    // Add pending message only if server hasn't echoed the same text yet.
+    // This ensures instant display on send, and zero-duplicate handoff when server catches up.
     if (pendingText) {
-      all.push({ kind: "user" as const, text: pendingText, timestamp: pendingTimestamp });
+      const echoedByServer = serverUserTexts.has(pendingText.trim());
+      if (!echoedByServer) {
+        all.push({ kind: "user" as const, text: pendingText, timestamp: pendingTimestamp });
+      }
     }
 
     return all.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
@@ -728,11 +734,16 @@ export function AgentChat({
             )}
             <AnimatePresence initial={false}>
             {messages.map((msg, i) => {
+              // Stable key: for user messages use kind+text (no timestamp/index)
+              // so the element survives when source switches from pending to server.
+              const key = msg.kind === "user"
+                ? `user-${msg.text.slice(0, 80)}`
+                : `${msg.kind}-${msg.timestamp}-${i}`;
               switch (msg.kind) {
                 case "user":
                   return (
                     <UserBubble
-                      key={`${msg.timestamp}-${i}`}
+                      key={key}
                       text={msg.text}
                       timestamp={msg.timestamp}
                     />
@@ -740,7 +751,7 @@ export function AgentChat({
                 case "text":
                   return (
                     <AgentBubble
-                      key={`${msg.timestamp}-${i}`}
+                      key={key}
                       text={msg.text}
                       timestamp={msg.timestamp}
                     />
@@ -748,14 +759,14 @@ export function AgentChat({
                 case "thinking":
                   return (
                     <ThinkingBubble
-                      key={`${msg.timestamp}-${i}`}
+                      key={key}
                       text={msg.text}
                     />
                   );
                 case "tool":
                   return (
                     <ToolCard
-                      key={`${msg.timestamp}-${i}`}
+                      key={key}
                       toolName={msg.toolName}
                       description={msg.description}
                       command={msg.command}
@@ -766,18 +777,18 @@ export function AgentChat({
                 case "completed":
                   return (
                     <CompletedDivider
-                      key={`${msg.timestamp}-${i}`}
+                      key={key}
                       costUSD={msg.costUSD}
                       duration={msg.duration}
                       turns={msg.turns}
                     />
                   );
                 case "cancelled":
-                  return <CancelledDivider key={`${msg.timestamp}-${i}`} />;
+                  return <CancelledDivider key={key} />;
                 case "error":
                   return (
                     <ErrorBar
-                      key={`${msg.timestamp}-${i}`}
+                      key={key}
                       message={msg.message}
                     />
                   );

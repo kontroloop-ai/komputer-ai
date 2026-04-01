@@ -2215,6 +2215,44 @@ func main() {
 	memoryCreateCmd.Flags().String("description", "", "Short description")
 	memoryCmd.AddCommand(memoryCreateCmd)
 
+	// ── memory edit ──────────────────────────────────────────────────
+	memoryEditCmd := &cobra.Command{
+		Use:   "edit <name>",
+		Short: "Edit a memory's content or description",
+		Args:  cobra.ExactArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			ep := resolveEndpoint(cmd)
+			body := map[string]interface{}{}
+			if content, _ := cmd.Flags().GetString("content"); content != "" {
+				body["content"] = content
+			}
+			if description, _ := cmd.Flags().GetString("description"); description != "" {
+				body["description"] = description
+			}
+			if len(body) == 0 {
+				fmt.Println(errorStyle.Render("No changes provided. Use --content or --description flags."))
+				os.Exit(1)
+			}
+			data, status, err := apiRequest("PATCH", fmt.Sprintf("%s/api/v1/memories/%s%s", ep, url.PathEscape(args[0]), nsQuery(cmd)), body)
+			if err != nil {
+				fmt.Println(errorStyle.Render("Request failed: " + err.Error()))
+				os.Exit(1)
+			}
+			if status == 404 {
+				fmt.Println(errorStyle.Render(fmt.Sprintf("Memory %q not found", args[0])))
+				os.Exit(1)
+			}
+			if status != 200 {
+				fmt.Println(errorStyle.Render(fmt.Sprintf("API error (%d): %s", status, string(data))))
+				os.Exit(1)
+			}
+			fmt.Println(successStyle.Render(fmt.Sprintf("✔ Memory %q updated", args[0])))
+		},
+	}
+	memoryEditCmd.Flags().String("content", "", "New memory content")
+	memoryEditCmd.Flags().String("description", "", "New description")
+	memoryCmd.AddCommand(memoryEditCmd)
+
 	// ── memory delete ────────────────────────────────────────────────
 	memoryCmd.AddCommand(&cobra.Command{
 		Use:     "delete <name>",

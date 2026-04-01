@@ -196,6 +196,7 @@ func SetupRoutes(r *gin.Engine, k8s *K8sClient, hub *Hub, worker *RedisWorker) {
 		v1.GET("/memories", listMemories(k8s))
 		v1.GET("/memories/:name", getMemory(k8s))
 		v1.DELETE("/memories/:name", deleteMemory(k8s))
+		v1.PATCH("/memories/:name", patchMemory(k8s))
 
 		v1.GET("/templates", listTemplates(k8s))
 	}
@@ -963,6 +964,45 @@ func listMemories(k8s *K8sClient) gin.HandlerFunc {
 			})
 		}
 		c.JSON(http.StatusOK, gin.H{"memories": resp})
+	}
+}
+
+type PatchMemoryRequest struct {
+	Content     *string `json:"content,omitempty"`
+	Description *string `json:"description,omitempty"`
+}
+
+func patchMemory(k8s *K8sClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		name := c.Param("name")
+		ns := resolveNamespace(c, k8s)
+		var req PatchMemoryRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: " + err.Error()})
+			return
+		}
+		if req.Content == nil && req.Description == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "no fields to update"})
+			return
+		}
+		if err := k8s.PatchMemory(c.Request.Context(), ns, name, req.Content, req.Description); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to patch memory: " + err.Error()})
+			return
+		}
+		memory, err := k8s.GetMemory(c.Request.Context(), ns, name)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "patched but failed to read back: " + err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, MemoryResponse{
+			Name:           memory.Name,
+			Namespace:      memory.Namespace,
+			Content:        memory.Spec.Content,
+			Description:    memory.Spec.Description,
+			AttachedAgents: memory.Status.AttachedAgents,
+			AgentNames:     memory.Status.AgentNames,
+			CreatedAt:      memory.CreationTimestamp.UTC().Format(time.RFC3339),
+		})
 	}
 }
 

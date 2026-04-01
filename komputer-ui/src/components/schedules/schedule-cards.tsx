@@ -53,7 +53,7 @@ export function ScheduleCards({ schedules, onDelete }: ScheduleCardsProps) {
                         {schedule.name}
                       </span>
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <div onClick={(e) => e.stopPropagation()} className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div onClick={(e) => { e.stopPropagation(); e.preventDefault(); }} className="opacity-0 group-hover:opacity-100 transition-opacity">
                           <ConfirmDialog
                             title={`Delete ${schedule.name}?`}
                             description="This will delete the schedule and managed agents."

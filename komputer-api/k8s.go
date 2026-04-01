@@ -633,6 +633,28 @@ func (k *K8sClient) DeleteMemory(ctx context.Context, ns, name string) error {
 	return k.client.Delete(ctx, memory)
 }
 
+func (k *K8sClient) PatchMemory(ctx context.Context, ns, name string, content, description *string) error {
+	memory := &komputerv1alpha1.KomputerMemory{}
+	key := types.NamespacedName{Name: name, Namespace: ns}
+	if err := k.client.Get(ctx, key, memory); err != nil {
+		return fmt.Errorf("failed to get memory %s: %w", name, err)
+	}
+	original := memory.DeepCopy()
+	changed := false
+	if content != nil && *content != memory.Spec.Content {
+		memory.Spec.Content = *content
+		changed = true
+	}
+	if description != nil && *description != memory.Spec.Description {
+		memory.Spec.Description = *description
+		changed = true
+	}
+	if !changed {
+		return nil
+	}
+	return k.client.Patch(ctx, memory, client.MergeFrom(original))
+}
+
 // ResolveMemoryContent fetches all referenced memories and returns concatenated content.
 // References can be "name" (same namespace) or "namespace/name" (cross-namespace).
 func (k *K8sClient) ResolveMemoryContent(ctx context.Context, agentNs string, memoryRefs []string) (string, error) {

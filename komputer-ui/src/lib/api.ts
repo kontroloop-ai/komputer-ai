@@ -105,6 +105,11 @@ export const createMemory = (data: CreateMemoryRequest) =>
 export const deleteMemory = (name: string, ns?: string) =>
   request<void>(`/memories/${name}${ns ? `?namespace=${ns}` : ''}`, { method: 'DELETE' });
 
+export const patchMemory = (name: string, data: { content?: string; description?: string }, ns?: string) =>
+  request<MemoryResponse>(`/memories/${name}${ns ? `?namespace=${ns}` : ''}`, {
+    method: 'PATCH', body: JSON.stringify(data),
+  });
+
 // Templates
 export const listTemplates = (ns?: string) =>
   request<TemplateListResponse>(`/templates${ns ? `?namespace=${ns}` : ''}`);

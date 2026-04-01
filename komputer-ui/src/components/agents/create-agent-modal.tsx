@@ -51,7 +51,7 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
   const [templateRef, setTemplateRef] = useState("default");
   const [templates, setTemplates] = useState<TemplateResponse[]>([]);
   const [selectedMemories, setSelectedMemories] = useState<string[]>([]);
-  const [availableMemories, setAvailableMemories] = useState<{ name: string }[]>([]);
+  const [availableMemories, setAvailableMemories] = useState<{ name: string; namespace: string; ref: string }[]>([]);
   const [secrets, setSecrets] = useState<SecretEntry[]>([]);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -98,8 +98,12 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
     listTemplates(namespace || undefined)
       .then((res) => setTemplates(res.templates ?? []))
       .catch(() => setTemplates([]));
-    listMemories(namespace || undefined)
-      .then((res) => setAvailableMemories((res.memories ?? []).map((m) => ({ name: m.name }))))
+    listMemories()
+      .then((res) => setAvailableMemories((res.memories ?? []).map((m) => ({
+        name: m.name,
+        namespace: m.namespace,
+        ref: m.namespace === (namespace || "default") ? m.name : `${m.namespace}/${m.name}`,
+      }))))
       .catch(() => setAvailableMemories([]));
   }, [open, namespace]);
 
@@ -467,22 +471,24 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
                         <Label>Memories</Label>
                         <div className="flex flex-wrap gap-1.5">
                           {availableMemories.map((m) => {
-                            const selected = selectedMemories.includes(m.name);
+                            const selected = selectedMemories.includes(m.ref);
+                            const isCrossNs = m.ref.includes("/");
                             return (
                               <button
-                                key={m.name}
+                                key={m.ref}
                                 type="button"
                                 onClick={() => setSelectedMemories(prev =>
-                                  selected ? prev.filter(n => n !== m.name) : [...prev, m.name]
+                                  selected ? prev.filter(n => n !== m.ref) : [...prev, m.ref]
                                 )}
                                 className={`text-xs px-2.5 py-1 rounded-full border transition-colors cursor-pointer ${
                                   selected
-                                    ? "border-[var(--color-brand-violet)] bg-[var(--color-brand-violet)]/10 text-[var(--color-brand-violet)]"
+                                    ? "border-[var(--color-text)] bg-white/10 text-[var(--color-text)]"
                                     : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)]"
                                 }`}
                               >
                                 {selected && <Check className="inline size-2.5 mr-1" />}
                                 {m.name}
+                                {isCrossNs && <span className="ml-1 text-[9px] text-[var(--color-brand-blue-light)]">{m.namespace}</span>}
                               </button>
                             );
                           })}

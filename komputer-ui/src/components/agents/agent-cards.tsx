@@ -56,7 +56,7 @@ export function AgentCards({ agents, onDelete }: AgentCardsProps) {
                         {agent.name}
                       </span>
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <div onClick={(e) => e.stopPropagation()} className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div onClick={(e) => { e.stopPropagation(); e.preventDefault(); }} className="opacity-0 group-hover:opacity-100 transition-opacity">
                           <ConfirmDialog
                             title={`Delete ${agent.name}?`}
                             description="This will permanently delete this agent and its workspace."

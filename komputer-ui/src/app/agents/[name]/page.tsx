@@ -1,11 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { Ban, Trash2, Zap, KeyRound, ChevronRight, FileText, Save, Check, Plus } from "lucide-react";
-
-import { cn } from "@/lib/utils";
+import { Ban, Trash2, Zap, Save, Check, Plus } from "lucide-react";
 import { Button } from "@/components/kit/button";
 import { Badge } from "@/components/kit/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/kit/tabs";
@@ -379,38 +377,6 @@ function StatCard({ label, value, color, highlight }: {
   );
 }
 
-function InstructionsCard({ instructions }: { instructions: string }) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <motion.div
-      className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] transition-colors duration-150 hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-hover)]"
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: "easeOut", delay: 0.15 }}
-    >
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-2 px-5 py-4 text-left cursor-pointer"
-      >
-        <ChevronRight
-          className={cn(
-            "size-3.5 shrink-0 text-[var(--color-text-secondary)] transition-transform duration-200",
-            open && "rotate-90"
-          )}
-        />
-        <FileText className="size-3.5 text-[var(--color-text-muted)]" />
-        <h3 className="text-[11px] uppercase tracking-wider font-semibold text-[var(--color-text-muted)]">Instructions</h3>
-      </button>
-      {open && (
-        <div className="px-5 pb-4">
-          <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed whitespace-pre-wrap">{instructions}</p>
-        </div>
-      )}
-    </motion.div>
-  );
-}
-
 function SettingsCard({ agent, agentNs, onSaved }: {
   agent: AgentResponse;
   agentNs?: string;
@@ -418,17 +384,21 @@ function SettingsCard({ agent, agentNs, onSaved }: {
 }) {
   const [model, setModel] = useState(agent.model);
   const [lifecycle, setLifecycle] = useState<string>(agent.lifecycle || "default");
-  const [instructions, setInstructions] = useState(agent.instructions ?? "");
+  const instructions = agent.instructions ?? "";
   const [newSecrets, setNewSecrets] = useState<{ key: string; value: string }[]>([]);
   const [agentMemories, setAgentMemories] = useState<string[]>(agent.memories ?? []);
-  const [availableMemories, setAvailableMemories] = useState<string[]>([]);
+  const [availableMemories, setAvailableMemories] = useState<{ name: string; namespace: string; ref: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    listMemories(agentNs).then((res) => {
-      setAvailableMemories((res.memories ?? []).map((m) => m.name));
+    listMemories().then((res) => {
+      setAvailableMemories((res.memories ?? []).map((m) => ({
+        name: m.name,
+        namespace: m.namespace,
+        ref: m.namespace === (agentNs || "default") ? m.name : `${m.namespace}/${m.name}`,
+      })));
     }).catch(() => {});
   }, [agentNs]);
 
@@ -555,23 +525,25 @@ function SettingsCard({ agent, agentNs, onSaved }: {
       <div className="flex flex-col gap-1.5">
         <Label>Memories</Label>
         <div className="flex flex-wrap gap-1.5">
-          {availableMemories.map((name) => {
-            const attached = agentMemories.includes(name);
+          {availableMemories.map((m) => {
+            const attached = agentMemories.includes(m.ref);
+            const isCrossNs = m.ref.includes("/");
             return (
               <button
-                key={name}
+                key={m.ref}
                 type="button"
                 onClick={() => setAgentMemories(prev =>
-                  attached ? prev.filter(n => n !== name) : [...prev, name]
+                  attached ? prev.filter(n => n !== m.ref) : [...prev, m.ref]
                 )}
                 className={`text-xs px-2.5 py-1 rounded-full border transition-colors cursor-pointer ${
                   attached
-                    ? "border-[var(--color-brand-violet)] bg-[var(--color-brand-violet)]/10 text-[var(--color-brand-violet)]"
+                    ? "border-[var(--color-text)] bg-white/10 text-[var(--color-text)]"
                     : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)]"
                 }`}
               >
                 {attached && <Check className="inline size-2.5 mr-1" />}
-                {name}
+                {m.name}
+                {isCrossNs && <span className="ml-1 text-[9px] text-[var(--color-brand-blue-light)]">{m.namespace}</span>}
               </button>
             );
           })}

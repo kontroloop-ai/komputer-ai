@@ -45,6 +45,8 @@ When adding a new field to `KomputerAgentSpec` or `KomputerAgentStatus`, it must
 | 5 | **API handlers** | All response paths in create, get, list, and wake handlers |
 | 6 | **K8s client** | `komputer-api/k8s.go` — pass field when creating/updating CR |
 | 7 | **CLI** | `komputer-cli/main.go` — add flag + include in request/display |
+| 8 | **UI types** | `komputer-ui/src/lib/types.ts` — update `AgentResponse` / `CreateAgentRequest` |
+| 9 | **UI components** | `komputer-ui/src/components/` — display/accept the field where relevant |
 
 Do not merge a new field unless all layers are updated. A missing layer means clients can't see or set the field.
 
@@ -57,3 +59,15 @@ When adding a new Kubernetes API call in `komputer-api` or `komputer-operator` (
 - `komputer-agent` → `helm/komputer-ai/templates/komputer-agent/rbac.yaml`
 
 Add the resource, API group, and verbs needed. Without this, the component will get `403 Forbidden` at runtime.
+
+## 7. Tags Must Include Release Notes
+
+When creating a git tag, always create a GitHub release with release notes. Summarize changes since the last tag using the commit history, grouped by category (features, fixes, docs, etc.). Use `gh release create` with a descriptive body.
+
+## 8. Minimal Prompt Changes
+
+When modifying agent system prompts (`komputer-api/prompt.go`, `komputer-agent/prompts.py`), keep additions as short as possible — a sentence or two, not whole sections. Prompts accumulate fast and directly impact token cost and context limits. Before adding, check if an existing line can be tweaked instead.
+
+## 9. Surgical Changes, Cloud-Native Mindset
+
+When implementing a feature or fix, make the smallest clean change that solves the problem. Do not bundle refactors, renames, or "improvements" unless the problem specifically requires them. Default to cloud-native patterns (CRDs, controllers, reconciliation loops, declarative config) — avoid inventing custom state machines or orchestration when Kubernetes primitives already handle it.

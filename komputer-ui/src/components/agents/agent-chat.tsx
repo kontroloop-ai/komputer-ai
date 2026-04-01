@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { AgentEvent } from "@/lib/types";
-import { createAgent } from "@/lib/api";
+import { createAgent, cancelAgent } from "@/lib/api";
 import { CostBadge } from "@/components/shared/cost-badge";
 import { CopyButton } from "@/components/shared/copy-button";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ import {
   ChevronRight,
   ArrowUp,
   ArrowDown,
+  Square,
   Terminal,
   FileText,
   Globe,
@@ -44,6 +45,7 @@ type ChatMessage =
   | {
       kind: "tool";
       toolName: string;
+      description?: string;
       command?: string;
       input?: unknown;
       output?: unknown;
@@ -95,12 +97,24 @@ function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
       }
       case "tool_result": {
         const toolName = event.payload.tool ?? event.payload.name ?? "tool";
-        const command =
-          event.payload.input?.command ?? event.payload.input?.cmd;
+        const description =
+          event.payload.input?.description ?? event.payload.description;
+        // Build a compact summary of the input for the collapsed view
+        const inp = event.payload.input;
+        let inputSummary: string | undefined;
+        if (inp?.command ?? inp?.cmd) {
+          inputSummary = inp.command ?? inp.cmd;
+        } else if (inp && typeof inp === "object") {
+          const parts = Object.entries(inp)
+            .filter(([k]) => k !== "description")
+            .map(([k, v]) => `${k}=${typeof v === "string" ? v : JSON.stringify(v)}`);
+          if (parts.length > 0) inputSummary = parts.join(" ");
+        }
         messages.push({
           kind: "tool",
           toolName,
-          command,
+          description,
+          command: inputSummary,
           input: event.payload.input,
           output: event.payload.output ?? event.payload.content,
           timestamp: event.timestamp,
@@ -220,11 +234,13 @@ function ThinkingBubble({ text }: { text: string }) {
 
 function ToolCard({
   toolName,
+  description,
   command,
   input,
   output,
 }: {
   toolName: string;
+  description?: string;
   command?: string;
   input?: unknown;
   output?: unknown;
@@ -245,11 +261,16 @@ function ToolCard({
           )}
         />
         {getToolIcon(toolName)}
-        <span className="truncate text-sm font-semibold text-[var(--color-text)]">
+        <span className="shrink-0 text-sm font-semibold text-[var(--color-text)]">
           {toolName}
         </span>
+        {description && (
+          <span className="shrink-0 text-sm text-[var(--color-text-secondary)]">
+            {description}
+          </span>
+        )}
         {command && (
-          <code className="truncate text-xs font-mono text-[var(--color-text-secondary)]">
+          <code className="min-w-0 truncate text-xs font-mono text-[var(--color-text-muted)]">
             {command}
           </code>
         )}
@@ -374,11 +395,42 @@ function CompletedDivider({
 
 function CancelledDivider() {
   return (
-    <div className="flex items-center gap-3 py-1">
-      <div className="flex-1 border-t border-[var(--color-border)]" />
-      <span className="text-xs text-amber-400">Task cancelled</span>
-      <div className="flex-1 border-t border-[var(--color-border)]" />
-    </div>
+    <motion.div
+      className="py-2"
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+    >
+      <motion.div
+        className="flex items-center gap-3"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3, delay: 0.1 }}
+      >
+        <motion.div
+          className="flex-1 border-t border-amber-400/20"
+          initial={{ scaleX: 0 }}
+          animate={{ scaleX: 1 }}
+          transition={{ duration: 0.5, delay: 0.2, ease: "easeOut" }}
+          style={{ transformOrigin: "right" }}
+        />
+        <motion.span
+          className="text-xs font-medium text-amber-400"
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.15 }}
+        >
+          Task cancelled
+        </motion.span>
+        <motion.div
+          className="flex-1 border-t border-amber-400/20"
+          initial={{ scaleX: 0 }}
+          animate={{ scaleX: 1 }}
+          transition={{ duration: 0.5, delay: 0.2, ease: "easeOut" }}
+          style={{ transformOrigin: "left" }}
+        />
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -455,12 +507,14 @@ export function AgentChat({
     }
   }, [hasPending, events.length]);
 
+  const [cancelling, setCancelling] = useState(false);
+
   // Show thinking: pending send OR actively working
   const isWorking = hasPending || eventBasedWorking;
 
-  // Build messages: merge server messages with local user messages that server didn't echo
+  // Build messages: merge server messages with local user messages that server didn't echo.
+  // Pending message (the one just sent) is always included to ensure instant display.
   const messages: ChatMessage[] = (() => {
-    // Start with local user messages that aren't already in server messages
     const serverUserTexts = new Set(
       serverMessages.filter((m) => m.kind === "user").map((m) => m.text.trim())
     );
@@ -468,17 +522,12 @@ export function AgentChat({
       (m) => m.kind === "user" && !serverUserTexts.has(m.text.trim())
     );
 
-    // Merge and sort by timestamp
     const all = [...serverMessages, ...missingUserMessages];
 
-    // Add pending optimistic message if not yet echoed
+    // Always add the pending message — it's the one the user just sent and must appear instantly.
+    // It will be deduped away once the server echoes it back (pendingText gets cleared).
     if (pendingText) {
-      const alreadyPresent = all.some(
-        (m) => m.kind === "user" && m.text.trim() === pendingText.trim()
-      );
-      if (!alreadyPresent) {
-        all.push({ kind: "user" as const, text: pendingText, timestamp: pendingTimestamp });
-      }
+      all.push({ kind: "user" as const, text: pendingText, timestamp: pendingTimestamp });
     }
 
     return all.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
@@ -561,7 +610,7 @@ export function AgentChat({
     return () => observer.disconnect();
   }, [hasMoreEvents, loadingOlder, onLoadOlder]);
 
-  const handleSend = useCallback(async () => {
+  const handleSend = useCallback(() => {
     const text = input.trim();
     if (!text || isWorking) return;
 
@@ -575,21 +624,56 @@ export function AgentChat({
       { kind: "user" as const, text, timestamp: ts },
     ]);
     forceScrollToBottom.current = true;
-    try {
-      await createAgent({ name: agentName, instructions: text, namespace: agentNamespace, lifecycle });
-    } catch {
-      setPendingText(null);
-    }
+    // Scroll after React renders the new message
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+    // Fire and forget — state is already set, render happens immediately
+    createAgent({ name: agentName, instructions: text, namespace: agentNamespace, lifecycle })
+      .catch(() => setPendingText(null));
   }, [input, isWorking, agentName, agentNamespace, lifecycle, events.length]);
+
+  const handleCancel = useCallback(async () => {
+    if (!isWorking || cancelling) return;
+    setCancelling(true);
+    setPendingText(null);
+    try {
+      await cancelAgent(agentName, agentNamespace);
+    } catch {
+      setCancelling(false);
+    }
+  }, [isWorking, cancelling, agentName, agentNamespace]);
+
+  // Reset cancelling when the task actually stops (event arrives)
+  useEffect(() => {
+    if (cancelling && !eventBasedWorking) {
+      setCancelling(false);
+    }
+  }, [cancelling, eventBasedWorking]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
+    if (e.key === "Escape" && isWorking) {
+      e.preventDefault();
+      handleCancel();
+    }
   };
 
-  const showThinking = isWorking;
+  // Global ESC to cancel
+  useEffect(() => {
+    if (!isWorking) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        handleCancel();
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [isWorking, handleCancel]);
+
+  const showThinking = isWorking && !cancelling;
 
   // Track if user is scrolled away from the bottom
   const [showScrollDown, setShowScrollDown] = useState(false);
@@ -673,6 +757,7 @@ export function AgentChat({
                     <ToolCard
                       key={`${msg.timestamp}-${i}`}
                       toolName={msg.toolName}
+                      description={msg.description}
                       command={msg.command}
                       input={msg.input}
                       output={msg.output}
@@ -699,11 +784,13 @@ export function AgentChat({
               }
             })}
             </AnimatePresence>
+            <AnimatePresence>
             {showThinking && (
               <motion.div
                 className="flex items-center gap-2.5 py-1"
-                initial={{ opacity: 0, y: 4 }}
+                initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12, transition: { duration: 0.25, ease: "easeIn" } }}
                 transition={{ duration: 0.2 }}
               >
                 <div className="flex items-center gap-1">
@@ -726,6 +813,7 @@ export function AgentChat({
                 </span>
               </motion.div>
             )}
+            </AnimatePresence>
             <div ref={bottomRef} />
           </div>
         )}
@@ -755,19 +843,31 @@ export function AgentChat({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Send a message..."
-            disabled={isWorking}
+            placeholder={cancelling ? "Cancelling..." : isWorking ? "Agent is working... press Esc to stop" : "Send a message..."}
+            disabled={isWorking && !cancelling}
             rows={1}
             className="field-sizing-content max-h-24 min-h-10 flex-1 resize-none rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:border-[var(--color-brand-blue)] focus:outline-none disabled:opacity-50"
           />
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={!input.trim() || isWorking}
-            className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-brand-blue)] text-white transition-opacity hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            <ArrowUp className="size-4" />
-          </button>
+          {isWorking || cancelling ? (
+            <button
+              type="button"
+              onClick={handleCancel}
+              disabled={cancelling}
+              className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-red-500 text-white transition-opacity hover:opacity-80 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Stop task (Esc)"
+            >
+              <Square className="size-3.5 fill-current" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSend}
+              disabled={!input.trim()}
+              className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-brand-blue)] text-white transition-opacity hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ArrowUp className="size-4" />
+            </button>
+          )}
           {/* Lifecycle menu */}
           <div className="relative" ref={lifecycleRef}>
             <motion.button

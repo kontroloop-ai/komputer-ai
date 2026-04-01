@@ -20,7 +20,7 @@ export function formatRelativeTime(timestamp: string): string {
   if (diff < 0) {
     // Future time
     const absDiff = Math.abs(diff);
-    if (absDiff < 60_000) return `in ${Math.floor(absDiff / 1000)}s`;
+    if (absDiff < 60_000) return "just now";
     if (absDiff < 3_600_000) return `in ${Math.floor(absDiff / 60_000)}m`;
     if (absDiff < 86_400_000) return `in ${Math.floor(absDiff / 3_600_000)}h`;
     return `in ${Math.floor(absDiff / 86_400_000)}d`;

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 	"regexp"
 	"sort"
 	"strconv"
@@ -282,7 +283,7 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 					Secrets:         collectSecretKeys(*c, k8s, ns, existing.Spec.Secrets),
 					Memories:        existing.Spec.Memories,
 					Instructions:    extractUserTask(existing.Spec.Instructions),
-					CreatedAt:       existing.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
+					CreatedAt:       existing.CreationTimestamp.UTC().Format(time.RFC3339),
 				})
 				return
 			}
@@ -329,7 +330,7 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 				Secrets:         collectSecretKeys(*c, k8s, ns, existing.Spec.Secrets),
 				Memories:        existing.Spec.Memories,
 				Instructions:    extractUserTask(existing.Spec.Instructions),
-				CreatedAt:       existing.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
+				CreatedAt:       existing.CreationTimestamp.UTC().Format(time.RFC3339),
 			})
 			return
 		}
@@ -365,7 +366,7 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 			Secrets:      collectSecretKeys(*c, k8s, ns, agent.Spec.Secrets),
 			Memories:     agent.Spec.Memories,
 			Instructions: extractUserTask(agent.Spec.Instructions),
-			CreatedAt:    agent.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
+			CreatedAt:    agent.CreationTimestamp.UTC().Format(time.RFC3339),
 		})
 	}
 }
@@ -487,7 +488,7 @@ func getAgent(k8s *K8sClient) gin.HandlerFunc {
 			Secrets:         agent.Spec.Secrets,
 			Memories:        agent.Spec.Memories,
 			Instructions:    extractUserTask(agent.Spec.Instructions),
-			CreatedAt:       agent.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
+			CreatedAt:       agent.CreationTimestamp.UTC().Format(time.RFC3339),
 		})
 	}
 }
@@ -562,7 +563,7 @@ func listAgents(k8s *K8sClient) gin.HandlerFunc {
 				Secrets:         collectSecretKeys(*c, k8s, ns, a.Spec.Secrets),
 				Memories:        a.Spec.Memories,
 				Instructions:    extractUserTask(a.Spec.Instructions),
-				CreatedAt:       a.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
+				CreatedAt:       a.CreationTimestamp.UTC().Format(time.RFC3339),
 			})
 		}
 
@@ -581,7 +582,7 @@ func officeToResponse(o komputerv1alpha1.KomputerOffice, includeMembers bool) Of
 		ActiveAgents:    o.Status.ActiveAgents,
 		CompletedAgents: o.Status.CompletedAgents,
 		TotalCostUSD:    o.Status.TotalCostUSD,
-		CreatedAt:       o.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
+		CreatedAt:       o.CreationTimestamp.UTC().Format(time.RFC3339),
 	}
 	if includeMembers {
 		members := make([]OfficeMemberResponse, 0, len(o.Status.Members)+1)
@@ -699,7 +700,7 @@ func scheduleToResponse(s komputerv1alpha1.KomputerSchedule) ScheduleResponse {
 		TotalCostUSD:   s.Status.TotalCostUSD,
 		LastRunCostUSD: s.Status.LastRunCostUSD,
 		LastRunStatus:  s.Status.LastRunStatus,
-		CreatedAt:      s.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
+		CreatedAt:      s.CreationTimestamp.UTC().Format(time.RFC3339),
 	}
 	if s.Status.NextRunTime != nil {
 		resp.NextRunTime = s.Status.NextRunTime.Format("2006-01-02T15:04:05Z")
@@ -904,7 +905,7 @@ func createMemory(k8s *K8sClient) gin.HandlerFunc {
 			Namespace: memory.Namespace,
 			Content:   memory.Spec.Content,
 			Description: memory.Spec.Description,
-			CreatedAt: memory.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
+			CreatedAt: memory.CreationTimestamp.UTC().Format(time.RFC3339),
 		})
 	}
 }
@@ -925,7 +926,7 @@ func getMemory(k8s *K8sClient) gin.HandlerFunc {
 			Description:    memory.Spec.Description,
 			AttachedAgents: memory.Status.AttachedAgents,
 			AgentNames:     memory.Status.AgentNames,
-			CreatedAt:      memory.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
+			CreatedAt:      memory.CreationTimestamp.UTC().Format(time.RFC3339),
 		})
 	}
 }
@@ -947,7 +948,7 @@ func listMemories(k8s *K8sClient) gin.HandlerFunc {
 				Description:    m.Spec.Description,
 				AttachedAgents: m.Status.AttachedAgents,
 				AgentNames:     m.Status.AgentNames,
-				CreatedAt:      m.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
+				CreatedAt:      m.CreationTimestamp.UTC().Format(time.RFC3339),
 			})
 		}
 		c.JSON(http.StatusOK, gin.H{"memories": resp})
@@ -1078,7 +1079,7 @@ func patchAgent(k8s *K8sClient) gin.HandlerFunc {
 			Secrets:         updated.Spec.Secrets,
 			Memories:        updated.Spec.Memories,
 			Instructions:    extractUserTask(updated.Spec.Instructions),
-			CreatedAt:       updated.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
+			CreatedAt:       updated.CreationTimestamp.UTC().Format(time.RFC3339),
 		})
 	}
 }

@@ -218,9 +218,92 @@ async def delete_schedule(args):
     return await _request("DELETE", f"/api/v1/schedules/{full_name}")
 
 
+@tool(
+    name="create_memory",
+    description="Create a KomputerMemory resource containing reusable knowledge (notes, context, instructions). Optionally attach it to yourself so it's included in your system prompt on next wake.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "Unique name for the memory (lowercase, hyphens, no spaces)."},
+            "content": {"type": "string", "description": "The memory content (markdown text, instructions, notes, etc.)."},
+            "description": {"type": "string", "description": "Short human-readable description of what this memory contains."},
+            "attach": {"type": "boolean", "description": "If true, also attach this memory to the current agent."},
+        },
+        "required": ["name", "content"],
+    },
+)
+async def create_memory(args):
+    sanitized = _sanitize_name(args["name"])
+    payload = {
+        "name": sanitized,
+        "content": args["content"],
+        "namespace": NAMESPACE,
+    }
+    if args.get("description"):
+        payload["description"] = args["description"]
+
+    result = await _request("POST", "/api/v1/memories", timeout=30, json=payload)
+    if result.get("isError"):
+        return result
+
+    if args.get("attach"):
+        self_name = os.environ.get("KOMPUTER_AGENT_NAME", "")
+        if not self_name:
+            return _err("Memory created but could not attach: KOMPUTER_AGENT_NAME not set.")
+        # Get current memories, then append.
+        get_result = await _request("GET", f"/api/v1/agents/{self_name}")
+        if get_result.get("isError"):
+            return _err(f"Memory created but failed to fetch agent for attach: {get_result['content'][0]['text']}")
+        agent_data = json.loads(get_result["content"][0]["text"])
+        current_memories = agent_data.get("memories") or []
+        if sanitized not in current_memories:
+            current_memories.append(sanitized)
+        patch_result = await _request("PATCH", f"/api/v1/agents/{self_name}", timeout=30, json={"memories": current_memories})
+        if patch_result.get("isError"):
+            return _err(f"Memory created but attach failed: {patch_result['content'][0]['text']}")
+        return _ok(f"Memory '{sanitized}' created and attached to '{self_name}'.")
+
+    return result
+
+
+@tool(
+    name="attach_memory",
+    description="Attach an existing KomputerMemory to an agent so it's included in the agent's system prompt on next wake.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "memory_name": {"type": "string", "description": "Name of the KomputerMemory to attach."},
+            "agent_name": {"type": "string", "description": "Agent to attach the memory to. Defaults to the current agent."},
+        },
+        "required": ["memory_name"],
+    },
+)
+async def attach_memory(args):
+    memory = _sanitize_name(args["memory_name"])
+    agent = args.get("agent_name")
+    if agent:
+        agent = _sanitize_name(agent)
+    else:
+        agent = os.environ.get("KOMPUTER_AGENT_NAME", "")
+        if not agent:
+            return _err("No agent_name provided and KOMPUTER_AGENT_NAME not set.")
+
+    # Get current memories, then append.
+    get_result = await _request("GET", f"/api/v1/agents/{agent}")
+    if get_result.get("isError"):
+        return get_result
+    agent_data = json.loads(get_result["content"][0]["text"])
+    current_memories = agent_data.get("memories") or []
+    if memory in current_memories:
+        return _ok(f"Memory '{memory}' is already attached to '{agent}'.")
+    current_memories.append(memory)
+
+    return await _request("PATCH", f"/api/v1/agents/{agent}", timeout=30, json={"memories": current_memories})
+
+
 def create_manager_server():
     """Create the MCP server with manager orchestration tools."""
     return create_sdk_mcp_server(
         name="komputer",
-        tools=[create_agent, schedule_agent, get_agent_status, get_agent_events, delete_agent, delete_schedule],
+        tools=[create_agent, schedule_agent, get_agent_status, get_agent_events, delete_agent, delete_schedule, create_memory, attach_memory],
     )

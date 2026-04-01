@@ -189,7 +189,7 @@ func (k *K8sClient) GetSecretKeys(ctx context.Context, ns, secretName string) ([
 	return keys, nil
 }
 
-func (k *K8sClient) CreateAgent(ctx context.Context, ns, name, instructions, model, templateRef, role string, secretNames []string, lifecycle, officeManager string) (*komputerv1alpha1.KomputerAgent, error) {
+func (k *K8sClient) CreateAgent(ctx context.Context, ns, name, instructions, model, templateRef, role string, secretNames []string, memories []string, lifecycle, officeManager string) (*komputerv1alpha1.KomputerAgent, error) {
 	if model == "" {
 		model = "claude-sonnet-4-6"
 	}
@@ -211,6 +211,7 @@ func (k *K8sClient) CreateAgent(ctx context.Context, ns, name, instructions, mod
 			Model:         model,
 			Role:          role,
 			Secrets:       secretNames,
+			Memories:      memories,
 			Lifecycle:     komputerv1alpha1.AgentLifecycle(lifecycle),
 			OfficeManager: officeManager,
 		},
@@ -565,6 +566,97 @@ func (k *K8sClient) PatchAgentSecretsList(ctx context.Context, ns, agentName str
 	original := agent.DeepCopy()
 	agent.Spec.Secrets = secrets
 	return k.client.Patch(ctx, agent, client.MergeFrom(original))
+}
+
+// PatchAgentMemoriesList updates the memories list on an agent's spec.
+func (k *K8sClient) PatchAgentMemoriesList(ctx context.Context, ns, agentName string, memories []string) error {
+	agent := &komputerv1alpha1.KomputerAgent{}
+	key := types.NamespacedName{Name: agentName, Namespace: ns}
+	if err := k.client.Get(ctx, key, agent); err != nil {
+		return fmt.Errorf("failed to get agent %s: %w", agentName, err)
+	}
+	original := agent.DeepCopy()
+	agent.Spec.Memories = memories
+	return k.client.Patch(ctx, agent, client.MergeFrom(original))
+}
+
+// --- Memory CRUD ---
+
+func (k *K8sClient) CreateMemory(ctx context.Context, ns, name, content, description string) (*komputerv1alpha1.KomputerMemory, error) {
+	memory := &komputerv1alpha1.KomputerMemory{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+			Labels: map[string]string{
+				"komputer.ai/memory-name": name,
+			},
+		},
+		Spec: komputerv1alpha1.KomputerMemorySpec{
+			Content:     content,
+			Description: description,
+		},
+	}
+	if err := k.client.Create(ctx, memory); err != nil {
+		return nil, err
+	}
+	return memory, nil
+}
+
+func (k *K8sClient) GetMemory(ctx context.Context, ns, name string) (*komputerv1alpha1.KomputerMemory, error) {
+	memory := &komputerv1alpha1.KomputerMemory{}
+	err := k.client.Get(ctx, types.NamespacedName{Name: name, Namespace: ns}, memory)
+	if err != nil {
+		return nil, err
+	}
+	return memory, nil
+}
+
+func (k *K8sClient) ListMemories(ctx context.Context, ns string) ([]komputerv1alpha1.KomputerMemory, error) {
+	list := &komputerv1alpha1.KomputerMemoryList{}
+	var opts []client.ListOption
+	if ns != "" {
+		opts = append(opts, client.InNamespace(ns))
+	}
+	if err := k.client.List(ctx, list, opts...); err != nil {
+		return nil, err
+	}
+	return list.Items, nil
+}
+
+func (k *K8sClient) DeleteMemory(ctx context.Context, ns, name string) error {
+	memory := &komputerv1alpha1.KomputerMemory{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+		},
+	}
+	return k.client.Delete(ctx, memory)
+}
+
+// ResolveMemoryContent fetches all referenced memories and returns concatenated content.
+// References can be "name" (same namespace) or "namespace/name" (cross-namespace).
+func (k *K8sClient) ResolveMemoryContent(ctx context.Context, agentNs string, memoryRefs []string) (string, error) {
+	if len(memoryRefs) == 0 {
+		return "", nil
+	}
+	var sections []string
+	for _, ref := range memoryRefs {
+		ns := agentNs
+		name := ref
+		if parts := strings.SplitN(ref, "/", 2); len(parts) == 2 {
+			ns = parts[0]
+			name = parts[1]
+		}
+		memory, err := k.GetMemory(ctx, ns, name)
+		if err != nil {
+			continue // skip missing memories
+		}
+		sections = append(sections, fmt.Sprintf("### %s\n%s", name, memory.Spec.Content))
+	}
+	if len(sections) == 0 {
+		return "", nil
+	}
+	return "\n## Memory / Knowledge\nThe following knowledge has been provided. Use it as context when relevant.\n\n" + strings.Join(sections, "\n\n"), nil
 }
 
 // PatchAgentTaskStatus patches only the task-related status fields on a KomputerAgent CR.

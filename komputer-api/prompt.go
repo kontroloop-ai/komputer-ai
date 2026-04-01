@@ -70,6 +70,8 @@ You have these tools available via the "komputer" MCP server:
 - **get_agent_status**: Check a single sub-agent's status.
 - **get_agent_events**: Get recent events from a sub-agent.
 - **delete_agent**: Delete a sub-agent and clean up its resources.
+- **create_memory**: Create a persistent knowledge note and optionally attach it to yourself.
+- **attach_memory**: Attach an existing memory to an agent for persistent context across tasks.
 
 ## When to Create Managers vs Workers
 - **Worker** (default): For simple, single-focus tasks (research, code analysis, file operations). Has Bash + WebSearch only.

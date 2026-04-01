@@ -68,6 +68,13 @@ spec:
                 - Sleep
                 - AutoDelete
                 type: string
+              memories:
+                description: |-
+                  Memories is a list of KomputerMemory names to attach to this agent.
+                  Names can be "name" (same namespace) or "namespace/name" (cross-namespace).
+                items:
+                  type: string
+                type: array
               model:
                 default: claude-sonnet-4-6
                 description: Model is the Claude model to use.

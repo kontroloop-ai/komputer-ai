@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -49,6 +50,8 @@ type KomputerAgentReconciler struct {
 // +kubebuilder:rbac:groups=komputer.komputer.ai,resources=komputeragenttemplates,verbs=get;list;watch
 // +kubebuilder:rbac:groups=komputer.komputer.ai,resources=komputeragentclustertemplates,verbs=get;list;watch
 // +kubebuilder:rbac:groups=komputer.komputer.ai,resources=komputerconfigs,verbs=get;list;watch
+// +kubebuilder:rbac:groups=komputer.komputer.ai,resources=komputermemories,verbs=get;list;watch
+// +kubebuilder:rbac:groups=komputer.komputer.ai,resources=komputermemories/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
@@ -225,7 +228,61 @@ func (r *KomputerAgentReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	}
 
+	// 10. Update KomputerMemory status for all referenced memories
+	if err := r.reconcileMemoryStatus(ctx, agent); err != nil {
+		log.Info("Failed to reconcile memory status", "error", err)
+	}
+
 	return ctrl.Result{}, nil
+}
+
+// reconcileMemoryStatus updates the status of each KomputerMemory referenced by any agent.
+func (r *KomputerAgentReconciler) reconcileMemoryStatus(ctx context.Context, agent *komputerv1alpha1.KomputerAgent) error {
+	for _, memRef := range agent.Spec.Memories {
+		ns := agent.Namespace
+		name := memRef
+		if parts := strings.SplitN(memRef, "/", 2); len(parts) == 2 {
+			ns = parts[0]
+			name = parts[1]
+		}
+
+		memory := &komputerv1alpha1.KomputerMemory{}
+		if err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: ns}, memory); err != nil {
+			continue // memory might not exist yet
+		}
+
+		// List all agents that reference this memory
+		allAgents := &komputerv1alpha1.KomputerAgentList{}
+		if err := r.List(ctx, allAgents); err != nil {
+			continue
+		}
+
+		agentNames := []string{}
+		for _, a := range allAgents.Items {
+			for _, m := range a.Spec.Memories {
+				refNs := a.Namespace
+				refName := m
+				if parts := strings.SplitN(m, "/", 2); len(parts) == 2 {
+					refNs = parts[0]
+					refName = parts[1]
+				}
+				if refNs == ns && refName == name {
+					agentNames = append(agentNames, a.Name)
+					break
+				}
+			}
+		}
+
+		if memory.Status.AttachedAgents != len(agentNames) {
+			original := memory.DeepCopy()
+			memory.Status.AttachedAgents = len(agentNames)
+			memory.Status.AgentNames = agentNames
+			if err := r.Status().Patch(ctx, memory, client.MergeFrom(original)); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // getConfig lists cluster-scoped KomputerConfig resources and returns the first one.

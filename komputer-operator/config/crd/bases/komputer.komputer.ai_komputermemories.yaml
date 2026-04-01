@@ -1,0 +1,83 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: komputermemories.komputer.komputer.ai
+spec:
+  group: komputer.komputer.ai
+  names:
+    kind: KomputerMemory
+    listKind: KomputerMemoryList
+    plural: komputermemories
+    singular: komputermemory
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.description
+      name: Description
+      type: string
+    - jsonPath: .status.attachedAgents
+      name: Agents
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          KomputerMemory is a persistent knowledge resource that can be attached to agents.
+          Agents reference memories by name in their spec. Memory content is injected into
+          the agent's system prompt as contextual knowledge.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: KomputerMemorySpec defines the desired state of KomputerMemory.
+            properties:
+              content:
+                description: Content is the memory/knowledge text to attach to agents.
+                type: string
+              description:
+                description: Description is a short human-readable description of
+                  what this memory contains.
+                type: string
+            required:
+            - content
+            type: object
+          status:
+            description: KomputerMemoryStatus defines the observed state of KomputerMemory.
+            properties:
+              agentNames:
+                description: AgentNames is the list of agent names that reference
+                  this memory.
+                items:
+                  type: string
+                type: array
+              attachedAgents:
+                description: AttachedAgents is the number of agents that reference
+                  this memory.
+                type: integer
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

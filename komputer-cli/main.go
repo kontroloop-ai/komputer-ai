@@ -236,6 +236,19 @@ type ScheduleListResponse struct {
 	Schedules []ScheduleResponse `json:"schedules"`
 }
 
+type MemoryResponse struct {
+	Name        string   `json:"name"`
+	Namespace   string   `json:"namespace"`
+	Description string   `json:"description"`
+	Content     string   `json:"content"`
+	Agents      []string `json:"agents"`
+	CreatedAt   string   `json:"createdAt"`
+}
+
+type MemoryListResponse struct {
+	Memories []MemoryResponse `json:"memories"`
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 func printAgent(a AgentResponse) {
@@ -563,6 +576,9 @@ func main() {
 			}
 			if lc, _ := cmd.Flags().GetString("lifecycle"); lc != "" {
 				body["lifecycle"] = lc
+			}
+			if memFlags, _ := cmd.Flags().GetStringSlice("memory"); len(memFlags) > 0 {
+				body["memories"] = memFlags
 			}
 
 			data, status, err := apiRequest("POST", ep+"/api/v1/agents", body)

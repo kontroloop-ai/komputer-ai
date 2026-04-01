@@ -9,6 +9,7 @@ export interface AgentResponse {
   lastTaskCostUSD?: string;
   totalCostUSD?: string;
   secrets?: string[];
+  memories?: string[];
   instructions?: string;
   createdAt: string;
 }
@@ -115,4 +116,25 @@ export interface TemplateResponse {
 
 export interface TemplateListResponse {
   templates: TemplateResponse[];
+}
+
+export interface MemoryResponse {
+  name: string;
+  namespace: string;
+  content: string;
+  description?: string;
+  attachedAgents: number;
+  agentNames?: string[];
+  createdAt: string;
+}
+
+export interface MemoryListResponse {
+  memories: MemoryResponse[];
+}
+
+export interface CreateMemoryRequest {
+  name: string;
+  content: string;
+  description?: string;
+  namespace?: string;
 }

@@ -74,6 +74,10 @@ type KomputerAgentSpec struct {
 	// Each key in each secret is injected as an env var into the agent pod.
 	// +optional
 	Secrets []string `json:"secrets,omitempty"`
+	// Memories is a list of KomputerMemory names to attach to this agent.
+	// Names can be "name" (same namespace) or "namespace/name" (cross-namespace).
+	// +optional
+	Memories []string `json:"memories,omitempty"`
 	// Lifecycle controls what happens after task completion.
 	// Empty (default) keeps the pod running, "Sleep" deletes the pod but keeps the PVC,
 	// "AutoDelete" deletes the entire agent after task completion.

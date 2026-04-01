@@ -23,6 +23,7 @@ type CreateAgentRequest struct {
 	Role         string            `json:"role"`      // "manager" or "" (default manager)
 	Namespace    string            `json:"namespace"` // optional, defaults to server default
 	Secrets      map[string]string `json:"secrets"`   // optional key-value secrets
+	Memories     []string          `json:"memories"`  // optional KomputerMemory names to attach
 	Lifecycle     string            `json:"lifecycle"`     // "", "Sleep", or "AutoDelete"
 	OfficeManager string            `json:"officeManager"` // set by manager MCP tool
 }
@@ -38,6 +39,7 @@ type AgentResponse struct {
 	LastTaskCostUSD string   `json:"lastTaskCostUSD,omitempty"`
 	TotalCostUSD    string   `json:"totalCostUSD,omitempty"`
 	Secrets         []string `json:"secrets,omitempty"`      // Key names from K8s Secrets (not values)
+	Memories        []string `json:"memories,omitempty"`     // KomputerMemory names attached to this agent
 	Instructions    string   `json:"instructions,omitempty"` // User task extracted from spec.instructions
 	CreatedAt       string   `json:"createdAt"`
 }
@@ -189,6 +191,11 @@ func SetupRoutes(r *gin.Engine, k8s *K8sClient, hub *Hub, worker *RedisWorker) {
 		v1.GET("/schedules/:name", getSchedule(k8s))
 		v1.DELETE("/schedules/:name", deleteSchedule(k8s))
 
+		v1.POST("/memories", createMemory(k8s))
+		v1.GET("/memories", listMemories(k8s))
+		v1.GET("/memories/:name", getMemory(k8s))
+		v1.DELETE("/memories/:name", deleteMemory(k8s))
+
 		v1.GET("/templates", listTemplates(k8s))
 	}
 }
@@ -238,12 +245,15 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 		// System prompt and user instructions are sent separately to the agent.
 		// The agent passes system_prompt to the Claude SDK's system_prompt field
 		// (not as part of conversation history — replaced on each task, never accumulates).
+		// Resolve memory content for injection into system prompt.
+		memorySection, _ := k8s.ResolveMemoryContent(c.Request.Context(), ns, req.Memories)
+
 		agentHeader := fmt.Sprintf("\n---\n\n**Agent Name:** %s\n\n## Your Task\n", req.Name)
 		var systemPrompt string
 		if role == "manager" {
-			systemPrompt = managerSystemPrompt + agentHeader
+			systemPrompt = managerSystemPrompt + memorySection + agentHeader
 		} else {
-			systemPrompt = workerSystemPrompt + agentHeader
+			systemPrompt = workerSystemPrompt + memorySection + agentHeader
 		}
 		instructions := req.Instructions
 
@@ -270,6 +280,7 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 					LastTaskCostUSD: existing.Status.LastTaskCostUSD,
 					TotalCostUSD:    existing.Status.TotalCostUSD,
 					Secrets:         collectSecretKeys(*c, k8s, ns, existing.Spec.Secrets),
+					Memories:        existing.Spec.Memories,
 					Instructions:    extractUserTask(existing.Spec.Instructions),
 					CreatedAt:       existing.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
 				})
@@ -316,6 +327,7 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 				LastTaskCostUSD: existing.Status.LastTaskCostUSD,
 				TotalCostUSD:    existing.Status.TotalCostUSD,
 				Secrets:         collectSecretKeys(*c, k8s, ns, existing.Spec.Secrets),
+				Memories:        existing.Spec.Memories,
 				Instructions:    extractUserTask(existing.Spec.Instructions),
 				CreatedAt:       existing.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
 			})
@@ -337,7 +349,7 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 			secretNames = []string{secretName}
 		}
 
-		agent, err := k8s.CreateAgent(c.Request.Context(), ns, req.Name, systemPrompt+"\n\n"+instructions, req.Model, req.TemplateRef, role, secretNames, req.Lifecycle, req.OfficeManager)
+		agent, err := k8s.CreateAgent(c.Request.Context(), ns, req.Name, systemPrompt+"\n\n"+instructions, req.Model, req.TemplateRef, role, secretNames, req.Memories, req.Lifecycle, req.OfficeManager)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create agent: " + err.Error()})
 			return
@@ -351,6 +363,7 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 			Status:       "Pending",
 			Lifecycle:    string(agent.Spec.Lifecycle),
 			Secrets:      collectSecretKeys(*c, k8s, ns, agent.Spec.Secrets),
+			Memories:     agent.Spec.Memories,
 			Instructions: extractUserTask(agent.Spec.Instructions),
 			CreatedAt:    agent.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
 		})
@@ -472,6 +485,7 @@ func getAgent(k8s *K8sClient) gin.HandlerFunc {
 			LastTaskCostUSD: agent.Status.LastTaskCostUSD,
 			TotalCostUSD:    agent.Status.TotalCostUSD,
 			Secrets:         agent.Spec.Secrets,
+			Memories:        agent.Spec.Memories,
 			Instructions:    extractUserTask(agent.Spec.Instructions),
 			CreatedAt:       agent.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
 		})
@@ -546,6 +560,7 @@ func listAgents(k8s *K8sClient) gin.HandlerFunc {
 				LastTaskCostUSD: a.Status.LastTaskCostUSD,
 				TotalCostUSD:    a.Status.TotalCostUSD,
 				Secrets:         collectSecretKeys(*c, k8s, ns, a.Spec.Secrets),
+				Memories:        a.Spec.Memories,
 				Instructions:    extractUserTask(a.Spec.Instructions),
 				CreatedAt:       a.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
 			})
@@ -845,6 +860,112 @@ func getOfficeEvents(k8s *K8sClient, worker *RedisWorker) gin.HandlerFunc {
 	}
 }
 
+// --- Memory handlers ---
+
+type CreateMemoryRequest struct {
+	Name        string `json:"name" binding:"required"`
+	Content     string `json:"content" binding:"required"`
+	Description string `json:"description"`
+	Namespace   string `json:"namespace"`
+}
+
+type MemoryResponse struct {
+	Name           string   `json:"name"`
+	Namespace      string   `json:"namespace"`
+	Content        string   `json:"content"`
+	Description    string   `json:"description,omitempty"`
+	AttachedAgents int      `json:"attachedAgents"`
+	AgentNames     []string `json:"agentNames,omitempty"`
+	CreatedAt      string   `json:"createdAt"`
+}
+
+func createMemory(k8s *K8sClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req CreateMemoryRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: " + err.Error()})
+			return
+		}
+		if !isValidK8sName(req.Name) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid memory name: must be lowercase letters, numbers, and hyphens"})
+			return
+		}
+		ns := req.Namespace
+		if ns == "" {
+			ns = resolveNamespace(c, k8s)
+		}
+		memory, err := k8s.CreateMemory(c.Request.Context(), ns, req.Name, req.Content, req.Description)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create memory: " + err.Error()})
+			return
+		}
+		c.JSON(http.StatusCreated, MemoryResponse{
+			Name:      memory.Name,
+			Namespace: memory.Namespace,
+			Content:   memory.Spec.Content,
+			Description: memory.Spec.Description,
+			CreatedAt: memory.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
+		})
+	}
+}
+
+func getMemory(k8s *K8sClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		name := c.Param("name")
+		ns := resolveNamespace(c, k8s)
+		memory, err := k8s.GetMemory(c.Request.Context(), ns, name)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "memory not found"})
+			return
+		}
+		c.JSON(http.StatusOK, MemoryResponse{
+			Name:           memory.Name,
+			Namespace:      memory.Namespace,
+			Content:        memory.Spec.Content,
+			Description:    memory.Spec.Description,
+			AttachedAgents: memory.Status.AttachedAgents,
+			AgentNames:     memory.Status.AgentNames,
+			CreatedAt:      memory.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
+		})
+	}
+}
+
+func listMemories(k8s *K8sClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ns := resolveNamespace(c, k8s)
+		memories, err := k8s.ListMemories(c.Request.Context(), ns)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list memories: " + err.Error()})
+			return
+		}
+		resp := make([]MemoryResponse, 0, len(memories))
+		for _, m := range memories {
+			resp = append(resp, MemoryResponse{
+				Name:           m.Name,
+				Namespace:      m.Namespace,
+				Content:        m.Spec.Content,
+				Description:    m.Spec.Description,
+				AttachedAgents: m.Status.AttachedAgents,
+				AgentNames:     m.Status.AgentNames,
+				CreatedAt:      m.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
+			})
+		}
+		c.JSON(http.StatusOK, gin.H{"memories": resp})
+	}
+}
+
+func deleteMemory(k8s *K8sClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		name := c.Param("name")
+		ns := resolveNamespace(c, k8s)
+		if err := k8s.DeleteMemory(c.Request.Context(), ns, name); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete memory: " + err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"status": "deleted"})
+	}
+}
+
 type TemplateResponse struct {
 	Name      string `json:"name"`
 	Scope     string `json:"scope"`               // "namespace" or "cluster"
@@ -873,7 +994,8 @@ type PatchAgentRequest struct {
 	Lifecycle    *string           `json:"lifecycle,omitempty"`
 	Instructions *string           `json:"instructions,omitempty"`
 	TemplateRef  *string           `json:"templateRef,omitempty"`
-	Secrets      map[string]string `json:"secrets,omitempty"` // key-value pairs to set/update
+	Secrets      map[string]string `json:"secrets,omitempty"`  // key-value pairs to set/update
+	Memories     *[]string         `json:"memories,omitempty"` // memory names to attach
 }
 
 func patchAgent(k8s *K8sClient) gin.HandlerFunc {
@@ -886,7 +1008,7 @@ func patchAgent(k8s *K8sClient) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: " + err.Error()})
 			return
 		}
-		if req.Model == nil && req.Lifecycle == nil && req.Instructions == nil && req.TemplateRef == nil && len(req.Secrets) == 0 {
+		if req.Model == nil && req.Lifecycle == nil && req.Instructions == nil && req.TemplateRef == nil && len(req.Secrets) == 0 && req.Memories == nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "no fields to update"})
 			return
 		}
@@ -920,6 +1042,11 @@ func patchAgent(k8s *K8sClient) gin.HandlerFunc {
 			}
 		}
 
+		// 1c. Update memories if provided.
+		if req.Memories != nil {
+			k8s.PatchAgentMemoriesList(c.Request.Context(), ns, name, *req.Memories)
+		}
+
 		// 2. If pod is running, forward config to the agent so it takes effect immediately.
 		agent, err := k8s.GetAgent(c.Request.Context(), ns, name)
 		if err == nil && agent.Status.PodName != "" && agent.Status.Phase == "Running" {
@@ -949,6 +1076,7 @@ func patchAgent(k8s *K8sClient) gin.HandlerFunc {
 			LastTaskCostUSD: updated.Status.LastTaskCostUSD,
 			TotalCostUSD:    updated.Status.TotalCostUSD,
 			Secrets:         updated.Spec.Secrets,
+			Memories:        updated.Spec.Memories,
 			Instructions:    extractUserTask(updated.Spec.Instructions),
 			CreatedAt:       updated.CreationTimestamp.Format("2006-01-02T15:04:05Z"),
 		})

@@ -387,6 +387,7 @@ function SettingsCard({ agent, agentNs, onSaved }: {
   const instructions = agent.instructions ?? "";
   const [agentSecretRefs, setAgentSecretRefs] = useState<string[]>(agent.secrets ?? []);
   const [availableSecrets, setAvailableSecrets] = useState<{ name: string; namespace: string }[]>([]);
+  const [showAllSecrets, setShowAllSecrets] = useState(false);
   const [createSecretOpen, setCreateSecretOpen] = useState(false);
   const [agentMemories, setAgentMemories] = useState<string[]>(agent.memories ?? []);
   const [availableMemories, setAvailableMemories] = useState<{ name: string; namespace: string; ref: string }[]>([]);
@@ -411,10 +412,10 @@ function SettingsCard({ agent, agentNs, onSaved }: {
         ref: s.namespace === (agentNs || "default") ? s.name : `${s.namespace}/${s.name}`,
       })));
     }).catch(() => {});
-    listSecrets(agentNs || undefined).then((res) => {
+    listSecrets(agentNs || undefined, showAllSecrets).then((res) => {
       setAvailableSecrets((res.secrets ?? []).map((s) => ({ name: s.name, namespace: s.namespace })));
     }).catch(() => {});
-  }, [agentNs]);
+  }, [agentNs, showAllSecrets]);
 
   const agentLifecycle = agent.lifecycle || "default";
   const memoriesChanged = JSON.stringify(agentMemories.sort()) !== JSON.stringify((agent.memories ?? []).sort());
@@ -493,7 +494,20 @@ function SettingsCard({ agent, agentNs, onSaved }: {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label>Secrets</Label>
+        <div className="flex items-center justify-between">
+          <Label>Secrets</Label>
+          <button
+            type="button"
+            onClick={() => setShowAllSecrets((v) => !v)}
+            className={`text-xs px-2 py-0.5 rounded-full border transition-colors cursor-pointer ${
+              showAllSecrets
+                ? "border-amber-500/50 bg-amber-500/10 text-amber-400"
+                : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)]"
+            }`}
+          >
+            Show all
+          </button>
+        </div>
         <div className="flex flex-wrap gap-1.5">
           {availableSecrets.map((s) => {
             const attached = agentSecretRefs.includes(s.name);
@@ -528,7 +542,7 @@ function SettingsCard({ agent, agentNs, onSaved }: {
           open={createSecretOpen}
           onOpenChange={setCreateSecretOpen}
           onCreated={() => {
-            listSecrets(agentNs || undefined).then((res) => {
+            listSecrets(agentNs || undefined, showAllSecrets).then((res) => {
               setAvailableSecrets((res.secrets ?? []).map((s) => ({ name: s.name, namespace: s.namespace })));
             }).catch(() => {});
           }}

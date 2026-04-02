@@ -157,6 +157,9 @@ export const listTemplates = (ns?: string) =>
   request<TemplateListResponse>(`/templates${ns ? `?namespace=${ns}` : ''}`);
 
 // Health
+export const listNamespaces = () =>
+  request<{ namespaces: string[] }>('/namespaces');
+
 export const checkHealth = async () => {
   if (MOCK_EMPTY) return true;
   const res = await fetch(`${getConfig().apiUrl}/healthz`);

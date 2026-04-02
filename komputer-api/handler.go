@@ -239,6 +239,18 @@ func SetupRoutes(r *gin.Engine, k8s *K8sClient, hub *Hub, worker *RedisWorker) {
 		v1.DELETE("/secrets/:name", deleteManagedSecret(k8s))
 
 		v1.GET("/templates", listTemplates(k8s))
+		v1.GET("/namespaces", listNamespaces(k8s))
+	}
+}
+
+func listNamespaces(k8s *K8sClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		names, err := k8s.ListNamespaces(c.Request.Context())
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"namespaces": names})
 	}
 }
 

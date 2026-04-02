@@ -11,6 +11,7 @@ rules:
   - namespaces
   verbs:
   - get
+  - list
   - create
 - apiGroups:
   - ""

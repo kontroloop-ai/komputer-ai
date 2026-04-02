@@ -285,6 +285,18 @@ func (k *K8sClient) CreateAgent(ctx context.Context, ns, name, instructions, mod
 	return agent, nil
 }
 
+func (k *K8sClient) ListNamespaces(ctx context.Context) ([]string, error) {
+	list, err := k.clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(list.Items))
+	for _, ns := range list.Items {
+		names = append(names, ns.Name)
+	}
+	return names, nil
+}
+
 func (k *K8sClient) GetAgent(ctx context.Context, ns, name string) (*komputerv1alpha1.KomputerAgent, error) {
 	agent := &komputerv1alpha1.KomputerAgent{}
 	err := k.client.Get(ctx, types.NamespacedName{Name: name, Namespace: ns}, agent)

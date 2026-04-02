@@ -115,11 +115,12 @@ async def run_agent(instructions: str, model: str, publisher, system_prompt: str
 
         async for message in client.receive_response():
             if isinstance(message, AssistantMessage):
+                usage = message.usage  # dict | None, keys: input_tokens, output_tokens, cache_*
                 for block in message.content:
                     if isinstance(block, TextBlock):
-                        publisher.publish("text", {"content": block.text})
+                        publisher.publish("text", {"content": block.text, "usage": usage})
                     elif isinstance(block, ThinkingBlock):
-                        publisher.publish("thinking", {"content": block.thinking[:500]})
+                        publisher.publish("thinking", {"content": block.thinking[:500], "usage": usage})
                     elif isinstance(block, ToolUseBlock):
                         publisher.publish("tool_call", {
                             "id": block.id,
@@ -129,16 +130,17 @@ async def run_agent(instructions: str, model: str, publisher, system_prompt: str
             elif isinstance(message, ResultMessage):
                 result = message
 
-    if result:
-        # Persist session ID for future tasks
-        _save_session_id(result.session_id)
-        publisher.publish("task_completed", {
-            "cost_usd": result.total_cost_usd,
-            "duration_ms": result.duration_ms,
-            "turns": result.num_turns,
-            "stop_reason": result.stop_reason,
-            "session_id": result.session_id,
-        })
+        if result:
+            # Persist session ID for future tasks
+            _save_session_id(result.session_id)
+            publisher.publish("task_completed", {
+                "cost_usd": result.total_cost_usd,
+                "duration_ms": result.duration_ms,
+                "turns": result.num_turns,
+                "stop_reason": result.stop_reason,
+                "session_id": result.session_id,
+                "usage": result.usage,
+            })
 
     return result
 

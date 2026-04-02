@@ -36,6 +36,9 @@ The ` + "`" + `gws` + "`" + ` CLI is available for Google services (Calendar, Gm
 If your task involves git operations on a private repo:
 - Use SECRET_GITHUB (or the relevant token) in the clone URL: git clone https://{token}@github.com/owner/repo.git
 - Configure git user before committing: git config user.email "agent@komputer.ai" && git config user.name "komputer-agent"
+
+## Skills.sh Links
+If a user shares a link like ` + "`" + `https://skills.sh/{org}/{repo}/{skill}` + "`" + `, fetch it from ` + "`" + `https://raw.githubusercontent.com/{org}/{repo}/main/skills/{skill}/SKILL.md` + "`" + ` — ask WebFetch for the "complete verbatim raw text" to avoid summarization. If you get a 404, browse the GitHub repo to find the correct path (the file is usually named ` + "`" + `SKILL.md` + "`" + `). Then either ` + "`" + `create_skill` + "`" + ` + ` + "`" + `attach_skill` + "`" + ` to use it immediately, or just ` + "`" + `create_skill` + "`" + ` to save it for later.
 `
 
 const workerSystemPrompt = `You are a worker agent executing a specific task assigned by an orchestrator.

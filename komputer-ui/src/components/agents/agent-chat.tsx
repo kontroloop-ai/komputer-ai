@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -22,6 +23,7 @@ import {
   Moon,
   Trash2,
   Play,
+  Sparkles,
 } from "lucide-react";
 
 type AgentChatProps = {
@@ -98,26 +100,33 @@ function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
       }
       case "tool_result": {
         const toolName = event.payload.tool ?? event.payload.name ?? "tool";
-        const description =
-          event.payload.input?.description ?? event.payload.description;
-        // Build a compact summary of the input for the collapsed view
         const inp = event.payload.input;
+        let description: string | undefined;
         let inputSummary: string | undefined;
-        if (inp?.command ?? inp?.cmd) {
-          inputSummary = inp.command ?? inp.cmd;
-        } else if (inp && typeof inp === "object") {
-          const parts = Object.entries(inp)
-            .filter(([k]) => k !== "description")
-            .map(([k, v]) => `${k}=${typeof v === "string" ? v : JSON.stringify(v)}`);
-          if (parts.length > 0) inputSummary = parts.join(" ");
+        let output: unknown;
+        if (toolName === "Skill") {
+          description = inp?.skill;
+          inputSummary = inp?.args ? String(inp.args) : undefined;
+          // Don't show the raw skill file content as output
+        } else {
+          description = inp?.description ?? event.payload.description;
+          if (inp?.command ?? inp?.cmd) {
+            inputSummary = inp.command ?? inp.cmd;
+          } else if (inp && typeof inp === "object") {
+            const parts = Object.entries(inp)
+              .filter(([k]) => k !== "description")
+              .map(([k, v]) => `${k}=${typeof v === "string" ? v : JSON.stringify(v)}`);
+            if (parts.length > 0) inputSummary = parts.join(" ");
+          }
+          output = event.payload.output ?? event.payload.content;
         }
         messages.push({
           kind: "tool",
           toolName,
           description,
           command: inputSummary,
-          input: event.payload.input,
-          output: event.payload.output ?? event.payload.content,
+          input: toolName === "Skill" ? undefined : inp,
+          output,
           timestamp: event.timestamp,
         });
         break;
@@ -154,6 +163,8 @@ function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
 
 function getToolIcon(name: string) {
   const lower = name.toLowerCase();
+  if (lower === "skill")
+    return <Sparkles className="size-3.5" />;
   if (lower.includes("bash") || lower.includes("shell"))
     return <Terminal className="size-3.5" />;
   if (lower.includes("read") || lower.includes("write") || lower.includes("edit"))
@@ -315,6 +326,28 @@ function ToolCard({
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+function SkillCard({ skillName, args }: { skillName: string; args?: string }) {
+  return (
+    <Link
+      href={`/skills/${encodeURIComponent(skillName)}`}
+      className="flex items-center gap-2 px-3 py-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] transition-colors duration-150 hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-hover)] cursor-pointer"
+    >
+      <Sparkles className="size-3.5 shrink-0 text-[var(--color-brand-violet)]" />
+      <span className="shrink-0 text-sm font-semibold text-[var(--color-text)]">
+        Skill
+      </span>
+      <span className="shrink-0 text-sm text-[var(--color-text-secondary)]">
+        {skillName}
+      </span>
+      {args && (
+        <code className="min-w-0 truncate text-xs font-mono text-[var(--color-text-muted)]">
+          {args}
+        </code>
+      )}
+    </Link>
   );
 }
 
@@ -773,13 +806,20 @@ export function AgentChat({
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.2, ease: "easeOut" }}
                     >
-                      <ToolCard
-                        toolName={msg.toolName}
-                        description={msg.description}
-                        command={msg.command}
-                        input={msg.input}
-                        output={msg.output}
-                      />
+                      {msg.toolName === "Skill" ? (
+                        <SkillCard
+                          skillName={msg.description ?? "skill"}
+                          args={msg.command}
+                        />
+                      ) : (
+                        <ToolCard
+                          toolName={msg.toolName}
+                          description={msg.description}
+                          command={msg.command}
+                          input={msg.input}
+                          output={msg.output}
+                        />
+                      )}
                     </motion.div>
                   );
                 case "completed":

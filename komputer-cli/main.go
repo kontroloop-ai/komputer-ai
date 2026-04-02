@@ -1406,6 +1406,15 @@ func main() {
 									detail = q
 								}
 							}
+						} else if tool == "Skill" {
+							if inputMap, ok := event.Payload["input"].(map[string]interface{}); ok {
+								if s, ok := inputMap["skill"].(string); ok {
+									detail = s
+									if a, ok := inputMap["args"].(string); ok && a != "" {
+										detail += " " + a
+									}
+								}
+							}
 						} else if inputMap, ok := event.Payload["input"].(map[string]interface{}); ok {
 							// For MCP and other tools, show key params
 							var parts []string
@@ -1420,10 +1429,14 @@ func main() {
 						}
 						// Also show output snippet for MCP tools
 						output, _ := event.Payload["output"].(string)
+						icon := "⚙"
+						if tool == "Skill" {
+							icon = "✦"
+						}
 						if detail != "" {
-							fmt.Printf("  %s %s %s\n", toolIconStyle.Render("⚙"), toolNameStyle.Render(displayName), toolDetailStyle.Render(detail))
+							fmt.Printf("  %s %s %s\n", toolIconStyle.Render(icon), toolNameStyle.Render(displayName), toolDetailStyle.Render(detail))
 						} else {
-							fmt.Printf("  %s %s\n", toolIconStyle.Render("⚙"), toolNameStyle.Render(displayName))
+							fmt.Printf("  %s %s\n", toolIconStyle.Render(icon), toolNameStyle.Render(displayName))
 						}
 						if output != "" && strings.HasPrefix(tool, "mcp__") {
 							fmt.Printf("    %s\n", toolDetailStyle.Render(truncate(output, 200)))

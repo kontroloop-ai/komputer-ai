@@ -21,3 +21,5 @@
 # Internal
 docs/superpowers/
 local/
+workspace
+.superpowers

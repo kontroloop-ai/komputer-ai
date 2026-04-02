@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -57,6 +57,8 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
   const [availableSkills, setAvailableSkills] = useState<{ name: string; namespace: string; ref: string }[]>([]);
   const [secrets, setSecrets] = useState<SecretEntry[]>([]);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const advancedRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -199,7 +201,7 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
       }}
     >
       <DialogContent>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
           <DialogHeader>
             <DialogTitle>Create Agent</DialogTitle>
             <DialogDescription>
@@ -207,7 +209,7 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
             </DialogDescription>
           </DialogHeader>
 
-          <div className="mt-4 flex flex-col gap-4">
+          <div ref={scrollRef} className="mt-4 flex flex-col gap-4 overflow-y-auto flex-1 pr-1">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="agent-name">Name</Label>
               <Input
@@ -309,7 +311,7 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
             </div>
 
             {/* Advanced section */}
-            <div className="rounded-md border border-[var(--color-border)]">
+            <div ref={advancedRef} className="rounded-md border border-[var(--color-border)]">
               <button
                 type="button"
                 onClick={() => setAdvancedOpen(!advancedOpen)}
@@ -327,6 +329,9 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
                     animate={{ height: "auto", opacity: 1, overflow: "visible", transitionEnd: { overflow: "visible" } }}
                     exit={{ height: 0, opacity: 0, overflow: "hidden" }}
                     transition={{ duration: 0.2, ease: "easeOut" }}
+                    onAnimationComplete={() => {
+                      if (advancedOpen) scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+                    }}
                   >
                     <div className="border-t border-[var(--color-border)] px-3 py-3 flex flex-col gap-4">
                       <div className="flex flex-col gap-1.5">
@@ -424,7 +429,7 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
             )}
           </div>
 
-          <DialogFooter className="mt-4">
+          <DialogFooter className="mt-4 shrink-0">
             <Button variant="secondary" type="button" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>

@@ -18,7 +18,7 @@ from claude_agent_sdk import (
 os.environ.setdefault("CLAUDE_CONFIG_DIR", "/workspace/.claude")
 
 SESSION_FILE = Path("/workspace/.komputer-session")
-SKILLS_DIR = Path.home() / ".claude" / "skills"
+SKILLS_DIR = Path(os.environ.get("CLAUDE_CONFIG_DIR", Path.home() / ".claude")) / "skills"
 
 
 def _load_session_id() -> str | None:

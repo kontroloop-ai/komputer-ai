@@ -100,28 +100,39 @@ function NavItem({
 }
 
 function CollapseButton({ collapsed, onClick }: { collapsed: boolean; onClick: () => void }) {
-  const btn = (
-    <button
-      onClick={onClick}
-      className="p-1.5 rounded text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)] transition-colors cursor-pointer"
+  const [showTooltip, setShowTooltip] = useState(false);
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => collapsed && setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
     >
-      {collapsed ? (
-        <PanelLeftOpen className="h-4 w-4" />
-      ) : (
-        <PanelLeftClose className="h-4 w-4" />
-      )}
-    </button>
+      <button
+        onClick={onClick}
+        className="p-1.5 rounded text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)] transition-colors cursor-pointer"
+      >
+        {collapsed ? (
+          <PanelLeftOpen className="h-4 w-4" />
+        ) : (
+          <PanelLeftClose className="h-4 w-4" />
+        )}
+      </button>
+      <AnimatePresence>
+        {collapsed && showTooltip && (
+          <motion.div
+            className="absolute left-full top-1/2 -translate-y-1/2 ml-2 z-50 px-2.5 py-1 text-[11px] font-medium rounded-[var(--radius-sm)] bg-[var(--color-surface-raised)] text-[var(--color-text)] border border-[var(--color-border)] shadow-[0_4px_12px_rgba(0,0,0,0.3)] whitespace-nowrap pointer-events-none"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.1 }}
+          >
+            Expand sidebar
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
-
-  if (collapsed) {
-    return (
-      <Tooltip content="Expand sidebar" side="right" sideOffset={8}>
-        {btn}
-      </Tooltip>
-    );
-  }
-
-  return btn;
 }
 
 export function Sidebar() {

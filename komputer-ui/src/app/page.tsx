@@ -173,10 +173,10 @@ export default function DashboardPage() {
   // Running tasks (agents with InProgress task)
   const runningTasks = agents.filter((a) => a.taskStatus === "InProgress");
 
-  // Recent agents (10 most recent)
+  // Recent agents — fill 2 rows at the widest breakpoint (6 cols × 2 = 12)
   const recentAgents = [...agents]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 10);
+    .slice(0, 12);
 
   // Top cost agents (sorted by total cost, top 5)
   const topCostAgents = [...agents]
@@ -270,7 +270,7 @@ export default function DashboardPage() {
             </Link>
           </div>
           {showLoading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2.5">
+            <div className="grid grid-cols-6 gap-2.5">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="h-[130px] rounded-[var(--radius-md)] bg-[var(--color-surface)] animate-pulse" />
               ))}
@@ -280,7 +280,7 @@ export default function DashboardPage() {
               No agents yet. Create one to get started.
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2.5">
+            <div className="grid grid-cols-6 gap-2.5">
               {recentAgents.map((agent, i) => {
                 const statusColors: Record<string, string> = {
                   Running: "#34D399", Sleeping: "#FBBF24", Pending: "#FBBF24",

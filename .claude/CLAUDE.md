@@ -73,7 +73,16 @@ Add the resource, API group, and verbs needed. Without this, the component will 
 
 ## 8. Tags Must Include Release Notes
 
-When creating a git tag, always create a GitHub release with release notes. Summarize changes since the last tag using the commit history, grouped by category (features, fixes, docs, etc.). Use `gh release create` with a descriptive body.
+When creating a git tag, always create a GitHub release with release notes using `gh release create`. Follow this structure:
+
+- **Title format**: `vX.Y.Z — Short Theme` (e.g. `v0.7.0 — Skills & Memories`). Minor versions can omit the theme.
+- **Opening line**: One sentence explaining the theme or headline change in plain language.
+- **Body**: `## What's New` section with named subsections per feature area. Each subsection has a one-line description followed by bullet points of specific capabilities. Write for users — describe what they can now do, not internal implementation details.
+- **Fixes**: Group under `### Fixes` at the end of `## What's New`. One bullet per fix, plain language.
+- **Footer**: Horizontal rule, then `**Full Changelog**: https://github.com/kontroloop-ai/komputer-ai/compare/vOLD...vNEW`
+- **No emojis** in section headers. No `## Features` / `## Improvements` — use `## What's New` with named subsections.
+
+See `v0.6.3` and `v0.7.0` releases for reference.
 
 ## 9. Minimal Prompt Changes
 

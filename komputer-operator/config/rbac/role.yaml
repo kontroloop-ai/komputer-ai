@@ -33,6 +33,7 @@ rules:
   - komputeragenttemplates
   - komputerconfigs
   - komputermemories
+  - komputerskills
   verbs:
   - get
   - list
@@ -66,6 +67,7 @@ rules:
   - komputermemories/status
   - komputeroffices/status
   - komputerschedules/status
+  - komputerskills/status
   verbs:
   - get
   - patch

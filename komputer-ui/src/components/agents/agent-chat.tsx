@@ -41,10 +41,17 @@ type AgentChatProps = {
 
 // --- Message types derived from events ---
 
+type TokenUsage = {
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_read_input_tokens?: number;
+  cache_creation_input_tokens?: number;
+};
+
 type ChatMessage =
   | { kind: "user"; text: string; timestamp: string }
-  | { kind: "text"; text: string; timestamp: string }
-  | { kind: "thinking"; text: string; timestamp: string }
+  | { kind: "text"; text: string; timestamp: string; usage?: TokenUsage }
+  | { kind: "thinking"; text: string; timestamp: string; usage?: TokenUsage }
   | {
       kind: "tool";
       toolName: string;
@@ -59,6 +66,8 @@ type ChatMessage =
       costUSD?: string;
       duration?: string;
       turns?: number;
+      inputTokens?: number;
+      outputTokens?: number;
       timestamp: string;
     }
   | { kind: "error"; message: string; timestamp: string }
@@ -83,7 +92,12 @@ function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
       case "text": {
         const content = event.payload.content ?? event.payload.text ?? "";
         if (content) {
-          messages.push({ kind: "text", text: content, timestamp: event.timestamp });
+          messages.push({
+            kind: "text",
+            text: content,
+            timestamp: event.timestamp,
+            usage: event.payload.usage as TokenUsage | undefined,
+          });
         }
         break;
       }
@@ -94,6 +108,7 @@ function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
             kind: "thinking",
             text: content,
             timestamp: event.timestamp,
+            usage: event.payload.usage as TokenUsage | undefined,
           });
         }
         break;
@@ -136,11 +151,14 @@ function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
         const durationMs = event.payload.duration ?? event.payload.duration_ms;
         const duration = typeof durationMs === "number" ? `${(durationMs / 1000).toFixed(1)}s` : durationMs;
         const cost = typeof costRaw === "number" ? costRaw.toFixed(4) : costRaw;
+        const usage = event.payload.usage as TokenUsage | undefined;
         messages.push({
           kind: "completed",
           costUSD: cost,
           duration,
           turns: event.payload.turns ?? event.payload.num_turns,
+          inputTokens: usage?.input_tokens,
+          outputTokens: usage?.output_tokens,
           timestamp: event.timestamp,
         });
         break;
@@ -159,6 +177,25 @@ function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
     }
   }
   return messages;
+}
+
+function formatTokenCount(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return String(n);
+}
+
+function TokenBadge({ usage }: { usage?: TokenUsage }) {
+  if (!usage) return null;
+  const input = usage.input_tokens;
+  const output = usage.output_tokens;
+  if (input == null && output == null) return null;
+  return (
+    <span className="text-[10px] text-[var(--color-text-muted)] tabular-nums">
+      {input != null && <span>{formatTokenCount(input)} in</span>}
+      {input != null && output != null && <span className="mx-0.5">·</span>}
+      {output != null && <span>{formatTokenCount(output)} out</span>}
+    </span>
+  );
 }
 
 function getToolIcon(name: string) {
@@ -202,7 +239,7 @@ function UserBubble({ text, timestamp }: { text: string; timestamp: string }) {
   );
 }
 
-function AgentBubble({ text, timestamp }: { text: string; timestamp: string }) {
+function AgentBubble({ text, timestamp, usage }: { text: string; timestamp: string; usage?: TokenUsage }) {
   return (
     <motion.div
       className="group/msg flex justify-start"
@@ -217,12 +254,20 @@ function AgentBubble({ text, timestamp }: { text: string; timestamp: string }) {
         <div className="prose-chat text-sm text-[var(--color-text)]">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
         </div>
-        <p className="mt-1 text-[10px] text-[var(--color-text-secondary)]">
-          {new Date(timestamp).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </p>
+        <div className="mt-1 flex items-center gap-1.5">
+          <span className="text-[10px] text-[var(--color-text-secondary)]">
+            {new Date(timestamp).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </span>
+          {usage && (
+            <>
+              <span className="text-[10px] text-[var(--color-text-muted)]">·</span>
+              <TokenBadge usage={usage} />
+            </>
+          )}
+        </div>
       </div>
     </motion.div>
   );
@@ -355,10 +400,14 @@ function CompletedDivider({
   costUSD,
   duration,
   turns,
+  inputTokens,
+  outputTokens,
 }: {
   costUSD?: string;
   duration?: string;
   turns?: number;
+  inputTokens?: number;
+  outputTokens?: number;
 }) {
   return (
     <motion.div
@@ -419,6 +468,13 @@ function CompletedDivider({
           {turns != null && (
             <span className="text-xs text-[var(--color-text-secondary)]">
               {turns} turn{turns !== 1 ? "s" : ""}
+            </span>
+          )}
+          {(inputTokens != null || outputTokens != null) && (
+            <span className="text-xs text-[var(--color-text-secondary)] tabular-nums">
+              {inputTokens != null && `${formatTokenCount(inputTokens)} in`}
+              {inputTokens != null && outputTokens != null && " · "}
+              {outputTokens != null && `${formatTokenCount(outputTokens)} out`}
             </span>
           )}
         </motion.div>
@@ -788,6 +844,7 @@ export function AgentChat({
                       key={key}
                       text={msg.text}
                       timestamp={msg.timestamp}
+                      usage={msg.usage}
                     />
                   );
                 case "thinking":
@@ -828,6 +885,8 @@ export function AgentChat({
                       costUSD={msg.costUSD}
                       duration={msg.duration}
                       turns={msg.turns}
+                      inputTokens={msg.inputTokens}
+                      outputTokens={msg.outputTokens}
                     />
                   );
                 case "cancelled":

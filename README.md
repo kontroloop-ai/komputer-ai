@@ -44,7 +44,7 @@
 | [komputer-api](komputer-api/) | Go | REST + WebSocket API for creating agents, listing status, and streaming real-time events |
 | [komputer-agent](komputer-agent/) | Python | The agent runtime — runs Claude with bash/web tools in a persistent workspace |
 | [komputer-cli](komputer-cli/) | Go | Beautiful CLI for interacting with the platform |
-| [komputer-ui](komputer-ui/) | TypeScript | Web dashboard for managing agents, offices, schedules, memories, and costs |
+| [komputer-ui](komputer-ui/) | TypeScript | Web dashboard for managing agents, offices, schedules, memories, skills, and costs |
 
 
 ## Documentation
@@ -199,6 +199,49 @@ spec:
 
 **KomputerSchedule** — Runs agent tasks on a cron schedule with timezone support, auto-delete, and cost tracking.
 
+**KomputerMemory** — A persistent knowledge resource attached to agents. Memory content is injected into the agent's system prompt so Claude has it as context on every task:
+```yaml
+apiVersion: komputer.komputer.ai/v1alpha1
+kind: KomputerMemory
+metadata:
+  name: k8s-runbook
+spec:
+  description: "Kubernetes runbook for production cluster"
+  content: |
+    ## Production Cluster Runbook
+    - Always drain nodes before maintenance
+    - Use `kubectl rollout restart` instead of deleting pods
+```
+
+Attach to an agent in its spec:
+```yaml
+spec:
+  memories:
+    - k8s-runbook
+```
+
+**KomputerSkill** — A reusable skill written to the agent's filesystem as a Claude SDK skill file. Skills appear as slash commands the agent can invoke:
+```yaml
+apiVersion: komputer.komputer.ai/v1alpha1
+kind: KomputerSkill
+metadata:
+  name: python-expert
+spec:
+  description: "Expert Python code review and best practices"
+  content: |
+    When reviewing Python code:
+    - Check for PEP 8 compliance
+    - Look for common security issues
+    - Suggest type hints where missing
+```
+
+Attach to an agent in its spec:
+```yaml
+spec:
+  skills:
+    - python-expert
+```
+
 ## CLI Usage
 
 ```bash
@@ -217,6 +260,8 @@ komputer delete <name> [name...]    # Delete one or more agents
 --model <model>                     # Override Claude model per task
 -n, --namespace <ns>                # Target Kubernetes namespace
 --secret KEY=VALUE                  # Pass secrets (repeatable)
+--memory <name>                     # Attach a KomputerMemory (repeatable)
+--skill <name>                      # Attach a KomputerSkill (repeatable)
 ```
 
 ### Secrets

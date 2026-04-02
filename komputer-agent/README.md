@@ -98,14 +98,32 @@ The SDK requires the `claude` CLI binary, which is installed via `npm install -g
 
 When `KOMPUTER_ROLE=manager`, the agent additionally registers MCP orchestration tools via the komputer-api:
 
+**Agent management:**
+
 | Tool | Description |
 |------|-------------|
 | `create_agent` | Create a sub-agent (always a worker) to handle a task |
+| `schedule_agent` | Schedule an agent to run on a cron schedule |
 | `get_agent_status` | Check the status of a sub-agent |
 | `get_agent_events` | Get recent events/results from a sub-agent |
 | `delete_agent` | Delete a sub-agent and clean up resources |
+| `delete_schedule` | Delete a schedule |
 
-This allows manager agents to autonomously delegate work to sub-agents.
+**Memory tools:**
+
+| Tool | Description |
+|------|-------------|
+| `create_memory` | Create a `KomputerMemory` CR with the given name and content. Pass `attach: true` to also attach it to the current agent immediately. |
+| `attach_memory` | Attach an existing `KomputerMemory` to an agent (defaults to the current agent). The memory content will be injected into the agent's system prompt on its next task. |
+
+**Skill tools:**
+
+| Tool | Description |
+|------|-------------|
+| `create_skill` | Create a `KomputerSkill` CR with the given name, description, and content. Pass `attach: true` to also attach it to the current agent immediately. |
+| `attach_skill` | Attach an existing `KomputerSkill` to an agent (defaults to the current agent). The skill will be written as a slash command file on the agent's next task. |
+
+This allows manager agents to autonomously delegate work, build up shared knowledge as memories, and codify repeatable workflows as skills.
 
 ## Development
 

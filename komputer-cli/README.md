@@ -191,6 +191,90 @@ komputer schedule create <name> <cron> <prompt>  Create a schedule [--model, --l
 komputer schedule delete <name>     Delete a schedule
 ```
 
+### Memories
+```
+komputer memory list                List all memories
+komputer memory get <name>          Get memory details + content
+komputer memory create <name>       Create a memory [--content, --description]
+komputer memory edit <name>         Update content or description [--content, --description]
+komputer memory delete <name>       Delete a memory
+```
+
+### Skills
+```
+komputer skill list                 List all skills
+komputer skill get <name>           Get skill details + content
+komputer skill create <name>        Create a skill [--content, --description]
+komputer skill edit <name>          Update content or description [--content, --description]
+komputer skill delete <name>        Delete a skill
+```
+
+### Memories
+
+Manage `KomputerMemory` resources — persistent knowledge injected into agent system prompts.
+
+```bash
+# List all memories
+komputer memory list
+
+# Get memory details (including content)
+komputer memory get k8s-runbook
+
+# Create a memory
+komputer memory create k8s-runbook \
+  --description "Kubernetes runbook for production cluster" \
+  --content "Always drain nodes before maintenance..."
+
+# Edit a memory's content or description
+komputer memory edit k8s-runbook --content "Updated content..."
+
+# Delete a memory
+komputer memory delete k8s-runbook
+```
+
+Attach memories when creating an agent:
+```bash
+komputer create my-agent "Deploy the app" --memory k8s-runbook --memory deploy-policy
+```
+
+Update memories on an existing agent:
+```bash
+komputer config my-agent --memory k8s-runbook --memory deploy-policy
+```
+
+### Skills
+
+Manage `KomputerSkill` resources — reusable skill files available to agents as slash commands.
+
+```bash
+# List all skills
+komputer skill list
+
+# Get skill details (including content)
+komputer skill get python-expert
+
+# Create a skill
+komputer skill create python-expert \
+  --description "Expert Python code review" \
+  --content "When reviewing Python code: check PEP 8, look for security issues..."
+
+# Edit a skill's content or description
+komputer skill edit python-expert --content "Updated instructions..."
+
+# Delete a skill
+komputer skill delete python-expert
+```
+
+Attach skills when creating an agent:
+```bash
+komputer create my-agent "Review this PR" --skill python-expert --skill git-commit
+```
+
+Update skills on an existing agent:
+```bash
+komputer config my-agent --skill python-expert
+```
+
 ### Passing Secrets
 
 Pass credentials to agents at creation time using the `--secret` flag:
@@ -215,6 +299,8 @@ Secrets are stored as K8s Secrets and injected as `SECRET_*` env vars into the a
 | `--api <url>` | Override the saved API endpoint |
 | `-n, --namespace <ns>` | Target Kubernetes namespace |
 | `--secret KEY=VALUE` | Pass secrets to the agent (repeatable, on create/run) |
+| `--memory <name>` | Attach a KomputerMemory by name (repeatable, on create/run/config) |
+| `--skill <name>` | Attach a KomputerSkill by name (repeatable, on create/run/config) |
 | `--lifecycle <mode>` | Agent lifecycle: `Sleep` or `AutoDelete` (on create/run/chat) |
 | `--help` | Help for any command |
 

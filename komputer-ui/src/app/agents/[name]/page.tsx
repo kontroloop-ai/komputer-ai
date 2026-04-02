@@ -249,6 +249,17 @@ export default function AgentDetailPage() {
             <CostBadge cost={agent.lastTaskCostUSD} />
             <span>Total:</span>
             <CostBadge cost={agent.totalCostUSD} />
+            {agent.totalTokens != null && agent.totalTokens > 0 && (
+              <>
+                <span className="text-[var(--color-border)]">·</span>
+                <span className="font-mono text-xs text-[var(--color-text-secondary)]">
+                  {agent.totalTokens >= 1000
+                    ? `${(agent.totalTokens / 1000).toFixed(1)}k`
+                    : agent.totalTokens}{" "}
+                  tokens
+                </span>
+              </>
+            )}
           </div>
 
           <span className="text-[var(--color-border)]">|</span>
@@ -334,6 +345,16 @@ export default function AgentDetailPage() {
               <StatCard label="Task" value={agent.taskStatus || "Idle"} />
               <StatCard label="Total Cost" value={agent.totalCostUSD ? `$${agent.totalCostUSD}` : "—"} highlight />
               <StatCard label="Last Task" value={agent.lastTaskCostUSD ? `$${agent.lastTaskCostUSD}` : "—"} />
+              {agent.totalTokens != null && agent.totalTokens > 0 && (
+                <StatCard
+                  label="Total Tokens"
+                  value={
+                    agent.totalTokens >= 1000
+                      ? `${(agent.totalTokens / 1000).toFixed(1)}k`
+                      : String(agent.totalTokens)
+                  }
+                />
+              )}
             </motion.div>
 
             {/* Settings */}

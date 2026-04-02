@@ -3,6 +3,16 @@
 import { useState, useCallback } from "react";
 import { Copy, Check } from "lucide-react";
 
+function fallbackCopy(text: string, done: () => void) {
+  const el = document.createElement("textarea");
+  el.value = text;
+  el.style.cssText = "position:fixed;top:-9999px;left:-9999px;opacity:0";
+  document.body.appendChild(el);
+  el.select();
+  try { document.execCommand("copy"); done(); } catch {}
+  document.body.removeChild(el);
+}
+
 type CopyButtonProps = {
   text: string;
   size?: "sm" | "md";
@@ -15,10 +25,12 @@ export function CopyButton({ text, size = "sm", className = "" }: CopyButtonProp
   const handleCopy = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
-      navigator.clipboard.writeText(text).then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-      });
+      const done = () => { setCopied(true); setTimeout(() => setCopied(false), 1500); };
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+      } else {
+        fallbackCopy(text, done);
+      }
     },
     [text]
   );

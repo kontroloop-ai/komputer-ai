@@ -424,6 +424,7 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 			Skills:       agent.Spec.Skills,
 			Instructions: extractUserTask(agent.Spec.Instructions),
 			CreatedAt:    agent.CreationTimestamp.UTC().Format(time.RFC3339),
+			TotalTokens:  agent.Status.TotalTokens,
 		})
 	}
 }

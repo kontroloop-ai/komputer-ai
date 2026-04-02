@@ -14,6 +14,7 @@ import { Button } from "@/components/kit/button";
 import { Input } from "@/components/kit/input";
 import { Textarea } from "@/components/kit/textarea";
 import { Label } from "@/components/kit/label";
+import { NamespaceSelector } from "@/components/shared/namespace-selector";
 import { createSkill } from "@/lib/api";
 
 const NAME_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -108,16 +109,7 @@ export function CreateSkillModal({ open, onOpenChange, onCreated }: CreateSkillM
               />
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="skill-namespace">Namespace</Label>
-              <Input
-                id="skill-namespace"
-                placeholder="default"
-                value={namespace}
-                onChange={(e) => setNamespace(e.target.value)}
-                autoComplete="off"
-              />
-            </div>
+            <NamespaceSelector value={namespace} onChange={setNamespace} />
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="skill-description">Description</Label>

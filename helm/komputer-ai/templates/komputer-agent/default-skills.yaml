@@ -1,0 +1,95 @@
+{{- if .Values.defaultSkills.enabled }}
+apiVersion: komputer.komputer.ai/v1alpha1
+kind: KomputerSkill
+metadata:
+  name: memory-creation
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "komputer.labels" . | nindent 4 }}
+    komputer.ai/default: "true"
+spec:
+  description: "When and how to create memories — persistent knowledge that survives across tasks"
+  content: |
+    You can create memories using the create_memory tool. A memory is persistent knowledge injected into an agent's system prompt on every task.
+
+    ## When to Create a Memory
+
+    - You learned a fact, preference, or pattern that will be useful in future tasks
+    - The user explicitly asks you to remember something
+    - You discovered how a system, API, or codebase works and the knowledge isn't obvious
+    - You found credentials, endpoints, or configuration that will be needed again
+
+    ## When NOT to Create a Memory
+
+    - The information is only relevant to the current task
+    - The memory already exists (check before creating duplicates)
+    - It's ephemeral data (current prices, weather, timestamps)
+    - It's something easily found by searching again
+
+    ## How to Write Good Memories
+
+    - Keep it concise — a few sentences to a short paragraph
+    - Lead with the key fact, then add context
+    - Write it as a reference note, not a conversation recap
+    - Include why it matters, not just what it is
+
+    ## Naming
+
+    - Use lowercase with hyphens: `api-auth-flow`, `user-preferences`, `deploy-process`
+    - Be descriptive — the name should hint at the content
+
+    ## Attachment
+
+    - Use `attach: true` when the memory is relevant to your own future tasks
+    - Leave unattached if creating it for another agent or for general availability
+---
+apiVersion: komputer.komputer.ai/v1alpha1
+kind: KomputerSkill
+metadata:
+  name: skill-creation
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "komputer.labels" . | nindent 4 }}
+    komputer.ai/default: "true"
+spec:
+  description: "When and how to create skills — reusable workflows and instructions for agents"
+  content: |
+    You can create skills using the create_skill tool. A skill is a reusable set of instructions that any agent can invoke during a task — like a playbook.
+
+    ## When to Create a Skill
+
+    - You figured out a multi-step workflow that could be reused (deploy process, research pattern, report format)
+    - The user asks you to codify a process so other agents can follow it
+    - You developed a reliable approach to a recurring task type
+    - A task required domain-specific steps that aren't obvious
+
+    ## When NOT to Create a Skill
+
+    - The task is a one-off with no reuse potential
+    - It's a simple command or single action
+    - A similar skill already exists (check before creating duplicates)
+    - The instructions are too vague to be actionable
+
+    ## How to Write Good Skills
+
+    - Start with a clear trigger: "When asked to..." or "Use this skill when..."
+    - Write step-by-step instructions an agent can follow
+    - Include edge cases and what to do when things go wrong
+    - Keep it under 300 words — skills are injected as context and cost tokens
+    - Be specific and actionable, not generic
+
+    ## Description Field
+
+    - One sentence explaining when to use this skill
+    - This is what agents see when deciding whether to invoke it
+
+    ## Naming
+
+    - Use lowercase with hyphens: `deploy-to-staging`, `weekly-report`, `code-review`
+    - Name it after the task, not the tool
+
+    ## Attachment
+
+    - Use `attach: true` when the skill is relevant to your own future tasks
+    - Leave unattached if creating it for general use across agents
+{{- end }}

@@ -597,6 +597,26 @@ func (r *KomputerAgentReconciler) buildPod(ctx context.Context, agent *komputerv
 	}
 
 	// Inject skills as SKILL_* env vars (full markdown content).
+	// Start with default skills (labeled komputer.ai/default=true), then layer explicit skills on top.
+	injectedSkills := make(map[string]bool)
+	defaultSkills := &komputerv1alpha1.KomputerSkillList{}
+	if err := r.List(ctx, defaultSkills, client.MatchingLabels{"komputer.ai/default": "true"}); err == nil {
+		for i := range defaultSkills.Items {
+			skill := &defaultSkills.Items[i]
+			// Skip if the agent explicitly references this skill (explicit takes precedence).
+			if injectedSkills[skill.Name] {
+				continue
+			}
+			injectedSkills[skill.Name] = true
+			sanitized := strings.ToUpper(regexp.MustCompile(`[^A-Za-z0-9]`).ReplaceAllString(skill.Name, "_"))
+			md := fmt.Sprintf("---\nname: %s\ndescription: %s\n---\n\n%s", skill.Name, skill.Spec.Description, skill.Spec.Content)
+			envVars = append(envVars, corev1.EnvVar{
+				Name:  "SKILL_" + sanitized,
+				Value: md,
+			})
+		}
+	}
+
 	for _, skillRef := range agent.Spec.Skills {
 		skillNs := agent.Namespace
 		skillName := skillRef
@@ -604,11 +624,15 @@ func (r *KomputerAgentReconciler) buildPod(ctx context.Context, agent *komputerv
 			skillNs = parts[0]
 			skillName = parts[1]
 		}
+		if injectedSkills[skillName] {
+			continue
+		}
 		skill := &komputerv1alpha1.KomputerSkill{}
 		if err := r.Get(ctx, types.NamespacedName{Name: skillName, Namespace: skillNs}, skill); err != nil {
 			log.Info("Skill not found, skipping", "skill", skillRef)
 			continue
 		}
+		injectedSkills[skillName] = true
 		sanitized := strings.ToUpper(regexp.MustCompile(`[^A-Za-z0-9]`).ReplaceAllString(skillName, "_"))
 		md := fmt.Sprintf("---\nname: %s\ndescription: %s\n---\n\n%s", skillName, skill.Spec.Description, skill.Spec.Content)
 		envVars = append(envVars, corev1.EnvVar{

@@ -1047,6 +1047,7 @@ type SkillResponse struct {
 	Content        string   `json:"content"`
 	AttachedAgents int      `json:"attachedAgents"`
 	AgentNames     []string `json:"agentNames,omitempty"`
+	IsDefault      bool     `json:"isDefault"`
 	CreatedAt      string   `json:"createdAt"`
 }
 
@@ -1080,6 +1081,7 @@ func createSkill(k8s *K8sClient) gin.HandlerFunc {
 			Namespace:   skill.Namespace,
 			Description: skill.Spec.Description,
 			Content:     skill.Spec.Content,
+			IsDefault:   skill.Labels["komputer.ai/default"] == "true",
 			CreatedAt:   skill.CreationTimestamp.UTC().Format(time.RFC3339),
 		})
 	}
@@ -1101,6 +1103,7 @@ func getSkill(k8s *K8sClient) gin.HandlerFunc {
 			Content:        skill.Spec.Content,
 			AttachedAgents: skill.Status.AttachedAgents,
 			AgentNames:     skill.Status.AgentNames,
+			IsDefault:      skill.Labels["komputer.ai/default"] == "true",
 			CreatedAt:      skill.CreationTimestamp.UTC().Format(time.RFC3339),
 		})
 	}
@@ -1123,6 +1126,7 @@ func listSkills(k8s *K8sClient) gin.HandlerFunc {
 				Content:        s.Spec.Content,
 				AttachedAgents: s.Status.AttachedAgents,
 				AgentNames:     s.Status.AgentNames,
+				IsDefault:      s.Labels["komputer.ai/default"] == "true",
 				CreatedAt:      s.CreationTimestamp.UTC().Format(time.RFC3339),
 			})
 		}
@@ -1159,6 +1163,7 @@ func patchSkill(k8s *K8sClient) gin.HandlerFunc {
 			Content:        skill.Spec.Content,
 			AttachedAgents: skill.Status.AttachedAgents,
 			AgentNames:     skill.Status.AgentNames,
+			IsDefault:      skill.Labels["komputer.ai/default"] == "true",
 			CreatedAt:      skill.CreationTimestamp.UTC().Format(time.RFC3339),
 		})
 	}

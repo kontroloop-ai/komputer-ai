@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Trash2, Wand2, Users, Save, Check } from "lucide-react";
+import { Trash2, Wand2, Users, Save, Check, Lock } from "lucide-react";
 
 import { Button } from "@/components/kit/button";
 import { Badge } from "@/components/kit/badge";
@@ -91,6 +91,12 @@ export default function SkillDetailPage() {
       {/* Info bar */}
       <div className="flex flex-wrap items-center gap-3 border-b border-[var(--color-border)] bg-[var(--color-bg)] px-6 py-3">
         <Wand2 className="size-4 text-violet-400" />
+        {skill.isDefault && (
+          <Badge variant="outline" className="text-[10px] tracking-wider bg-amber-500/10 text-amber-400 border-amber-500/20 flex items-center gap-1">
+            <Lock className="size-2.5" />
+            built-in
+          </Badge>
+        )}
         <span className="text-sm text-[var(--color-text-muted)]">Namespace:</span>
         <Badge variant="outline" className="text-xs font-mono">{skill.namespace}</Badge>
         {skill.description && (

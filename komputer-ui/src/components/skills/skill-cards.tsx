@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Wand2, Trash2, Users } from "lucide-react";
+import { Wand2, Trash2, Users, Lock } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/kit/button";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -36,6 +36,12 @@ export function SkillCards({ skills, onDelete }: SkillCardsProps) {
                     <span className="text-[13px] font-semibold text-[var(--color-text)] truncate leading-tight flex-1 min-w-0">
                       {skill.name}
                     </span>
+                    {skill.isDefault && (
+                      <span className="inline-flex items-center gap-0.5 text-[9px] tracking-wider px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 shrink-0 leading-none">
+                        <Lock className="w-2 h-2 -mt-px" />
+                        built-in
+                      </span>
+                    )}
                     <div className="flex items-center gap-1.5 shrink-0">
                       <div onClick={(e) => { e.stopPropagation(); e.preventDefault(); }} className="opacity-0 group-hover:opacity-100 transition-opacity">
                         <ConfirmDialog

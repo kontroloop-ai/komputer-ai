@@ -163,6 +163,11 @@ config:
     streamPrefix: komputer-events
     db: 0
 
+# -- Default skills shipped with the chart (memory-creation, skill-creation).
+# These are auto-attached to every agent via the komputer.ai/default label.
+defaultSkills:
+  enabled: true
+
 # -- Default KomputerAgentClusterTemplate settings
 clusterTemplate:
   # -- PVC storage size for agent workspaces

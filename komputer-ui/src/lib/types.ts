@@ -151,6 +151,7 @@ export interface SkillResponse {
   content: string;
   attachedAgents: number;
   agentNames?: string[];
+  isDefault?: boolean;
   createdAt: string;
 }
 

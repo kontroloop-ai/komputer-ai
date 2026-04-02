@@ -164,14 +164,14 @@ function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
 function getToolIcon(name: string) {
   const lower = name.toLowerCase();
   if (lower === "skill")
-    return <Sparkles className="size-3.5" />;
+    return <Sparkles className="size-3.5 shrink-0" />;
   if (lower.includes("bash") || lower.includes("shell"))
-    return <Terminal className="size-3.5" />;
+    return <Terminal className="size-3.5 shrink-0" />;
   if (lower.includes("read") || lower.includes("write") || lower.includes("edit"))
-    return <FileText className="size-3.5" />;
+    return <FileText className="size-3.5 shrink-0" />;
   if (lower.includes("web") || lower.includes("fetch") || lower.includes("curl"))
-    return <Globe className="size-3.5" />;
-  return <Wrench className="size-3.5" />;
+    return <Globe className="size-3.5 shrink-0" />;
+  return <Wrench className="size-3.5 shrink-0" />;
 }
 
 // --- Sub-components ---

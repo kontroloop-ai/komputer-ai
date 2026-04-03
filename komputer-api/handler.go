@@ -139,12 +139,13 @@ type ScheduleListResponse struct {
 // --- Secret types ---
 
 type SecretResponse struct {
-	Name      string   `json:"name"`
-	Namespace string   `json:"namespace"`
-	Keys      []string `json:"keys"`
-	Managed   bool     `json:"managed"`
-	AgentName string   `json:"agentName,omitempty"`
-	CreatedAt string   `json:"createdAt"`
+	Name           string   `json:"name"`
+	Namespace      string   `json:"namespace"`
+	Keys           []string `json:"keys"`
+	Managed        bool     `json:"managed"`
+	AgentName      string   `json:"agentName,omitempty"`
+	AttachedAgents int      `json:"attachedAgents"`
+	CreatedAt      string   `json:"createdAt"`
 }
 
 type SecretListResponse struct {
@@ -1274,6 +1275,14 @@ func listSecrets(k8s *K8sClient) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list secrets: " + err.Error()})
 			return
 		}
+		// Count how many agents reference each secret.
+		secretUsage := make(map[string]int)
+		agents, _ := k8s.ListAgents(c.Request.Context(), "")
+		for _, a := range agents {
+			for _, s := range a.Spec.Secrets {
+				secretUsage[a.Namespace+"/"+s]++
+			}
+		}
 		resp := make([]SecretResponse, 0, len(secrets))
 		for _, s := range secrets {
 			keys := make([]string, 0, len(s.Data))
@@ -1282,12 +1291,13 @@ func listSecrets(k8s *K8sClient) gin.HandlerFunc {
 			}
 			sort.Strings(keys)
 			resp = append(resp, SecretResponse{
-				Name:      s.Name,
-				Namespace: s.Namespace,
-				Keys:      keys,
-				Managed:   s.Labels["komputer.ai/managed-by"] == "komputer-ai",
-				AgentName: s.Labels["komputer.ai/agent-name"],
-				CreatedAt: s.CreationTimestamp.UTC().Format(time.RFC3339),
+				Name:           s.Name,
+				Namespace:      s.Namespace,
+				Keys:           keys,
+				Managed:        s.Labels["komputer.ai/managed-by"] == "komputer-ai",
+				AgentName:      s.Labels["komputer.ai/agent-name"],
+				AttachedAgents: secretUsage[s.Namespace+"/"+s.Name],
+				CreatedAt:      s.CreationTimestamp.UTC().Format(time.RFC3339),
 			})
 		}
 		c.JSON(http.StatusOK, SecretListResponse{Secrets: resp})

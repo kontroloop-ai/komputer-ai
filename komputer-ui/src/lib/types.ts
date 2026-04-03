@@ -179,6 +179,7 @@ export interface SecretResponse {
   keys: string[];
   managed: boolean;
   agentName?: string;
+  attachedAgents: number;
   createdAt: string;
 }
 

@@ -1381,9 +1381,10 @@ type PatchAgentRequest struct {
 	Lifecycle    *string           `json:"lifecycle,omitempty"`
 	Instructions *string           `json:"instructions,omitempty"`
 	TemplateRef  *string           `json:"templateRef,omitempty"`
-	Secrets      map[string]string `json:"secrets,omitempty"`  // key-value pairs to set/update
-	Memories     *[]string         `json:"memories,omitempty"` // memory names to attach
-	Skills       *[]string         `json:"skills,omitempty"`   // skill names to attach
+	Secrets      map[string]string `json:"secrets,omitempty"`    // key-value pairs to set/update
+	SecretRefs   *[]string         `json:"secretRefs,omitempty"` // full replacement list of K8s secret names
+	Memories     *[]string         `json:"memories,omitempty"`   // memory names to attach
+	Skills       *[]string         `json:"skills,omitempty"`     // skill names to attach
 }
 
 func patchAgent(k8s *K8sClient) gin.HandlerFunc {
@@ -1396,7 +1397,7 @@ func patchAgent(k8s *K8sClient) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: " + err.Error()})
 			return
 		}
-		if req.Model == nil && req.Lifecycle == nil && req.Instructions == nil && req.TemplateRef == nil && len(req.Secrets) == 0 && req.Memories == nil && req.Skills == nil {
+		if req.Model == nil && req.Lifecycle == nil && req.Instructions == nil && req.TemplateRef == nil && len(req.Secrets) == 0 && req.SecretRefs == nil && req.Memories == nil && req.Skills == nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "no fields to update"})
 			return
 		}
@@ -1433,7 +1434,12 @@ func patchAgent(k8s *K8sClient) gin.HandlerFunc {
 			}
 		}
 
-		// 1c. Update memories if provided.
+		// 1c. Replace secret refs list if provided (used for removal).
+		if req.SecretRefs != nil {
+			k8s.PatchAgentSecretsList(c.Request.Context(), ns, name, *req.SecretRefs)
+		}
+
+		// 1d. Update memories if provided.
 		if req.Memories != nil {
 			k8s.PatchAgentMemoriesList(c.Request.Context(), ns, name, *req.Memories)
 		}

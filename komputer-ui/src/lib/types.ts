@@ -115,6 +115,7 @@ export interface PatchAgentRequest {
   lifecycle?: string;
   instructions?: string;
   templateRef?: string;
+  secretRefs?: string[];
   memories?: string[];
   skills?: string[];
 }

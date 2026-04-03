@@ -100,7 +100,7 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
         ref: s.namespace === (namespace || "default") ? s.name : `${s.namespace}/${s.name}`,
       }))))
       .catch(() => setAvailableSkills([]));
-    listSecrets(namespace || undefined, showAllSecrets)
+    listSecrets(undefined, showAllSecrets)
       .then((res) => setAvailableSecrets((res.secrets ?? []).map((s) => ({ name: s.name, namespace: s.namespace }))))
       .catch(() => setAvailableSecrets([]));
   }, [open, namespace, showAllSecrets]);
@@ -291,7 +291,7 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
               open={createSecretOpen}
               onOpenChange={setCreateSecretOpen}
               onCreated={() => {
-                listSecrets(namespace || undefined, showAllSecrets)
+                listSecrets(undefined, showAllSecrets)
                   .then((res) => setAvailableSecrets((res.secrets ?? []).map((s) => ({ name: s.name, namespace: s.namespace }))))
                   .catch(() => {});
               }}

@@ -487,7 +487,7 @@ function SettingsCard({ agent, agentNs, onSaved }: {
         ref: s.namespace === (agentNs || "default") ? s.name : `${s.namespace}/${s.name}`,
       })));
     }).catch(() => {});
-    listSecrets(agentNs || undefined, showAllSecrets).then((res) => {
+    listSecrets(undefined, showAllSecrets).then((res) => {
       setAvailableSecrets((res.secrets ?? []).map((s) => ({ name: s.name, namespace: s.namespace })));
     }).catch(() => {});
   }, [agentNs, showAllSecrets]);
@@ -617,7 +617,7 @@ function SettingsCard({ agent, agentNs, onSaved }: {
           open={createSecretOpen}
           onOpenChange={setCreateSecretOpen}
           onCreated={() => {
-            listSecrets(agentNs || undefined, showAllSecrets).then((res) => {
+            listSecrets(undefined, showAllSecrets).then((res) => {
               setAvailableSecrets((res.secrets ?? []).map((s) => ({ name: s.name, namespace: s.namespace })));
             }).catch(() => {});
           }}

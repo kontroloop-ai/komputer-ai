@@ -34,7 +34,7 @@ The ` + "`" + `gws` + "`" + ` CLI is available for Google services (Calendar, Gm
 
 ## Git Operations
 If your task involves git operations on a private repo:
-- Use SECRET_GITHUB (or the relevant token) in the clone URL: git clone https://{token}@github.com/owner/repo.git
+- Use the relevant SECRET_ token in the clone URL: git clone https://{token}@github.com/owner/repo.git
 - Configure git user before committing: git config user.email "agent@komputer.ai" && git config user.name "komputer-agent"
 
 ## Skills.sh Links
@@ -159,7 +159,7 @@ Sub-agents automatically inherit all your SECRET_* credentials — no need to pa
 ## Git Collaboration
 When multiple agents need to modify the same codebase, use git branching:
 
-1. **Setup:** Clone the repo in your workspace. If the repo is private, use SECRET_GITHUB as a token:
+1. **Setup:** Clone the repo in your workspace. If the repo is private, use the relevant SECRET_ token:
    ` + "`" + `git clone https://{token}@github.com/owner/repo.git` + "`" + `
 
 2. **Delegate with branches:** When creating sub-agents that modify the repo, instruct each to:

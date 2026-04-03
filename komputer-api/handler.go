@@ -23,7 +23,6 @@ type CreateAgentRequest struct {
 	TemplateRef  string            `json:"templateRef"`
 	Role         string            `json:"role"`      // "manager" or "" (default manager)
 	Namespace    string            `json:"namespace"` // optional, defaults to server default
-	Secrets      map[string]string `json:"secrets"`    // optional key-value secrets
 	SecretRefs   []string          `json:"secretRefs"` // names of existing K8s Secrets to attach
 	Memories     []string          `json:"memories"`   // optional KomputerMemory names to attach
 	Skills       []string          `json:"skills"`     // optional KomputerSkill names to attach
@@ -104,11 +103,11 @@ type CreateScheduleRequest struct {
 }
 
 type CreateScheduleAgentSpec struct {
-	Model       string            `json:"model"`
-	Lifecycle   string            `json:"lifecycle"`
-	Role        string            `json:"role"`
-	TemplateRef string            `json:"templateRef"`
-	Secrets     map[string]string `json:"secrets"`
+	Model       string   `json:"model"`
+	Lifecycle   string   `json:"lifecycle"`
+	Role        string   `json:"role"`
+	TemplateRef string   `json:"templateRef"`
+	SecretRefs  []string `json:"secretRefs"`
 }
 
 type ScheduleResponse struct {
@@ -416,18 +415,7 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 			return
 		}
 
-		var secretNames []string
-		if len(req.Secrets) > 0 {
-			secretName, err := k8s.CreateAgentSecrets(c.Request.Context(), ns, req.Name, req.Secrets)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create secrets: " + err.Error()})
-				return
-			}
-			secretNames = []string{secretName}
-		}
-		secretNames = append(secretNames, req.SecretRefs...)
-
-		agent, err := k8s.CreateAgent(c.Request.Context(), ns, req.Name, buildSystemPrompt(req.Memories)+"\n\n"+instructions, req.Model, req.TemplateRef, role, secretNames, req.Memories, req.Skills, req.Lifecycle, req.OfficeManager)
+		agent, err := k8s.CreateAgent(c.Request.Context(), ns, req.Name, buildSystemPrompt(req.Memories)+"\n\n"+instructions, req.Model, req.TemplateRef, role, req.SecretRefs, req.Memories, req.Skills, req.Lifecycle, req.OfficeManager)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create agent: " + err.Error()})
 			return
@@ -1381,7 +1369,6 @@ type PatchAgentRequest struct {
 	Lifecycle    *string           `json:"lifecycle,omitempty"`
 	Instructions *string           `json:"instructions,omitempty"`
 	TemplateRef  *string           `json:"templateRef,omitempty"`
-	Secrets      map[string]string `json:"secrets,omitempty"`    // key-value pairs to set/update
 	SecretRefs   *[]string         `json:"secretRefs,omitempty"` // full replacement list of K8s secret names
 	Memories     *[]string         `json:"memories,omitempty"`   // memory names to attach
 	Skills       *[]string         `json:"skills,omitempty"`     // skill names to attach
@@ -1397,7 +1384,7 @@ func patchAgent(k8s *K8sClient) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: " + err.Error()})
 			return
 		}
-		if req.Model == nil && req.Lifecycle == nil && req.Instructions == nil && req.TemplateRef == nil && len(req.Secrets) == 0 && req.SecretRefs == nil && req.Memories == nil && req.Skills == nil {
+		if req.Model == nil && req.Lifecycle == nil && req.Instructions == nil && req.TemplateRef == nil && req.SecretRefs == nil && req.Memories == nil && req.Skills == nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "no fields to update"})
 			return
 		}
@@ -1411,30 +1398,7 @@ func patchAgent(k8s *K8sClient) gin.HandlerFunc {
 		// 1a. If model changed and pod is running, fetch context window via the agent (it has the API key).
 		// This is handled below in step 2 where we forward config to the pod and read the response.
 
-		// 1b. Update secrets if provided.
-		if len(req.Secrets) > 0 {
-			secretName, err := k8s.CreateAgentSecrets(c.Request.Context(), ns, name, req.Secrets)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update secrets: " + err.Error()})
-				return
-			}
-			// Ensure the secret name is on the CR's spec.secrets list.
-			agent, err := k8s.GetAgent(c.Request.Context(), ns, name)
-			if err == nil {
-				hasSecret := false
-				for _, s := range agent.Spec.Secrets {
-					if s == secretName {
-						hasSecret = true
-						break
-					}
-				}
-				if !hasSecret {
-					k8s.PatchAgentSecretsList(c.Request.Context(), ns, name, append(agent.Spec.Secrets, secretName))
-				}
-			}
-		}
-
-		// 1c. Replace secret refs list if provided (used for removal).
+		// 1b. Replace secret refs list if provided.
 		if req.SecretRefs != nil {
 			k8s.PatchAgentSecretsList(c.Request.Context(), ns, name, *req.SecretRefs)
 		}
@@ -1470,26 +1434,7 @@ func patchAgent(k8s *K8sClient) gin.HandlerFunc {
 		if err == nil && agent.Status.PodName != "" && agent.Status.Phase == "Running" {
 			// Build config payload. If secretRefs changed, resolve all secrets to env-var key-value
 			// pairs so the agent can apply the complete set (and remove any stale SECRET_* vars).
-			type agentConfigPayload struct {
-				Model        *string            `json:"model,omitempty"`
-				Lifecycle    *string            `json:"lifecycle,omitempty"`
-				Instructions *string            `json:"instructions,omitempty"`
-				TemplateRef  *string            `json:"templateRef,omitempty"`
-				Secrets      map[string]string  `json:"secrets"`
-			}
-			payload := agentConfigPayload{
-				Model:        req.Model,
-				Lifecycle:    req.Lifecycle,
-				Instructions: req.Instructions,
-				TemplateRef:  req.TemplateRef,
-			}
-			if req.SecretRefs != nil {
-				// Full replacement: resolve all remaining secrets so the agent can remove stale ones.
-				payload.Secrets = k8s.ResolveSecretEnvVars(c.Request.Context(), ns, *req.SecretRefs)
-			} else if len(req.Secrets) > 0 {
-				payload.Secrets = req.Secrets
-			}
-			configPayload, _ := json.Marshal(payload)
+			configPayload, _ := json.Marshal(req)
 			podIP, ipErr := k8s.GetAgentPodIP(c.Request.Context(), ns, agent.Status.PodName)
 			if ipErr == nil {
 				if req.Model != nil && *req.Model != "" {

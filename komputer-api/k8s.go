@@ -139,45 +139,6 @@ func (k *K8sClient) WakeAgent(ctx context.Context, ns, name, instructions, model
 // CreateAgentSecrets creates a K8s Secret with agent-specific secrets.
 // Keys are prefixed with SECRET_ (e.g. "GITHUB" becomes "SECRET_GITHUB").
 // Returns the secret name.
-func (k *K8sClient) CreateAgentSecrets(ctx context.Context, ns, agentName string, secrets map[string]string) (string, error) {
-	secretName := agentName + "-secrets"
-	data := make(map[string][]byte, len(secrets))
-	sanitize := regexp.MustCompile(`[^A-Za-z0-9]`)
-	for key, value := range secrets {
-		safe := strings.ToUpper(sanitize.ReplaceAllString(key, "_"))
-		data[safe] = []byte(value)
-	}
-
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName,
-			Namespace: ns,
-			Labels: map[string]string{
-				"komputer.ai/managed-by":  "komputer-ai",
-				"komputer.ai/agent-name": agentName,
-			},
-		},
-		Data: data,
-	}
-
-	if err := k.client.Create(ctx, secret); err != nil {
-		if errors.IsAlreadyExists(err) {
-			// Update existing secret.
-			existing := &corev1.Secret{}
-			if getErr := k.client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: ns}, existing); getErr != nil {
-				return "", fmt.Errorf("failed to get existing secret: %w", getErr)
-			}
-			existing.Data = data
-			if updateErr := k.client.Update(ctx, existing); updateErr != nil {
-				return "", fmt.Errorf("failed to update secret: %w", updateErr)
-			}
-			return secretName, nil
-		}
-		return "", fmt.Errorf("failed to create secret: %w", err)
-	}
-	return secretName, nil
-}
-
 // GetSecretKeys returns the key names from a K8s Secret (not the values).
 func (k *K8sClient) GetSecretKeys(ctx context.Context, ns, secretName string) ([]string, error) {
 	secret := &corev1.Secret{}
@@ -234,7 +195,7 @@ func (k *K8sClient) CreateManagedSecret(ctx context.Context, ns, name string, da
 	secretData := make(map[string][]byte, len(data))
 	for key, value := range data {
 		safe := strings.ToUpper(sanitize.ReplaceAllString(key, "_"))
-		secretData["SECRET_"+safe] = []byte(value)
+		secretData[safe] = []byte(value)
 	}
 
 	secret := &corev1.Secret{
@@ -567,13 +528,8 @@ func (k *K8sClient) CreateSchedule(ctx context.Context, ns string, req *CreateSc
 			Role:        req.Agent.Role,
 			TemplateRef: req.Agent.TemplateRef,
 		}
-		// Create K8s Secrets from key-value pairs and store secret names on agent spec
-		if len(req.Agent.Secrets) > 0 {
-			secretName, err := k.CreateAgentSecrets(ctx, ns, req.Name+"-agent", req.Agent.Secrets)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create secrets: %w", err)
-			}
-			agentSpec.Secrets = []string{secretName}
+		if len(req.Agent.SecretRefs) > 0 {
+			agentSpec.Secrets = req.Agent.SecretRefs
 		}
 		schedule.Spec.Agent = agentSpec
 	}

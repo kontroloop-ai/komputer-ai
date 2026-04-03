@@ -52,7 +52,6 @@ async def _request(method: str, path: str, timeout: int = 10, **kwargs) -> dict:
             "lifecycle": {"type": "string", "enum": ["", "Sleep", "AutoDelete"], "description": "Post-task behavior. Empty=pod stays running, 'Sleep'=pod deleted/PVC kept, 'AutoDelete'=everything deleted."},
             "model": {"type": "string", "description": "Claude model override (optional)."},
             "templateRef": {"type": "string", "description": "Pod template name (optional, defaults to 'default')."},
-            "secrets": {"type": "object", "description": "Key-value secrets (e.g. {\"GITHUB\": \"ghp_xxx\"}). Parent secrets are auto-forwarded.", "additionalProperties": {"type": "string"}},
         },
         "required": ["name", "instructions"],
     },
@@ -78,15 +77,7 @@ async def create_agent(args):
     if manager_name:
         payload["officeManager"] = manager_name
 
-    # Auto-forward all SECRET_* env vars from the manager to the sub-agent.
-    inherited_secrets = {}
-    for key, value in os.environ.items():
-        if key.startswith("SECRET_"):
-            inherited_secrets[key[7:]] = value
-    if args.get("secrets"):
-        inherited_secrets.update(args["secrets"])
-    if inherited_secrets:
-        payload["secrets"] = inherited_secrets
+    # Secrets are inherited automatically by the operator from the office manager.
 
     return await _request("POST", "/api/v1/agents", timeout=30, json=payload)
 
@@ -137,13 +128,7 @@ async def schedule_agent(args):
         }
         if args.get("model"):
             agent_spec["model"] = args["model"]
-        # Auto-forward all SECRET_* env vars from the manager to the scheduled agent.
-        inherited_secrets = {}
-        for key, value in os.environ.items():
-            if key.startswith("SECRET_"):
-                inherited_secrets[key[7:]] = value
-        if inherited_secrets:
-            agent_spec["secrets"] = inherited_secrets
+        # Secrets are inherited automatically by the operator from the office manager.
         payload["agent"] = agent_spec
 
     # Instructions live at top level on the schedule.

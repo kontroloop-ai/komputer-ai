@@ -136,20 +136,6 @@ func (r *KomputerAgentReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
-	// 5. Set owner references on agent secrets so they're garbage-collected on deletion
-	for _, secretName := range agent.Spec.Secrets {
-		secret := &corev1.Secret{}
-		if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: agent.Namespace}, secret); err != nil {
-			continue // secret may not exist yet
-		}
-		if len(secret.OwnerReferences) == 0 {
-			if err := ctrl.SetControllerReference(agent, secret, r.Scheme); err == nil {
-				if err := r.Update(ctx, secret); err != nil {
-					log.Error(err, "Failed to set owner reference on secret", "secret", secretName)
-				}
-			}
-		}
-	}
 
 	// 6. Ensure Pod exists
 	podName := agent.Name + "-pod"
@@ -578,27 +564,20 @@ func (r *KomputerAgentReconciler) buildPod(ctx context.Context, agent *komputerv
 			corev1.EnvVar{Name: "KOMPUTER_API_URL", Value: config.Spec.APIURL},
 		)
 	}
-	// Inject env vars from agent secrets.
-	// - Komputer-managed bundle secrets (labeled komputer.ai/managed-by=komputer-ai): SECRET_<KEY>
-	// - User-named secrets: SECRET_<SECRETNAME>_<KEY>
+	// Inject env vars from agent secrets as SECRET_<SECRETNAME>_<KEY>.
+	injectedSecrets := make(map[string]bool)
 	for _, secretName := range agent.Spec.Secrets {
+		injectedSecrets[secretName] = true
 		secret := &corev1.Secret{}
 		if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: agent.Namespace}, secret); err != nil {
 			log.Error(err, "Failed to get agent secret", "secret", secretName)
 			continue
 		}
-		managed := secret.Labels["komputer.ai/managed-by"] == "komputer-ai"
 		sanitizedName := strings.ToUpper(strings.NewReplacer("-", "_", ".", "_").Replace(secretName))
 		for key := range secret.Data {
 			sanitizedKey := strings.ToUpper(strings.NewReplacer("-", "_", ".", "_").Replace(key))
-			var envName string
-			if managed {
-				envName = "SECRET_" + sanitizedKey
-			} else {
-				envName = "SECRET_" + sanitizedName + "_" + sanitizedKey
-			}
 			envVars = append(envVars, corev1.EnvVar{
-				Name: envName,
+				Name: "SECRET_" + sanitizedName + "_" + sanitizedKey,
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
 						LocalObjectReference: corev1.LocalObjectReference{Name: secretName},
@@ -606,6 +585,34 @@ func (r *KomputerAgentReconciler) buildPod(ctx context.Context, agent *komputerv
 					},
 				},
 			})
+		}
+	}
+	// Inherit secrets from office manager (sub-agents get the same secrets as their manager).
+	if agent.Spec.OfficeManager != "" {
+		manager := &komputerv1alpha1.KomputerAgent{}
+		if err := r.Get(ctx, types.NamespacedName{Name: agent.Spec.OfficeManager, Namespace: agent.Namespace}, manager); err == nil {
+			for _, secretName := range manager.Spec.Secrets {
+				if injectedSecrets[secretName] {
+					continue
+				}
+				secret := &corev1.Secret{}
+				if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: agent.Namespace}, secret); err != nil {
+					continue
+				}
+				sanitizedName := strings.ToUpper(strings.NewReplacer("-", "_", ".", "_").Replace(secretName))
+				for key := range secret.Data {
+					sanitizedKey := strings.ToUpper(strings.NewReplacer("-", "_", ".", "_").Replace(key))
+					envVars = append(envVars, corev1.EnvVar{
+						Name: "SECRET_" + sanitizedName + "_" + sanitizedKey,
+						ValueFrom: &corev1.EnvVarSource{
+							SecretKeyRef: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{Name: secretName},
+								Key:                  key,
+							},
+						},
+					})
+				}
+			}
 		}
 	}
 

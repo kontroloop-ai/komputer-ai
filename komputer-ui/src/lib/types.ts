@@ -180,6 +180,7 @@ export interface SecretResponse {
   managed: boolean;
   agentName?: string;
   attachedAgents: number;
+  agentNames?: string[];
   createdAt: string;
 }
 

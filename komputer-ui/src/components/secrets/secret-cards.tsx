@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { KeyRound, Trash2 } from "lucide-react";
+import { KeyRound, Trash2, Users } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/kit/button";
 import {
@@ -86,9 +86,10 @@ export function SecretCards({ secrets, onDelete }: SecretCardsProps) {
 
                   <div className="mt-auto pt-3 space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">namespace</span>
-                      <span className="text-[11px] text-[var(--color-text-secondary)] truncate max-w-[60%] text-right">
-                        {secret.namespace}
+                      <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">agents</span>
+                      <span className="text-[11px] text-[var(--color-text-secondary)] flex items-center gap-1">
+                        <Users className="w-2.5 h-2.5" />
+                        {secret.attachedAgents}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
@@ -131,6 +132,23 @@ export function SecretCards({ secrets, onDelete }: SecretCardsProps) {
                   <p className="text-xs text-[var(--color-text-muted)]">No keys</p>
                 )}
               </div>
+              {inspecting.agentNames && inspecting.agentNames.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-1.5">Used by agents</p>
+                  <div className="space-y-1">
+                    {inspecting.agentNames.map((name) => (
+                      <Link
+                        key={name}
+                        href={`/agents/${name}?namespace=${inspecting.namespace}`}
+                        className="flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--color-bg)] px-3 py-2 text-xs text-[var(--color-brand-blue-light)] hover:underline"
+                        onClick={() => setInspecting(null)}
+                      >
+                        {name}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </DialogContent>

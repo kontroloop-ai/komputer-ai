@@ -145,6 +145,7 @@ type SecretResponse struct {
 	Managed        bool     `json:"managed"`
 	AgentName      string   `json:"agentName,omitempty"`
 	AttachedAgents int      `json:"attachedAgents"`
+	AgentNames     []string `json:"agentNames,omitempty"`
 	CreatedAt      string   `json:"createdAt"`
 }
 
@@ -1275,12 +1276,13 @@ func listSecrets(k8s *K8sClient) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list secrets: " + err.Error()})
 			return
 		}
-		// Count how many agents reference each secret.
-		secretUsage := make(map[string]int)
+		// Count how many agents reference each secret and collect their names.
+		secretUsage := make(map[string][]string)
 		agents, _ := k8s.ListAgents(c.Request.Context(), "")
 		for _, a := range agents {
 			for _, s := range a.Spec.Secrets {
-				secretUsage[a.Namespace+"/"+s]++
+				key := a.Namespace + "/" + s
+				secretUsage[key] = append(secretUsage[key], a.Name)
 			}
 		}
 		resp := make([]SecretResponse, 0, len(secrets))
@@ -1296,7 +1298,8 @@ func listSecrets(k8s *K8sClient) gin.HandlerFunc {
 				Keys:           keys,
 				Managed:        s.Labels["komputer.ai/managed-by"] == "komputer-ai",
 				AgentName:      s.Labels["komputer.ai/agent-name"],
-				AttachedAgents: secretUsage[s.Namespace+"/"+s.Name],
+				AttachedAgents: len(secretUsage[s.Namespace+"/"+s.Name]),
+				AgentNames:     secretUsage[s.Namespace+"/"+s.Name],
 				CreatedAt:      s.CreationTimestamp.UTC().Format(time.RFC3339),
 			})
 		}

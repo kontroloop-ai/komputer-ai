@@ -160,7 +160,7 @@ func listConnectorTools(k8s *K8sClient) gin.HandlerFunc {
 			c.JSON(http.StatusNotFound, gin.H{"error": "connector not found"})
 			return
 		}
-		if conn.Spec.URL == "" {
+		if conn.Spec.URL == "" || strings.HasPrefix(conn.Spec.URL, "oauth://") {
 			c.JSON(http.StatusOK, gin.H{"tools": []interface{}{}})
 			return
 		}

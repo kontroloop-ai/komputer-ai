@@ -765,26 +765,59 @@ func main() {
 		Short:   "Delete one or more agents and all their resources",
 		Args:    cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
+			jsonMode, _ := cmd.Flags().GetBool("json")
 			ep := resolveEndpoint(cmd)
 			hasError := false
+			type deleteResult struct {
+				Name    string `json:"name"`
+				Deleted bool   `json:"deleted"`
+				Error   string `json:"error,omitempty"`
+			}
+			var results []deleteResult
 			for _, name := range args {
 				data, status, err := apiRequest("DELETE", fmt.Sprintf("%s/api/v1/agents/%s%s", ep, url.PathEscape(name), nsQuery(cmd)), nil)
 				if err != nil {
+					if jsonMode {
+						results = append(results, deleteResult{Name: name, Deleted: false, Error: err.Error()})
+						hasError = true
+						continue
+					}
 					fmt.Println(errorStyle.Render(fmt.Sprintf("Failed to delete %q: %s", name, err.Error())))
 					hasError = true
 					continue
 				}
 				if status == 404 {
+					if jsonMode {
+						results = append(results, deleteResult{Name: name, Deleted: false, Error: "not found"})
+						hasError = true
+						continue
+					}
 					fmt.Println(errorStyle.Render(fmt.Sprintf("Agent %q not found", name)))
 					hasError = true
 					continue
 				}
 				if status != 200 {
+					if jsonMode {
+						results = append(results, deleteResult{Name: name, Deleted: false, Error: fmt.Sprintf("API error (%d): %s", status, string(data))})
+						hasError = true
+						continue
+					}
 					fmt.Println(errorStyle.Render(fmt.Sprintf("Failed to delete %q (%d): %s", name, status, string(data))))
 					hasError = true
 					continue
 				}
+				if jsonMode {
+					results = append(results, deleteResult{Name: name, Deleted: true})
+					continue
+				}
 				fmt.Println(successStyle.Render(fmt.Sprintf("✔ Agent %q deleted", name)))
+			}
+			if jsonMode {
+				printJSON(results)
+				if hasError {
+					os.Exit(1)
+				}
+				return
 			}
 			if hasError {
 				os.Exit(1)

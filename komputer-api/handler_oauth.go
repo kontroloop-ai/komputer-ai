@@ -26,25 +26,23 @@ type oauthProvider struct {
 	TokenURL    string
 	Scopes      []string
 	ExtraParams map[string]string
-	MCPURL      string // the actual MCP server URL to use for this provider
 }
 
 // oauthProviderRegistry maps service names to their OAuth provider config.
 // Credentials are NOT stored here — they come from each connector's secret.
+// MCP server URLs come from the UI connector templates, not here.
 var oauthProviderRegistry = map[string]*oauthProvider{
 	"google": {
 		AuthURL:     "https://accounts.google.com/o/oauth2/v2/auth",
 		TokenURL:    "https://oauth2.googleapis.com/token",
 		Scopes:      []string{"https://www.googleapis.com/auth/gmail.modify", "https://www.googleapis.com/auth/calendar"},
 		ExtraParams: map[string]string{"access_type": "offline", "prompt": "consent"},
-		MCPURL:      "https://mcp.google.com/mcp",
 	},
 	"notion": {
 		AuthURL:     "https://api.notion.com/v1/oauth/authorize",
 		TokenURL:    "https://api.notion.com/v1/oauth/token",
 		Scopes:      nil,
 		ExtraParams: map[string]string{"owner": "user"},
-		MCPURL:      "https://mcp.notion.com/mcp",
 	},
 }
 
@@ -232,12 +230,7 @@ func oauthCallback(k8s *K8sClient) gin.HandlerFunc {
 		// Now create the connector CR with auth pointing at the secret.
 		sn := secretName
 		sk := secretKey
-		// Use the provider's real MCP URL instead of the placeholder.
-		connURL := flow.URL
-		if provider.MCPURL != "" {
-			connURL = provider.MCPURL
-		}
-		conn, err := k8s.CreateConnector(ctx, flow.Namespace, flow.ConnectorName, flow.Service, flow.DisplayName, connURL, "remote", "oauth", &sn, &sk)
+		conn, err := k8s.CreateConnector(ctx, flow.Namespace, flow.ConnectorName, flow.Service, flow.DisplayName, flow.URL, "remote", "oauth", &sn, &sk)
 		if err != nil {
 			log.Printf("OAuth: failed to create connector %s/%s: %v", flow.Namespace, flow.ConnectorName, err)
 			c.Data(http.StatusInternalServerError, "text/html; charset=utf-8", []byte(oauthErrorHTML("Failed to create connector: "+err.Error())))

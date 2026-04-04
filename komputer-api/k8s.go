@@ -942,7 +942,7 @@ func (k *K8sClient) PatchSkill(ctx context.Context, ns, name string, description
 
 // --- Connector CRUD ---
 
-func (k *K8sClient) CreateConnector(ctx context.Context, ns, name, service, displayName, url, connType string, authSecretName, authSecretKey *string) (*komputerv1alpha1.KomputerConnector, error) {
+func (k *K8sClient) CreateConnector(ctx context.Context, ns, name, service, displayName, url, connType, authType string, authSecretName, authSecretKey *string) (*komputerv1alpha1.KomputerConnector, error) {
 	conn := &komputerv1alpha1.KomputerConnector{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -953,6 +953,7 @@ func (k *K8sClient) CreateConnector(ctx context.Context, ns, name, service, disp
 		},
 		Spec: komputerv1alpha1.KomputerConnectorSpec{
 			Type:        connType,
+			AuthType:    authType,
 			Service:     service,
 			DisplayName: displayName,
 			URL:         url,

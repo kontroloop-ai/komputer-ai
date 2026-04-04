@@ -174,6 +174,20 @@ export const deleteConnector = (name: string, ns?: string) =>
 export const getConnectorTools = (name: string, ns?: string) =>
   request<{ tools: { name: string; description: string }[] }>(`/connectors/${name}/tools${ns ? `?namespace=${ns}` : ''}`);
 
+export const getOAuthAuthorizeUrl = (data: {
+  service: string;
+  connector_name: string;
+  displayName?: string;
+  url?: string;
+  oauthClientId: string;
+  oauthClientSecret: string;
+  namespace?: string;
+}) =>
+  request<{ authorizeUrl: string }>('/oauth/authorize', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+
 // Templates
 export const listTemplates = (ns?: string) =>
   request<TemplateListResponse>(`/templates${ns ? `?namespace=${ns}` : ''}`);

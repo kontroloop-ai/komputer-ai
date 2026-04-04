@@ -14,14 +14,17 @@ import (
 )
 
 type CreateConnectorRequest struct {
-	Name           string  `json:"name" binding:"required"`
-	Service        string  `json:"service" binding:"required"`
-	DisplayName    string  `json:"displayName"`
-	URL            string  `json:"url" binding:"required"`
-	Type           string  `json:"type"`
-	AuthSecretName *string `json:"authSecretName,omitempty"`
-	AuthSecretKey  *string `json:"authSecretKey,omitempty"`
-	Namespace      string  `json:"namespace"`
+	Name              string  `json:"name" binding:"required"`
+	Service           string  `json:"service" binding:"required"`
+	DisplayName       string  `json:"displayName"`
+	URL               string  `json:"url" binding:"required"`
+	Type              string  `json:"type"`
+	AuthType          string  `json:"authType,omitempty"`          // "token" or "oauth"
+	AuthSecretName    *string `json:"authSecretName,omitempty"`
+	AuthSecretKey     *string `json:"authSecretKey,omitempty"`
+	OAuthClientID     string  `json:"oauthClientId,omitempty"`     // OAuth client ID (stored in secret)
+	OAuthClientSecret string  `json:"oauthClientSecret,omitempty"` // OAuth client secret (stored in secret)
+	Namespace         string  `json:"namespace"`
 }
 
 type ConnectorResponse struct {
@@ -31,6 +34,8 @@ type ConnectorResponse struct {
 	DisplayName    string   `json:"displayName"`
 	URL            string   `json:"url"`
 	Type           string   `json:"type"`
+	AuthType       string   `json:"authType,omitempty"`
+	OAuthStatus    string   `json:"oauthStatus,omitempty"` // "pending", "connected", ""
 	AuthSecretName string   `json:"authSecretName,omitempty"`
 	AuthSecretKey  string   `json:"authSecretKey,omitempty"`
 	AttachedAgents int      `json:"attachedAgents"`
@@ -69,7 +74,7 @@ func createConnector(k8s *K8sClient) gin.HandlerFunc {
 		if connType == "" {
 			connType = "remote"
 		}
-		conn, err := k8s.CreateConnector(c.Request.Context(), ns, req.Name, req.Service, req.DisplayName, req.URL, connType, req.AuthSecretName, req.AuthSecretKey)
+		conn, err := k8s.CreateConnector(c.Request.Context(), ns, req.Name, req.Service, req.DisplayName, req.URL, connType, req.AuthType, req.AuthSecretName, req.AuthSecretKey)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create connector: " + err.Error()})
 			return
@@ -169,7 +174,17 @@ func listConnectorTools(k8s *K8sClient) gin.HandlerFunc {
 		if conn.Spec.AuthSecretKeyRef != nil {
 			token, err := k8s.GetSecretValue(c.Request.Context(), conn.Namespace, conn.Spec.AuthSecretKeyRef.Name, conn.Spec.AuthSecretKeyRef.Key)
 			if err == nil && token != "" {
-				authHeader = "Bearer " + token
+				if conn.Spec.AuthType == "oauth" {
+					// Secret value is a JSON blob: {"access_token": "...", ...}
+					var oauthData struct {
+						AccessToken string `json:"access_token"`
+					}
+					if jsonErr := json.Unmarshal([]byte(token), &oauthData); jsonErr == nil && oauthData.AccessToken != "" {
+						authHeader = "Bearer " + oauthData.AccessToken
+					}
+				} else {
+					authHeader = "Bearer " + token
+				}
 			}
 		}
 
@@ -299,6 +314,7 @@ func connectorToResponse(conn *komputerv1alpha1.KomputerConnector, agentNames []
 		DisplayName:    conn.Spec.DisplayName,
 		URL:            conn.Spec.URL,
 		Type:           conn.Spec.Type,
+		AuthType:       conn.Spec.AuthType,
 		AttachedAgents: len(agentNames),
 		AgentNames:     agentNames,
 		CreatedAt:      conn.CreationTimestamp.UTC().Format(time.RFC3339),
@@ -306,6 +322,13 @@ func connectorToResponse(conn *komputerv1alpha1.KomputerConnector, agentNames []
 	if conn.Spec.AuthSecretKeyRef != nil {
 		resp.AuthSecretName = conn.Spec.AuthSecretKeyRef.Name
 		resp.AuthSecretKey = conn.Spec.AuthSecretKeyRef.Key
+	}
+	if conn.Spec.AuthType == "oauth" {
+		if conn.Spec.AuthSecretKeyRef != nil {
+			resp.OAuthStatus = "connected"
+		} else {
+			resp.OAuthStatus = "pending"
+		}
 	}
 	return resp
 }

@@ -15,7 +15,7 @@ import { Button } from "@/components/kit/button";
 import { Input } from "@/components/kit/input";
 import { Label } from "@/components/kit/label";
 import { NamespaceSelector } from "@/components/shared/namespace-selector";
-import { createConnector, createSecretResource } from "@/lib/api";
+import { createConnector, createSecretResource, getOAuthAuthorizeUrl } from "@/lib/api";
 import { CONNECTOR_TEMPLATES, type ConnectorTemplate } from "@/lib/connector-templates";
 import { ArrowLeft, Copy, Check, Plug } from "lucide-react";
 
@@ -74,10 +74,13 @@ export function CreateConnectorModal({ open, onOpenChange, onCreated, initialTem
   const [namespace, setNamespace] = useState("default");
   const [url, setUrl] = useState("");
   const [credential, setCredential] = useState("");
+  const [oauthClientId, setOauthClientId] = useState("");
+  const [oauthClientSecret, setOauthClientSecret] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isCustom = selectedTemplate?.service === "custom";
+  const isOAuth = selectedTemplate?.authType === "oauth";
   const isKnownTemplate = selectedTemplate && selectedTemplate.url && !isCustom;
 
   useEffect(() => {
@@ -94,6 +97,8 @@ export function CreateConnectorModal({ open, onOpenChange, onCreated, initialTem
     setNamespace("default");
     setUrl("");
     setCredential("");
+    setOauthClientId("");
+    setOauthClientSecret("");
     setError(null);
   }
 
@@ -156,6 +161,87 @@ export function CreateConnectorModal({ open, onOpenChange, onCreated, initialTem
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to create connector.");
     } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function validateOAuth(): string | null {
+    if (!name.trim()) return "Name is required.";
+    if (!NAME_PATTERN.test(name)) return "Name must be lowercase letters, numbers, and hyphens only.";
+    if (!oauthClientId.trim()) return "Client ID is required.";
+    if (!oauthClientSecret.trim()) return "Client Secret is required.";
+    return null;
+  }
+
+  async function handleOAuthSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const validationError = validateOAuth();
+    if (validationError) { setError(validationError); return; }
+
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      // Get OAuth authorize URL — connector is created only after successful callback.
+      const { authorizeUrl } = await getOAuthAuthorizeUrl({
+        service: selectedTemplate!.service,
+        connector_name: name.trim(),
+        displayName: selectedTemplate!.displayName,
+        url: selectedTemplate!.url,
+        oauthClientId: oauthClientId.trim(),
+        oauthClientSecret: oauthClientSecret.trim(),
+        namespace: namespace.trim() || undefined,
+      });
+
+      // 3. Open popup
+      const popup = window.open(authorizeUrl, "oauth-popup", "width=600,height=700,scrollbars=yes");
+
+      // 4. Listen for success — postMessage (same-origin) + localStorage (cross-origin fallback)
+      let resolved = false;
+      const onSuccess = () => {
+        if (resolved) return;
+        resolved = true;
+        cleanup();
+        resetForm();
+        onOpenChange(false);
+        onCreated?.();
+      };
+
+      const handleMessage = (event: MessageEvent) => {
+        if (event.data?.type === "oauth-success") onSuccess();
+      };
+      window.addEventListener("message", handleMessage);
+
+      // localStorage fallback: the callback page writes "oauth-success" key
+      const handleStorage = (event: StorageEvent) => {
+        if (event.key === "oauth-success") {
+          localStorage.removeItem("oauth-success");
+          onSuccess();
+        }
+      };
+      window.addEventListener("storage", handleStorage);
+
+      // 5. Poll for popup close (user cancelled)
+      const checkClosed = setInterval(() => {
+        if (popup?.closed) {
+          // Give a short grace period for the success signal to arrive
+          setTimeout(() => {
+            if (!resolved) {
+              cleanup();
+              setSubmitting(false);
+            }
+          }, 1000);
+        }
+      }, 500);
+
+      const cleanup = () => {
+        clearInterval(checkClosed);
+        window.removeEventListener("message", handleMessage);
+        window.removeEventListener("storage", handleStorage);
+      };
+
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to start OAuth flow.");
       setSubmitting(false);
     }
   }
@@ -225,7 +311,7 @@ export function CreateConnectorModal({ open, onOpenChange, onCreated, initialTem
               transition={{ duration: 0.2, ease: "easeOut" }}
               className="flex flex-col min-h-0 flex-1"
             >
-              <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
+              <form onSubmit={isOAuth ? handleOAuthSubmit : handleSubmit} className="flex flex-col min-h-0 flex-1">
                 <DialogHeader>
                   <DialogTitle className="flex items-center gap-3 text-lg">
                     <button type="button" onClick={() => setStep("pick")} className="p-1.5 -ml-1 rounded-md hover:bg-[var(--color-surface-hover)] transition-colors cursor-pointer">
@@ -304,18 +390,48 @@ export function CreateConnectorModal({ open, onOpenChange, onCreated, initialTem
                       </div>
                     )}
 
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="conn-cred">{isKnownTemplate ? selectedTemplate.authLabel : "Auth Token"}</Label>
-                      <Input
-                        id="conn-cred"
-                        type="password"
-                        placeholder={isKnownTemplate ? selectedTemplate.authPlaceholder : "optional"}
-                        value={credential}
-                        onChange={(e) => setCredential(e.target.value)}
-                        autoComplete="off"
-                        className="font-[family-name:var(--font-mono)]"
-                      />
-                    </div>
+                    {isOAuth && (
+                      <>
+                        <div className="flex flex-col gap-2">
+                          <Label htmlFor="conn-client-id">Client ID</Label>
+                          <Input
+                            id="conn-client-id"
+                            placeholder="OAuth Client ID"
+                            value={oauthClientId}
+                            onChange={(e) => setOauthClientId(e.target.value)}
+                            autoComplete="off"
+                            className="font-[family-name:var(--font-mono)]"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <Label htmlFor="conn-client-secret">Client Secret</Label>
+                          <Input
+                            id="conn-client-secret"
+                            type="password"
+                            placeholder="OAuth Client Secret"
+                            value={oauthClientSecret}
+                            onChange={(e) => setOauthClientSecret(e.target.value)}
+                            autoComplete="off"
+                            className="font-[family-name:var(--font-mono)]"
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {!isOAuth && (
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="conn-cred">{isKnownTemplate ? selectedTemplate.authLabel : "Auth Token"}</Label>
+                        <Input
+                          id="conn-cred"
+                          type="password"
+                          placeholder={isKnownTemplate ? selectedTemplate.authPlaceholder : "optional"}
+                          value={credential}
+                          onChange={(e) => setCredential(e.target.value)}
+                          autoComplete="off"
+                          className="font-[family-name:var(--font-mono)]"
+                        />
+                      </div>
+                    )}
 
                     {error && (
                       <p className="text-sm text-red-400">{error}</p>
@@ -328,7 +444,7 @@ export function CreateConnectorModal({ open, onOpenChange, onCreated, initialTem
                     Cancel
                   </Button>
                   <Button type="submit" disabled={submitting}>
-                    {submitting ? "Connecting..." : "Connect"}
+                    {isOAuth ? `Connect with ${selectedTemplate?.displayName}` : submitting ? "Connecting..." : "Connect"}
                   </Button>
                 </DialogFooter>
               </form>

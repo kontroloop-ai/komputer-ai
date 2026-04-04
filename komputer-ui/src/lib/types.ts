@@ -131,6 +131,8 @@ export interface ConnectorResponse {
   type: string;
   authSecretName?: string;
   authSecretKey?: string;
+  authType?: string;
+  oauthStatus?: string; // "pending" | "connected"
   attachedAgents: number;
   agentNames?: string[];
   createdAt: string;
@@ -146,8 +148,11 @@ export interface CreateConnectorRequest {
   displayName?: string;
   url: string;
   type?: string;
+  authType?: string;
   authSecretName?: string;
   authSecretKey?: string;
+  oauthClientId?: string;
+  oauthClientSecret?: string;
   namespace?: string;
 }
 

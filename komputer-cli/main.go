@@ -678,6 +678,7 @@ func main() {
 		Short: "Get details of a specific agent and its recent events",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
+			jsonMode, _ := cmd.Flags().GetBool("json")
 			ep := resolveEndpoint(cmd)
 			agentName := args[0]
 			limit, _ := cmd.Flags().GetInt("events")
@@ -685,37 +686,52 @@ func main() {
 			// Fetch agent details
 			data, status, err := apiRequest("GET", fmt.Sprintf("%s/api/v1/agents/%s%s", ep, url.PathEscape(agentName), nsQuery(cmd)), nil)
 			if err != nil {
+				if jsonMode {
+					dieJSON("Request failed: "+err.Error(), 0)
+				}
 				fmt.Println(errorStyle.Render("Request failed: " + err.Error()))
 				os.Exit(1)
 			}
 			if status == 404 {
+				if jsonMode {
+					dieJSON(fmt.Sprintf("Agent %q not found", agentName), 404)
+				}
 				fmt.Println(errorStyle.Render(fmt.Sprintf("Agent %q not found", agentName)))
 				os.Exit(1)
 			}
 			if status != 200 {
+				if jsonMode {
+					dieJSON(fmt.Sprintf("API error (%d): %s", status, string(data)), status)
+				}
 				fmt.Println(errorStyle.Render(fmt.Sprintf("API error (%d): %s", status, string(data))))
 				os.Exit(1)
 			}
 
 			var agent AgentResponse
 			json.Unmarshal(data, &agent)
-			printAgent(agent)
 
 			// Fetch recent events
 			eventsData, eventsStatus, err := apiRequest("GET", fmt.Sprintf("%s/api/v1/agents/%s/events?limit=%d%s", ep, url.PathEscape(agentName), limit, nsQueryAmp(cmd)), nil)
-			if err != nil || eventsStatus != 200 {
-				return // silently skip events if unavailable
+			var events []AgentEvent
+			if err == nil && eventsStatus == 200 {
+				var eventsResp struct {
+					Events []AgentEvent `json:"events"`
+				}
+				json.Unmarshal(eventsData, &eventsResp)
+				events = eventsResp.Events
 			}
 
-			var eventsResp struct {
-				Events []AgentEvent `json:"events"`
+			if jsonMode {
+				printJSON(map[string]any{"agent": agent, "events": events})
+				return
 			}
-			json.Unmarshal(eventsData, &eventsResp)
 
-			if len(eventsResp.Events) > 0 {
-				fmt.Println(labelStyle.Render(fmt.Sprintf("  Recent Events (%d)", len(eventsResp.Events))))
+			printAgent(agent)
+
+			if len(events) > 0 {
+				fmt.Println(labelStyle.Render(fmt.Sprintf("  Recent Events (%d)", len(events))))
 				fmt.Println(dimStyle.Render("  " + strings.Repeat("─", 60)))
-				for _, e := range eventsResp.Events {
+				for _, e := range events {
 					if formatted := formatEvent(e); formatted != "" {
 						fmt.Println(formatted)
 						fmt.Println()

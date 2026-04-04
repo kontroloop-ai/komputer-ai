@@ -1627,19 +1627,31 @@ func main() {
 		Aliases: []string{"ls"},
 		Short:   "List all offices",
 		Run: func(cmd *cobra.Command, args []string) {
+			jsonMode, _ := cmd.Flags().GetBool("json")
 			ep := resolveEndpoint(cmd)
 			data, status, err := apiRequest("GET", ep+"/api/v1/offices"+nsQuery(cmd), nil)
 			if err != nil {
+				if jsonMode {
+					dieJSON("Request failed: "+err.Error(), 0)
+				}
 				fmt.Println(errorStyle.Render("Request failed: " + err.Error()))
 				os.Exit(1)
 			}
 			if status != 200 {
+				if jsonMode {
+					dieJSON(fmt.Sprintf("API error (%d): %s", status, string(data)), status)
+				}
 				fmt.Println(errorStyle.Render(fmt.Sprintf("API error (%d): %s", status, string(data))))
 				os.Exit(1)
 			}
 
 			var resp OfficeListResponse
 			json.Unmarshal(data, &resp)
+
+			if jsonMode {
+				printJSON(resp)
+				return
+			}
 
 			if len(resp.Offices) == 0 {
 				fmt.Println(dimStyle.Render("No offices found."))
@@ -1714,19 +1726,29 @@ func main() {
 		Short: "Get office details and members",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
+			jsonMode, _ := cmd.Flags().GetBool("json")
 			ep := resolveEndpoint(cmd)
 			officeName := args[0]
 
 			data, status, err := apiRequest("GET", fmt.Sprintf("%s/api/v1/offices/%s%s", ep, url.PathEscape(officeName), nsQuery(cmd)), nil)
 			if err != nil {
+				if jsonMode {
+					dieJSON("Request failed: "+err.Error(), 0)
+				}
 				fmt.Println(errorStyle.Render("Request failed: " + err.Error()))
 				os.Exit(1)
 			}
 			if status == 404 {
+				if jsonMode {
+					dieJSON(fmt.Sprintf("Office %q not found", officeName), 404)
+				}
 				fmt.Println(errorStyle.Render(fmt.Sprintf("Office %q not found", officeName)))
 				os.Exit(1)
 			}
 			if status != 200 {
+				if jsonMode {
+					dieJSON(fmt.Sprintf("API error (%d): %s", status, string(data)), status)
+				}
 				fmt.Println(errorStyle.Render(fmt.Sprintf("API error (%d): %s", status, string(data))))
 				os.Exit(1)
 			}
@@ -1818,19 +1840,24 @@ func main() {
 			// Recent events
 			eventsLimit, _ := cmd.Flags().GetInt("events")
 			eventsData, eventsStatus, err := apiRequest("GET", fmt.Sprintf("%s/api/v1/offices/%s/events?limit=%d%s", ep, url.PathEscape(officeName), eventsLimit, nsQueryAmp(cmd)), nil)
-			if err != nil || eventsStatus != 200 {
+			var events []AgentEvent
+			if err == nil && eventsStatus == 200 {
+				var eventsResp struct {
+					Events []AgentEvent `json:"events"`
+				}
+				json.Unmarshal(eventsData, &eventsResp)
+				events = eventsResp.Events
+			}
+
+			if jsonMode {
+				printJSON(map[string]any{"office": office, "events": events})
 				return
 			}
 
-			var eventsResp struct {
-				Events []AgentEvent `json:"events"`
-			}
-			json.Unmarshal(eventsData, &eventsResp)
-
-			if len(eventsResp.Events) > 0 {
-				fmt.Println(labelStyle.Render(fmt.Sprintf("  Recent Events (%d)", len(eventsResp.Events))))
+			if len(events) > 0 {
+				fmt.Println(labelStyle.Render(fmt.Sprintf("  Recent Events (%d)", len(events))))
 				fmt.Println(dimStyle.Render("  " + strings.Repeat("─", 60)))
-				for _, e := range eventsResp.Events {
+				for _, e := range events {
 					if formatted := formatEvent(e); formatted != "" {
 						prefix := titleStyle.Render(fmt.Sprintf("[%s]", e.AgentName))
 						fmt.Printf("%s %s\n\n", prefix, formatted)

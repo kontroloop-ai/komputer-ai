@@ -831,25 +831,42 @@ func main() {
 		Short: "Cancel the running task on an agent",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
+			jsonMode, _ := cmd.Flags().GetBool("json")
 			ep := resolveEndpoint(cmd)
 			data, status, err := apiRequest("POST", fmt.Sprintf("%s/api/v1/agents/%s/cancel%s", ep, url.PathEscape(args[0]), nsQuery(cmd)), nil)
 			if err != nil {
+				if jsonMode {
+					dieJSON("Request failed: "+err.Error(), 0)
+				}
 				fmt.Println(errorStyle.Render("Request failed: " + err.Error()))
 				os.Exit(1)
 			}
 			if status == 404 {
+				if jsonMode {
+					dieJSON(fmt.Sprintf("Agent %q not found", args[0]), 404)
+				}
 				fmt.Println(errorStyle.Render(fmt.Sprintf("Agent %q not found", args[0])))
 				os.Exit(1)
 			}
 			if status == 409 {
 				var errResp ErrorResponse
 				json.Unmarshal(data, &errResp)
+				if jsonMode {
+					dieJSON(errResp.Error, 409)
+				}
 				fmt.Println(warnStyle.Render("⚠ " + errResp.Error))
 				os.Exit(1)
 			}
 			if status != 200 {
+				if jsonMode {
+					dieJSON(fmt.Sprintf("API error (%d): %s", status, string(data)), status)
+				}
 				fmt.Println(errorStyle.Render(fmt.Sprintf("API error (%d): %s", status, string(data))))
 				os.Exit(1)
+			}
+			if jsonMode {
+				printJSON(map[string]any{"name": args[0], "cancelled": true})
+				return
 			}
 			fmt.Println(warnStyle.Render(fmt.Sprintf("⚠ Cancelling task on %q", args[0])))
 		},

@@ -151,6 +151,8 @@ export interface CreateConnectorRequest {
   authType?: string;
   authSecretName?: string;
   authSecretKey?: string;
+  oauthClientId?: string;
+  oauthClientSecret?: string;
   namespace?: string;
 }
 

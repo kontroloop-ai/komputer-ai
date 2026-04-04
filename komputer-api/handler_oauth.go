@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
@@ -18,56 +19,46 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// oauthProvider holds configuration for an OAuth 2.0 provider.
+// oauthProvider holds static configuration for an OAuth 2.0 provider.
+// Client credentials are per-connector (stored in K8s Secrets), not here.
 type oauthProvider struct {
-	AuthURL      string
-	TokenURL     string
-	Scopes       []string
-	ClientID     string
-	ClientSecret string
-	ExtraParams  map[string]string
+	AuthURL     string
+	TokenURL    string
+	Scopes      []string
+	ExtraParams map[string]string
 }
 
-// getOAuthProviders returns the configured provider registry.
-// Aliases (gmail, google-calendar) resolve to nil — callers must resolve to "google".
-func getOAuthProviders() map[string]*oauthProvider {
-	return map[string]*oauthProvider{
-		"google": {
-			AuthURL:      "https://accounts.google.com/o/oauth2/v2/auth",
-			TokenURL:     "https://oauth2.googleapis.com/token",
-			Scopes:       []string{"https://www.googleapis.com/auth/gmail.modify", "https://www.googleapis.com/auth/calendar"},
-			ClientID:     os.Getenv("OAUTH_GOOGLE_CLIENT_ID"),
-			ClientSecret: os.Getenv("OAUTH_GOOGLE_CLIENT_SECRET"),
-			ExtraParams:  map[string]string{"access_type": "offline", "prompt": "consent"},
-		},
-		"google-calendar": nil, // alias → resolve to "google" at runtime
-		"gmail":           nil, // alias → resolve to "google" at runtime
-		"notion": {
-			AuthURL:      "https://api.notion.com/v1/oauth/authorize",
-			TokenURL:     "https://api.notion.com/v1/oauth/token",
-			Scopes:       nil,
-			ClientID:     os.Getenv("OAUTH_NOTION_CLIENT_ID"),
-			ClientSecret: os.Getenv("OAUTH_NOTION_CLIENT_SECRET"),
-			ExtraParams:  map[string]string{"owner": "user"},
-		},
-	}
+// oauthProviderRegistry maps service names to their OAuth provider config.
+// Credentials are NOT stored here — they come from each connector's secret.
+var oauthProviderRegistry = map[string]*oauthProvider{
+	"google": {
+		AuthURL:     "https://accounts.google.com/o/oauth2/v2/auth",
+		TokenURL:    "https://oauth2.googleapis.com/token",
+		Scopes:      []string{"https://www.googleapis.com/auth/gmail.modify", "https://www.googleapis.com/auth/calendar"},
+		ExtraParams: map[string]string{"access_type": "offline", "prompt": "consent"},
+	},
+	"notion": {
+		AuthURL:     "https://api.notion.com/v1/oauth/authorize",
+		TokenURL:    "https://api.notion.com/v1/oauth/token",
+		Scopes:      nil,
+		ExtraParams: map[string]string{"owner": "user"},
+	},
 }
 
 // resolveOAuthProvider resolves a service name (including aliases) to a provider.
 func resolveOAuthProvider(service string) *oauthProvider {
-	providers := getOAuthProviders()
-	p, ok := providers[service]
-	if !ok {
-		return nil
+	// Resolve aliases
+	switch service {
+	case "gmail", "google-calendar":
+		service = "google"
 	}
-	if p == nil {
-		// Alias — resolve google aliases to "google"
-		if service == "gmail" || service == "google-calendar" {
-			return providers["google"]
-		}
-		return nil
-	}
-	return p
+	return oauthProviderRegistry[service]
+}
+
+// oauthClientCredentials holds per-connector OAuth client credentials read from K8s Secret.
+type oauthClientCredentials struct {
+	ClientID     string
+	ClientSecret string
 }
 
 // oauthPendingFlow stores state for an in-progress OAuth flow.
@@ -111,8 +102,11 @@ func oauthAuthorize(k8s *K8sClient) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported service: " + service})
 			return
 		}
-		if provider.ClientID == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "OAuth not configured for service: " + service})
+
+		// Read OAuth client credentials from connector's secret.
+		creds, err := getConnectorOAuthCreds(c.Request.Context(), k8s, ns, connectorName)
+		if err != nil || creds.ClientID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "OAuth client credentials not found for connector " + connectorName})
 			return
 		}
 
@@ -132,7 +126,7 @@ func oauthAuthorize(k8s *K8sClient) gin.HandlerFunc {
 		callbackURL := os.Getenv("OAUTH_CALLBACK_URL")
 
 		params := url.Values{}
-		params.Set("client_id", provider.ClientID)
+		params.Set("client_id", creds.ClientID)
 		params.Set("redirect_uri", callbackURL)
 		params.Set("response_type", "code")
 		params.Set("state", state)
@@ -185,7 +179,15 @@ func oauthCallback(k8s *K8sClient) gin.HandlerFunc {
 
 		callbackURL := os.Getenv("OAUTH_CALLBACK_URL")
 
-		tokenData, err := exchangeCodeForTokens(provider, code, callbackURL)
+		// Read OAuth client credentials from connector's secret.
+		ctx := c.Request.Context()
+		creds, credErr := getConnectorOAuthCreds(ctx, k8s, flow.Namespace, flow.ConnectorName)
+		if credErr != nil || creds.ClientID == "" {
+			c.Data(http.StatusInternalServerError, "text/html; charset=utf-8", []byte(oauthErrorHTML("OAuth client credentials not found")))
+			return
+		}
+
+		tokenData, err := exchangeCodeForTokens(provider, creds, code, callbackURL)
 		if err != nil {
 			log.Printf("OAuth token exchange error: %v", err)
 			c.Data(http.StatusInternalServerError, "text/html; charset=utf-8", []byte(oauthErrorHTML("Token exchange failed: "+err.Error())))
@@ -205,28 +207,17 @@ func oauthCallback(k8s *K8sClient) gin.HandlerFunc {
 			return
 		}
 
+		// Store the OAuth token in the connector's existing secret (alongside client_id/client_secret).
 		secretName := flow.ConnectorName + "-oauth"
 		secretKey := "oauth-token"
-		ctx := c.Request.Context()
 
-		// Create or update the secret.
-		_, getErr := k8s.GetSecretValue(ctx, flow.Namespace, secretName, secretKey)
-		if getErr != nil {
-			// Secret doesn't exist — create it.
-			if _, err := k8s.CreateManagedSecret(ctx, flow.Namespace, secretName, map[string]string{secretKey: string(tokenJSON)}); err != nil {
-				log.Printf("OAuth: failed to create secret %s/%s: %v", flow.Namespace, secretName, err)
-				c.Data(http.StatusInternalServerError, "text/html; charset=utf-8", []byte(oauthErrorHTML("Failed to store token")))
-				return
-			}
-		} else {
-			if _, err := k8s.UpdateManagedSecret(ctx, flow.Namespace, secretName, map[string]string{secretKey: string(tokenJSON)}); err != nil {
-				log.Printf("OAuth: failed to update secret %s/%s: %v", flow.Namespace, secretName, err)
-				c.Data(http.StatusInternalServerError, "text/html; charset=utf-8", []byte(oauthErrorHTML("Failed to update token")))
-				return
-			}
+		if _, err := k8s.UpdateManagedSecret(ctx, flow.Namespace, secretName, map[string]string{secretKey: string(tokenJSON)}); err != nil {
+			log.Printf("OAuth: failed to update secret %s/%s: %v", flow.Namespace, secretName, err)
+			c.Data(http.StatusInternalServerError, "text/html; charset=utf-8", []byte(oauthErrorHTML("Failed to store token")))
+			return
 		}
 
-		// Patch the connector CR to reference the OAuth secret.
+		// Patch the connector CR to reference the OAuth token key.
 		if err := k8s.UpdateConnectorAuth(ctx, flow.Namespace, flow.ConnectorName, secretName, secretKey); err != nil {
 			log.Printf("OAuth: failed to patch connector %s/%s auth: %v", flow.Namespace, flow.ConnectorName, err)
 			// Non-fatal: token is stored, connector patch can be retried.
@@ -304,7 +295,14 @@ func oauthRefresh(k8s *K8sClient) gin.HandlerFunc {
 			return
 		}
 
-		newTokenData, err := refreshGoogleToken(provider, refreshToken)
+		// Read OAuth client credentials from connector's secret.
+		creds, credErr := getConnectorOAuthCreds(ctx, k8s, req.Namespace, req.ConnectorName)
+		if credErr != nil || creds.ClientID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "OAuth client credentials not found for connector"})
+			return
+		}
+
+		newTokenData, err := refreshGoogleToken(provider, creds, refreshToken)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "token refresh failed: " + err.Error()})
 			return
@@ -328,7 +326,7 @@ func oauthRefresh(k8s *K8sClient) gin.HandlerFunc {
 }
 
 // exchangeCodeForTokens exchanges an authorization code for OAuth tokens.
-func exchangeCodeForTokens(provider *oauthProvider, code, redirectURI string) (map[string]interface{}, error) {
+func exchangeCodeForTokens(provider *oauthProvider, creds oauthClientCredentials, code, redirectURI string) (map[string]interface{}, error) {
 	var (
 		resp *http.Response
 		err  error
@@ -348,15 +346,15 @@ func exchangeCodeForTokens(provider *oauthProvider, code, redirectURI string) (m
 			return nil, reqErr
 		}
 		req.Header.Set("Content-Type", "application/json")
-		creds := base64.StdEncoding.EncodeToString([]byte(provider.ClientID + ":" + provider.ClientSecret))
-		req.Header.Set("Authorization", "Basic "+creds)
+		basicAuth := base64.StdEncoding.EncodeToString([]byte(creds.ClientID + ":" + creds.ClientSecret))
+		req.Header.Set("Authorization", "Basic "+basicAuth)
 		resp, err = client.Do(req)
 	} else {
 		// Standard form-encoded POST (Google, etc.).
 		form := url.Values{}
 		form.Set("code", code)
-		form.Set("client_id", provider.ClientID)
-		form.Set("client_secret", provider.ClientSecret)
+		form.Set("client_id", creds.ClientID)
+		form.Set("client_secret", creds.ClientSecret)
 		form.Set("redirect_uri", redirectURI)
 		form.Set("grant_type", "authorization_code")
 		resp, err = client.PostForm(provider.TokenURL, form)
@@ -390,11 +388,11 @@ func exchangeCodeForTokens(provider *oauthProvider, code, redirectURI string) (m
 }
 
 // refreshGoogleToken uses the refresh_token to obtain a new access_token from Google.
-func refreshGoogleToken(provider *oauthProvider, refreshToken string) (map[string]interface{}, error) {
+func refreshGoogleToken(provider *oauthProvider, creds oauthClientCredentials, refreshToken string) (map[string]interface{}, error) {
 	form := url.Values{}
 	form.Set("refresh_token", refreshToken)
-	form.Set("client_id", provider.ClientID)
-	form.Set("client_secret", provider.ClientSecret)
+	form.Set("client_id", creds.ClientID)
+	form.Set("client_secret", creds.ClientSecret)
 	form.Set("grant_type", "refresh_token")
 
 	client := &http.Client{Timeout: 15 * time.Second}
@@ -421,6 +419,17 @@ func refreshGoogleToken(provider *oauthProvider, refreshToken string) (map[strin
 		result["expires_at"] = float64(time.Now().Unix()) + expiresIn
 	}
 	return result, nil
+}
+
+// getConnectorOAuthCreds reads OAuth client_id and client_secret from a connector's secret.
+func getConnectorOAuthCreds(ctx context.Context, k8s *K8sClient, ns, connectorName string) (oauthClientCredentials, error) {
+	secretName := connectorName + "-oauth"
+	clientID, err := k8s.GetSecretValue(ctx, ns, secretName, "client_id")
+	if err != nil {
+		return oauthClientCredentials{}, err
+	}
+	clientSecret, _ := k8s.GetSecretValue(ctx, ns, secretName, "client_secret")
+	return oauthClientCredentials{ClientID: clientID, ClientSecret: clientSecret}, nil
 }
 
 // oauthSuccessHTML returns an HTML page that signals success to the popup opener.

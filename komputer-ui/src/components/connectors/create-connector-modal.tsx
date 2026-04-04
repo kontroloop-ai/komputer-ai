@@ -74,6 +74,8 @@ export function CreateConnectorModal({ open, onOpenChange, onCreated, initialTem
   const [namespace, setNamespace] = useState("default");
   const [url, setUrl] = useState("");
   const [credential, setCredential] = useState("");
+  const [oauthClientId, setOauthClientId] = useState("");
+  const [oauthClientSecret, setOauthClientSecret] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -95,6 +97,8 @@ export function CreateConnectorModal({ open, onOpenChange, onCreated, initialTem
     setNamespace("default");
     setUrl("");
     setCredential("");
+    setOauthClientId("");
+    setOauthClientSecret("");
     setError(null);
   }
 
@@ -164,6 +168,8 @@ export function CreateConnectorModal({ open, onOpenChange, onCreated, initialTem
   function validateOAuth(): string | null {
     if (!name.trim()) return "Name is required.";
     if (!NAME_PATTERN.test(name)) return "Name must be lowercase letters, numbers, and hyphens only.";
+    if (!oauthClientId.trim()) return "Client ID is required.";
+    if (!oauthClientSecret.trim()) return "Client Secret is required.";
     return null;
   }
 
@@ -176,13 +182,15 @@ export function CreateConnectorModal({ open, onOpenChange, onCreated, initialTem
     setError(null);
 
     try {
-      // 1. Create connector CR (without auth secret)
+      // 1. Create connector CR with OAuth client credentials
       await createConnector({
         name: name.trim(),
         service: selectedTemplate!.service,
         displayName: selectedTemplate!.displayName,
         url: selectedTemplate!.url,
         authType: "oauth",
+        oauthClientId: oauthClientId.trim(),
+        oauthClientSecret: oauthClientSecret.trim(),
         namespace: namespace.trim() || undefined,
       });
 
@@ -365,6 +373,34 @@ export function CreateConnectorModal({ open, onOpenChange, onCreated, initialTem
                           autoComplete="off"
                         />
                       </div>
+                    )}
+
+                    {isOAuth && (
+                      <>
+                        <div className="flex flex-col gap-2">
+                          <Label htmlFor="conn-client-id">Client ID</Label>
+                          <Input
+                            id="conn-client-id"
+                            placeholder="OAuth Client ID"
+                            value={oauthClientId}
+                            onChange={(e) => setOauthClientId(e.target.value)}
+                            autoComplete="off"
+                            className="font-[family-name:var(--font-mono)]"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <Label htmlFor="conn-client-secret">Client Secret</Label>
+                          <Input
+                            id="conn-client-secret"
+                            type="password"
+                            placeholder="OAuth Client Secret"
+                            value={oauthClientSecret}
+                            onChange={(e) => setOauthClientSecret(e.target.value)}
+                            autoComplete="off"
+                            className="font-[family-name:var(--font-mono)]"
+                          />
+                        </div>
+                      </>
                     )}
 
                     {!isOAuth && (

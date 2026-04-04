@@ -62,11 +62,16 @@ type oauthClientCredentials struct {
 }
 
 // oauthPendingFlow stores state for an in-progress OAuth flow.
+// All connector details are stashed here so the connector is only created on successful callback.
 type oauthPendingFlow struct {
-	ConnectorName string
-	Namespace     string
-	Service       string
-	CreatedAt     time.Time
+	ConnectorName     string
+	Namespace         string
+	Service           string
+	DisplayName       string
+	URL               string
+	OAuthClientID     string
+	OAuthClientSecret string
+	CreatedAt         time.Time
 }
 
 // pendingOAuthFlows maps state string → *oauthPendingFlow.
@@ -81,32 +86,30 @@ func generateOAuthState() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-// oauthAuthorize handles GET /api/v1/oauth/authorize
-// Query params: service, connector_name, namespace
+// oauthAuthorize handles POST /api/v1/oauth/authorize
+// Accepts full connector details so the connector is only created after successful OAuth callback.
 func oauthAuthorize(k8s *K8sClient) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		service := c.Query("service")
-		connectorName := c.Query("connector_name")
-		ns := c.Query("namespace")
-
-		if service == "" || connectorName == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "service and connector_name are required"})
+		var req struct {
+			Service           string `json:"service" binding:"required"`
+			ConnectorName     string `json:"connector_name" binding:"required"`
+			Namespace         string `json:"namespace"`
+			DisplayName       string `json:"displayName"`
+			URL               string `json:"url"`
+			OAuthClientID     string `json:"oauthClientId" binding:"required"`
+			OAuthClientSecret string `json:"oauthClientSecret" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: " + err.Error()})
 			return
 		}
-		if ns == "" {
-			ns = resolveNamespace(c, k8s)
+		if req.Namespace == "" {
+			req.Namespace = resolveNamespace(c, k8s)
 		}
 
-		provider := resolveOAuthProvider(service)
+		provider := resolveOAuthProvider(req.Service)
 		if provider == nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported service: " + service})
-			return
-		}
-
-		// Read OAuth client credentials from connector's secret.
-		creds, err := getConnectorOAuthCreds(c.Request.Context(), k8s, ns, connectorName)
-		if err != nil || creds.ClientID == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "OAuth client credentials not found for connector " + connectorName})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported service: " + req.Service})
 			return
 		}
 
@@ -117,16 +120,20 @@ func oauthAuthorize(k8s *K8sClient) gin.HandlerFunc {
 		}
 
 		pendingOAuthFlows.Store(state, &oauthPendingFlow{
-			ConnectorName: connectorName,
-			Namespace:     ns,
-			Service:       service,
-			CreatedAt:     time.Now(),
+			ConnectorName:     req.ConnectorName,
+			Namespace:         req.Namespace,
+			Service:           req.Service,
+			DisplayName:       req.DisplayName,
+			URL:               req.URL,
+			OAuthClientID:     req.OAuthClientID,
+			OAuthClientSecret: req.OAuthClientSecret,
+			CreatedAt:         time.Now(),
 		})
 
 		callbackURL := resolveCallbackURL(c)
 
 		params := url.Values{}
-		params.Set("client_id", creds.ClientID)
+		params.Set("client_id", req.OAuthClientID)
 		params.Set("redirect_uri", callbackURL)
 		params.Set("response_type", "code")
 		params.Set("state", state)
@@ -138,7 +145,7 @@ func oauthAuthorize(k8s *K8sClient) gin.HandlerFunc {
 		}
 
 		authorizeURL := provider.AuthURL + "?" + params.Encode()
-		log.Printf("OAuth authorize: service=%s connector=%s/%s state=%s", service, ns, connectorName, state)
+		log.Printf("OAuth authorize: service=%s connector=%s/%s state=%s", req.Service, req.Namespace, req.ConnectorName, state)
 		c.JSON(http.StatusOK, gin.H{"authorizeUrl": authorizeURL})
 	}
 }
@@ -178,13 +185,11 @@ func oauthCallback(k8s *K8sClient) gin.HandlerFunc {
 		}
 
 		callbackURL := resolveCallbackURL(c)
-
-		// Read OAuth client credentials from connector's secret.
 		ctx := c.Request.Context()
-		creds, credErr := getConnectorOAuthCreds(ctx, k8s, flow.Namespace, flow.ConnectorName)
-		if credErr != nil || creds.ClientID == "" {
-			c.Data(http.StatusInternalServerError, "text/html; charset=utf-8", []byte(oauthErrorHTML("OAuth client credentials not found")))
-			return
+
+		creds := oauthClientCredentials{
+			ClientID:     flow.OAuthClientID,
+			ClientSecret: flow.OAuthClientSecret,
 		}
 
 		tokenData, err := exchangeCodeForTokens(provider, creds, code, callbackURL)
@@ -207,27 +212,32 @@ func oauthCallback(k8s *K8sClient) gin.HandlerFunc {
 			return
 		}
 
-		// Store the OAuth token in the connector's existing secret (alongside client_id/client_secret).
+		// Create the secret with client credentials + OAuth token (all in one).
 		secretName := flow.ConnectorName + "-oauth"
 		secretKey := "oauth-token"
 
-		if _, err := k8s.UpdateManagedSecret(ctx, flow.Namespace, secretName, map[string]string{secretKey: string(tokenJSON)}); err != nil {
-			log.Printf("OAuth: failed to update secret %s/%s: %v", flow.Namespace, secretName, err)
+		if _, err := k8s.CreateManagedSecret(ctx, flow.Namespace, secretName, map[string]string{
+			"client_id":     flow.OAuthClientID,
+			"client_secret": flow.OAuthClientSecret,
+			secretKey:       string(tokenJSON),
+		}); err != nil {
+			log.Printf("OAuth: failed to create secret %s/%s: %v", flow.Namespace, secretName, err)
 			c.Data(http.StatusInternalServerError, "text/html; charset=utf-8", []byte(oauthErrorHTML("Failed to store token")))
 			return
 		}
 
-		// Patch the connector CR to reference the OAuth token key.
-		if err := k8s.UpdateConnectorAuth(ctx, flow.Namespace, flow.ConnectorName, secretName, secretKey); err != nil {
-			log.Printf("OAuth: failed to patch connector %s/%s auth: %v", flow.Namespace, flow.ConnectorName, err)
-			// Non-fatal: token is stored, connector patch can be retried.
+		// Now create the connector CR with auth pointing at the secret.
+		sn := secretName
+		sk := secretKey
+		conn, err := k8s.CreateConnector(ctx, flow.Namespace, flow.ConnectorName, flow.Service, flow.DisplayName, flow.URL, "remote", "oauth", &sn, &sk)
+		if err != nil {
+			log.Printf("OAuth: failed to create connector %s/%s: %v", flow.Namespace, flow.ConnectorName, err)
+			c.Data(http.StatusInternalServerError, "text/html; charset=utf-8", []byte(oauthErrorHTML("Failed to create connector: "+err.Error())))
+			return
 		}
 
-		// Set owner reference on secret → connector.
-		conn, err := k8s.GetConnector(ctx, flow.Namespace, flow.ConnectorName)
-		if err == nil {
-			k8s.SetSecretOwnerRef(ctx, flow.Namespace, secretName, conn.Name, string(conn.UID))
-		}
+		// Set owner reference on secret → connector for garbage collection.
+		k8s.SetSecretOwnerRef(ctx, flow.Namespace, secretName, conn.Name, string(conn.UID))
 
 		log.Printf("OAuth success: service=%s connector=%s/%s secret=%s", flow.Service, flow.Namespace, flow.ConnectorName, secretName)
 		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(oauthSuccessHTML(flow.ConnectorName)))

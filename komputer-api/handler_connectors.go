@@ -74,23 +74,6 @@ func createConnector(k8s *K8sClient) gin.HandlerFunc {
 		if connType == "" {
 			connType = "remote"
 		}
-		// For OAuth connectors, store client credentials in a secret before creating the CR.
-		if req.AuthType == "oauth" && req.OAuthClientID != "" {
-			secretName := req.Name + "-oauth"
-			secretData := map[string]string{
-				"client_id":     req.OAuthClientID,
-				"client_secret": req.OAuthClientSecret,
-			}
-			if _, err := k8s.CreateManagedSecret(c.Request.Context(), ns, secretName, secretData); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create OAuth credentials secret: " + err.Error()})
-				return
-			}
-			sn := secretName
-			sk := "client_id" // authSecretKeyRef points here; oauth-token key added after auth flow
-			req.AuthSecretName = &sn
-			req.AuthSecretKey = &sk
-		}
-
 		conn, err := k8s.CreateConnector(c.Request.Context(), ns, req.Name, req.Service, req.DisplayName, req.URL, connType, req.AuthType, req.AuthSecretName, req.AuthSecretKey)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create connector: " + err.Error()})

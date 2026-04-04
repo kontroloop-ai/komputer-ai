@@ -182,24 +182,16 @@ export function CreateConnectorModal({ open, onOpenChange, onCreated, initialTem
     setError(null);
 
     try {
-      // 1. Create connector CR with OAuth client credentials
-      await createConnector({
-        name: name.trim(),
+      // Get OAuth authorize URL — connector is created only after successful callback.
+      const { authorizeUrl } = await getOAuthAuthorizeUrl({
         service: selectedTemplate!.service,
+        connector_name: name.trim(),
         displayName: selectedTemplate!.displayName,
         url: selectedTemplate!.url,
-        authType: "oauth",
         oauthClientId: oauthClientId.trim(),
         oauthClientSecret: oauthClientSecret.trim(),
         namespace: namespace.trim() || undefined,
       });
-
-      // 2. Get OAuth authorize URL
-      const { authorizeUrl } = await getOAuthAuthorizeUrl(
-        selectedTemplate!.service,
-        name.trim(),
-        namespace.trim() || undefined,
-      );
 
       // 3. Open popup
       const popup = window.open(authorizeUrl, "oauth-popup", "width=600,height=700,scrollbars=yes");

@@ -593,6 +593,7 @@ func main() {
 		Short: "Create a new agent or send a task to an existing one",
 		Args:  cobra.ExactArgs(2),
 		Run: func(cmd *cobra.Command, args []string) {
+			jsonMode, _ := cmd.Flags().GetBool("json")
 			ep := resolveEndpoint(cmd)
 			model, _ := cmd.Flags().GetString("model")
 			templateRef, _ := cmd.Flags().GetString("template")
@@ -635,6 +636,9 @@ func main() {
 
 			data, status, err := apiRequest("POST", ep+"/api/v1/agents", body)
 			if err != nil {
+				if jsonMode {
+					dieJSON("Request failed: "+err.Error(), 0)
+				}
 				fmt.Println(errorStyle.Render("Request failed: " + err.Error()))
 				os.Exit(1)
 			}
@@ -642,17 +646,28 @@ func main() {
 			if status == 409 {
 				var errResp ErrorResponse
 				json.Unmarshal(data, &errResp)
+				if jsonMode {
+					dieJSON(errResp.Error, 409)
+				}
 				fmt.Println(warnStyle.Render("⚠ " + errResp.Error))
 				os.Exit(1)
 			}
 
 			if status != 200 && status != 201 && status != 202 {
+				if jsonMode {
+					dieJSON(fmt.Sprintf("API error (%d): %s", status, string(data)), status)
+				}
 				fmt.Println(errorStyle.Render(fmt.Sprintf("API error (%d): %s", status, string(data))))
 				os.Exit(1)
 			}
 
 			var agent AgentResponse
 			json.Unmarshal(data, &agent)
+
+			if jsonMode {
+				printJSON(agent)
+				return
+			}
 
 			if status == 201 {
 				fmt.Println(successStyle.Render("✔ Agent created"))
@@ -813,6 +828,7 @@ func main() {
 		Short: "Update settings on an existing agent (model, lifecycle, secrets)",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
+			jsonMode, _ := cmd.Flags().GetBool("json")
 			ep := resolveEndpoint(cmd)
 			body := map[string]interface{}{}
 
@@ -841,26 +857,42 @@ func main() {
 			}
 
 			if len(body) == 0 {
+				if jsonMode {
+					dieJSON("No settings provided. Use --model, --lifecycle, --secret, --memory, or --skill flags.", 400)
+				}
 				fmt.Println(errorStyle.Render("No settings provided. Use --model, --lifecycle, --secret, --memory, or --skill flags."))
 				os.Exit(1)
 			}
 
 			data, status, err := apiRequest("PATCH", fmt.Sprintf("%s/api/v1/agents/%s%s", ep, url.PathEscape(args[0]), nsQuery(cmd)), body)
 			if err != nil {
+				if jsonMode {
+					dieJSON("Request failed: "+err.Error(), 0)
+				}
 				fmt.Println(errorStyle.Render("Request failed: " + err.Error()))
 				os.Exit(1)
 			}
 			if status == 404 {
+				if jsonMode {
+					dieJSON(fmt.Sprintf("Agent %q not found", args[0]), 404)
+				}
 				fmt.Println(errorStyle.Render(fmt.Sprintf("Agent %q not found", args[0])))
 				os.Exit(1)
 			}
 			if status != 200 {
+				if jsonMode {
+					dieJSON(fmt.Sprintf("API error (%d): %s", status, string(data)), status)
+				}
 				fmt.Println(errorStyle.Render(fmt.Sprintf("API error (%d): %s", status, string(data))))
 				os.Exit(1)
 			}
 
 			var agent AgentResponse
 			json.Unmarshal(data, &agent)
+			if jsonMode {
+				printJSON(agent)
+				return
+			}
 			fmt.Println(successStyle.Render("✔ Settings updated"))
 			printAgent(agent)
 		},

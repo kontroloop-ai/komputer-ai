@@ -292,12 +292,62 @@ komputer create deploy-agent "deploy to prod" \
 
 Secrets are stored as K8s Secrets and injected as `SECRET_*` env vars into the agent pod. The agent checks these env vars when credentials are needed.
 
+## JSON Output
+
+All commands that return structured data support `--json` for machine-readable output:
+
+```bash
+komputer list --json
+komputer get my-agent --json
+komputer create my-agent "Do the thing" --json
+komputer delete my-agent --json
+komputer cancel my-agent --json
+komputer config my-agent --model claude-opus-4-6 --json
+komputer office list --json
+komputer office get my-office --json
+komputer schedule list --json
+komputer schedule get my-schedule --json
+komputer schedule create my-schedule "0 9 * * *" "Daily report" --json
+komputer schedule delete my-schedule --json
+komputer memory list --json
+komputer memory get k8s-runbook --json
+komputer memory create k8s-runbook --content "..." --json
+komputer memory edit k8s-runbook --content "..." --json
+komputer memory delete k8s-runbook --json
+komputer skill list --json
+komputer skill get python-expert --json
+komputer skill create python-expert --content "..." --json
+komputer skill edit python-expert --content "..." --json
+komputer skill delete python-expert --json
+```
+
+In JSON mode:
+- Human-formatted output is suppressed; raw JSON is written to stdout
+- Errors are written to stderr as `{"error": "...", "status": 404}` and exit with a non-zero code
+- `delete` commands return an array: `[{"name": "my-agent", "deleted": true}]`
+- `cancel` returns `{"name": "my-agent", "cancelled": true}`
+- `get` commands include events inline: `{"agent": {...}, "events": [...]}`
+- Streaming commands (`run`, `watch`, `chat`, `office watch`) do not support `--json`
+
+Useful for scripting:
+```bash
+# Get all agent names
+komputer list --json | jq -r '.agents[].name'
+
+# Check if a task completed successfully
+komputer get my-agent --json | jq -r '.agent.taskStatus'
+
+# Create and capture the agent name
+name=$(komputer create my-agent "Do something" --json | jq -r '.name')
+```
+
 ## Global Flags
 
 | Flag | Description |
 |------|-------------|
 | `--api <url>` | Override the saved API endpoint |
 | `-n, --namespace <ns>` | Target Kubernetes namespace |
+| `--json` | Output raw JSON instead of formatted text |
 | `--secret KEY=VALUE` | Pass secrets to the agent (repeatable, on create/run) |
 | `--memory <name>` | Attach a KomputerMemory by name (repeatable, on create/run/config) |
 | `--skill <name>` | Attach a KomputerSkill by name (repeatable, on create/run/config) |

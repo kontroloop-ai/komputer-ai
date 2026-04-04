@@ -192,7 +192,7 @@ make install     # Uses server-side apply (required for large PodSpec CRD)
 ### Run locally
 
 ```bash
-make run         # Runs against current kubeconfig cluster
+KOMPUTER_API_URL=http://localhost:8080 make run
 ```
 
 For HA deployments, enable leader election:

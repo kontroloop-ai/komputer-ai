@@ -1950,21 +1950,35 @@ func main() {
 		Short:   "Delete an office and all its agents",
 		Args:    cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
+			jsonMode, _ := cmd.Flags().GetBool("json")
 			ep := resolveEndpoint(cmd)
 			officeName := args[0]
 
 			data, status, err := apiRequest("DELETE", fmt.Sprintf("%s/api/v1/offices/%s%s", ep, url.PathEscape(officeName), nsQuery(cmd)), nil)
 			if err != nil {
+				if jsonMode {
+					dieJSON("Request failed: "+err.Error(), 0)
+				}
 				fmt.Println(errorStyle.Render("Request failed: " + err.Error()))
 				os.Exit(1)
 			}
 			if status == 404 {
+				if jsonMode {
+					dieJSON(fmt.Sprintf("Office %q not found", officeName), 404)
+				}
 				fmt.Println(errorStyle.Render(fmt.Sprintf("Office %q not found", officeName)))
 				os.Exit(1)
 			}
 			if status != 200 {
+				if jsonMode {
+					dieJSON(fmt.Sprintf("API error (%d): %s", status, string(data)), status)
+				}
 				fmt.Println(errorStyle.Render(fmt.Sprintf("API error (%d): %s", status, string(data))))
 				os.Exit(1)
+			}
+			if jsonMode {
+				printJSON(map[string]any{"name": officeName, "deleted": true})
+				return
 			}
 			fmt.Println(successStyle.Render(fmt.Sprintf("✔ Office %q deleted", officeName)))
 		},

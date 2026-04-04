@@ -431,6 +431,21 @@ func truncate(s string, max int) string {
 	return s
 }
 
+// ─── JSON output ─────────────────────────────────────────────────────────────
+
+func printJSON(v any) {
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	enc.Encode(v)
+}
+
+func dieJSON(msg string, httpStatus int) {
+	enc := json.NewEncoder(os.Stderr)
+	enc.SetIndent("", "  ")
+	enc.Encode(map[string]any{"error": msg, "status": httpStatus})
+	os.Exit(1)
+}
+
 // ─── Commands ────────────────────────────────────────────────────────────────
 
 func main() {
@@ -441,6 +456,7 @@ func main() {
 
 	root.PersistentFlags().String("api", "", "API endpoint URL (overrides login config)")
 	root.PersistentFlags().StringP("namespace", "n", "", "Kubernetes namespace (default: server default)")
+	root.PersistentFlags().Bool("json", false, "Output raw JSON instead of formatted text")
 
 	// ── login ────────────────────────────────────────────────────────────
 	root.AddCommand(&cobra.Command{

@@ -1011,6 +1011,65 @@ func (k *K8sClient) DeleteConnector(ctx context.Context, ns, name string) error 
 	return k.client.Delete(ctx, conn)
 }
 
+// UpdateConnectorAuth patches a connector CR to set authType=oauth and authSecretKeyRef.
+func (k *K8sClient) UpdateConnectorAuth(ctx context.Context, ns, name, secretName, secretKey string) error {
+	conn, err := k.GetConnector(ctx, ns, name)
+	if err != nil {
+		return err
+	}
+	conn.Spec.AuthType = "oauth"
+	conn.Spec.AuthSecretKeyRef = &corev1.SecretKeySelector{
+		LocalObjectReference: corev1.LocalObjectReference{Name: secretName},
+		Key:                  secretKey,
+	}
+	return k.client.Update(ctx, conn)
+}
+
+// SetSecretOwnerRef sets an owner reference on a secret so it is garbage-collected with the connector.
+func (k *K8sClient) SetSecretOwnerRef(ctx context.Context, ns, secretName, ownerName, ownerUID string) {
+	secret := &corev1.Secret{}
+	if err := k.client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: ns}, secret); err != nil {
+		return
+	}
+	ref := metav1.OwnerReference{
+		APIVersion: "komputer.komputer.ai/v1alpha1",
+		Kind:       "KomputerConnector",
+		Name:       ownerName,
+		UID:        types.UID(ownerUID),
+	}
+	// Avoid duplicate owner refs.
+	for _, existing := range secret.OwnerReferences {
+		if existing.Name == ownerName {
+			return
+		}
+	}
+	secret.OwnerReferences = append(secret.OwnerReferences, ref)
+	k.client.Update(ctx, secret)
+}
+
+// GetOAuthTokenData reads a secret key and parses it as a JSON map.
+func (k *K8sClient) GetOAuthTokenData(ctx context.Context, ns, secretName, key string) (map[string]interface{}, error) {
+	raw, err := k.GetSecretValue(ctx, ns, secretName, key)
+	if err != nil {
+		return nil, err
+	}
+	var data map[string]interface{}
+	if err := json.Unmarshal([]byte(raw), &data); err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+// UpdateOAuthTokenData marshals a token map and writes it to a secret key.
+func (k *K8sClient) UpdateOAuthTokenData(ctx context.Context, ns, secretName, key string, data map[string]interface{}) error {
+	raw, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	_, updateErr := k.UpdateManagedSecret(ctx, ns, secretName, map[string]string{key: string(raw)})
+	return updateErr
+}
+
 func (k *K8sClient) PatchAgentConnectorsList(ctx context.Context, ns, agentName string, connectors []string) error {
 	agent := &komputerv1alpha1.KomputerAgent{}
 	key := types.NamespacedName{Name: agentName, Namespace: ns}

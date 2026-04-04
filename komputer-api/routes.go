@@ -96,5 +96,9 @@ func SetupRoutes(r *gin.Engine, k8s *K8sClient, hub *Hub, worker *RedisWorker) {
 
 		v1.GET("/templates", listTemplates(k8s))
 		v1.GET("/namespaces", listNamespaces(k8s))
+
+		v1.GET("/oauth/authorize", oauthAuthorize(k8s))
+		v1.GET("/oauth/callback", oauthCallback(k8s))
+		v1.POST("/oauth/refresh", oauthRefresh(k8s))
 	}
 }

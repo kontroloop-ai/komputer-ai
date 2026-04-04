@@ -464,10 +464,18 @@ func main() {
 		Short: "Save API endpoint to ~/.komputer-ai/config.json",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
+			jsonMode, _ := cmd.Flags().GetBool("json")
 			endpoint := strings.TrimRight(args[0], "/")
 			if err := saveConfig(&Config{APIEndpoint: endpoint}); err != nil {
+				if jsonMode {
+					dieJSON("Failed to save config: "+err.Error(), 500)
+				}
 				fmt.Println(errorStyle.Render("Failed to save config: " + err.Error()))
 				os.Exit(1)
+			}
+			if jsonMode {
+				printJSON(map[string]string{"endpoint": endpoint, "config": configPath()})
+				return
 			}
 			fmt.Println(successStyle.Render("✔ Logged in"))
 			fmt.Printf("  %s %s\n", labelStyle.Render("Endpoint:"), valueStyle.Render(endpoint))

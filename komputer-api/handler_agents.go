@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -420,7 +422,7 @@ func getAgent(k8s *K8sClient) gin.HandlerFunc {
 // @Failure 400 {object} map[string]string "Invalid limit parameter"
 // @Failure 500 {object} map[string]string "Internal error"
 // @Router /agents/{name}/events [get]
-func getAgentEvents(worker *RedisWorker) gin.HandlerFunc {
+func getAgentEvents(worker *RedisWorker, k8s *K8sClient) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		name := c.Param("name")
 		limit := int64(50)
@@ -435,6 +437,62 @@ func getAgentEvents(worker *RedisWorker) gin.HandlerFunc {
 			}
 			limit = parsed
 		}
+
+		// Feature flag: source=session fetches history from the agent's Claude session file
+		// instead of Redis. This gives richer history including tool calls and thinking.
+		if c.Query("source") == "session" {
+			ns := resolveNamespace(c, k8s)
+			agent, err := k8s.GetAgent(c.Request.Context(), ns, name)
+			if err != nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": "agent not found"})
+				return
+			}
+			podName := agent.Status.PodName
+			if podName == "" {
+				c.JSON(http.StatusOK, gin.H{"agent": name, "events": []interface{}{}, "source": "session"})
+				return
+			}
+			podIP, _ := k8s.GetAgentPodIP(c.Request.Context(), ns, podName)
+			if podIP == "" {
+				c.JSON(http.StatusOK, gin.H{"agent": name, "events": []interface{}{}, "source": "session"})
+				return
+			}
+
+			// Fetch history from agent's /history endpoint.
+			agentURL := fmt.Sprintf("http://%s:8000/history?limit=%d", podIP, limit)
+			ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+			defer cancel()
+
+			req, _ := http.NewRequestWithContext(ctx, http.MethodGet, agentURL, nil)
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				// Fallback to Redis if agent unreachable
+				log.Printf("session history fetch failed for %s, falling back to redis: %v", name, err)
+				events, _ := GetAgentEventsBefore(c.Request.Context(), worker.Rdb, name, limit, "", worker.StreamPrefix)
+				c.JSON(http.StatusOK, gin.H{"agent": name, "events": events, "source": "redis"})
+				return
+			}
+			defer resp.Body.Close()
+
+			body, _ := io.ReadAll(resp.Body)
+			var result map[string]interface{}
+			json.Unmarshal(body, &result)
+
+			// Pass through the agent's response, adding agent name
+			events, _ := result["events"].([]interface{})
+			if events == nil {
+				events = []interface{}{}
+			}
+			// Add agentName to each event
+			for _, e := range events {
+				if ev, ok := e.(map[string]interface{}); ok {
+					ev["agentName"] = name
+				}
+			}
+			c.JSON(http.StatusOK, gin.H{"agent": name, "events": events, "source": "session"})
+			return
+		}
+
 		before := c.Query("before") // RFC-3339 cursor for pagination
 		events, err := GetAgentEventsBefore(c.Request.Context(), worker.Rdb, name, limit, before, worker.StreamPrefix)
 		if err != nil {

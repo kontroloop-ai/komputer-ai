@@ -151,6 +151,117 @@ def _interrupt_agent():
         _current_loop.call_soon_threadsafe(_current_task.cancel)
 
 
+@app.get("/history")
+async def get_history(limit: int = 50):
+    """Read messages from the Claude session JSONL file and return as agent events."""
+    import json as _json
+    from pathlib import Path
+    from agent import _load_session_id
+
+    session_id = _load_session_id()
+    if not session_id:
+        return {"events": []}
+
+    # Claude stores sessions at {CLAUDE_CONFIG_DIR}/projects/{project-slug}/{session-id}.jsonl
+    claude_dir = Path(os.environ.get("CLAUDE_CONFIG_DIR", str(Path.home() / ".claude")))
+    # Find the session file — check all project dirs
+    session_file = None
+    projects_dir = claude_dir / "projects"
+    if projects_dir.exists():
+        for project_dir in projects_dir.iterdir():
+            candidate = project_dir / f"{session_id}.jsonl"
+            if candidate.exists():
+                session_file = candidate
+                break
+
+    if not session_file or not session_file.exists():
+        return {"events": []}
+
+    events = []
+    try:
+        with open(session_file, "r") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = _json.loads(line)
+                except _json.JSONDecodeError:
+                    continue
+
+                msg = entry.get("message", {})
+                role = msg.get("role", "")
+                content = msg.get("content", "")
+                timestamp = entry.get("timestamp", "")
+
+                # Convert to AgentEvent format
+                if role == "user":
+                    # User message — either a string or list of content blocks
+                    text = content if isinstance(content, str) else ""
+                    if isinstance(content, list):
+                        text = " ".join(
+                            block.get("text", "") for block in content
+                            if isinstance(block, dict) and block.get("type") == "text"
+                        )
+                    if text:
+                        events.append({
+                            "type": "user_message",
+                            "timestamp": timestamp,
+                            "payload": {"content": text},
+                        })
+                elif role == "assistant":
+                    # Assistant message — content is a list of blocks
+                    if isinstance(content, list):
+                        for block in content:
+                            if not isinstance(block, dict):
+                                continue
+                            btype = block.get("type", "")
+                            if btype == "text":
+                                events.append({
+                                    "type": "text",
+                                    "timestamp": timestamp,
+                                    "payload": {"content": block.get("text", "")},
+                                })
+                            elif btype == "thinking":
+                                events.append({
+                                    "type": "thinking",
+                                    "timestamp": timestamp,
+                                    "payload": {"content": block.get("thinking", "")},
+                                })
+                            elif btype == "tool_use":
+                                events.append({
+                                    "type": "tool_call",
+                                    "timestamp": timestamp,
+                                    "payload": {
+                                        "tool": block.get("name", ""),
+                                        "input": block.get("input", {}),
+                                    },
+                                })
+                            elif btype == "tool_result":
+                                events.append({
+                                    "type": "tool_result",
+                                    "timestamp": timestamp,
+                                    "payload": {
+                                        "tool": block.get("tool_use_id", ""),
+                                        "output": str(block.get("content", ""))[:500],
+                                    },
+                                })
+                    elif isinstance(content, str) and content:
+                        events.append({
+                            "type": "text",
+                            "timestamp": timestamp,
+                            "payload": {"content": content},
+                        })
+    except Exception as e:
+        return {"events": [], "error": str(e)}
+
+    # Return last N events
+    if limit and len(events) > limit:
+        events = events[-limit:]
+
+    return {"events": events}
+
+
 @app.get("/download/{file_path:path}")
 async def download_file(file_path: str):
     """Serve a file from /files/ directory."""

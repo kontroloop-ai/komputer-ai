@@ -159,7 +159,7 @@ export function Sidebar() {
         {/* Logo */}
         <div className="flex items-center justify-between px-3 h-12 border-b border-[var(--color-border)]">
           <Link href="/" className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
-            <img src="/logo-no-bg.png" alt="komputer" width={34} height={18} className="shrink-0" style={{ filter: "drop-shadow(0 0 0.5px rgba(255,255,255,0.5))" }} />
+            <img src="/logo-no-bg.png" alt="komputer" width={34} height={18} className="shrink-0"  />
             <AnimatePresence>
               {!collapsed && (
                 <motion.div
@@ -169,7 +169,7 @@ export function Sidebar() {
                   exit={{ opacity: 0, width: 0 }}
                   transition={{ duration: 0.15 }}
                 >
-                  <img src="/logo-text-no-subtext-no-bg.png" alt="komputer" height={14} className="h-3.5 w-auto" style={{ filter: "drop-shadow(0 0 0.5px rgba(255,255,255,0.5))" }} />
+                  <img src="/logo-text-no-subtext-no-bg.png" alt="komputer" height={14} className="h-3.5 w-auto"  />
                 </motion.div>
               )}
             </AnimatePresence>

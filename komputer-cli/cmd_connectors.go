@@ -222,8 +222,8 @@ func registerConnectorCommands(root *cobra.Command) {
 			if connURL == "" && tmpl != nil && tmpl.URL != "" && tmpl.URL != "__custom__" {
 				connURL = tmpl.URL
 			}
-			if connURL == "" && !isOAuth {
-				msg := "--url is required"
+			if connURL == "" {
+				msg := "--url is required for custom connectors"
 				if jsonMode {
 					dieJSON(msg, 400)
 				}
@@ -381,7 +381,7 @@ func registerConnectorCommands(root *cobra.Command) {
 		},
 	}
 	connCreateCmd.Flags().String("service", "", "Service type (e.g. github, slack, notion) (required)")
-	connCreateCmd.Flags().String("url", "", "MCP server URL (auto-filled for known services)")
+	connCreateCmd.Flags().String("url", "", "MCP server URL (auto-filled from template for known services)")
 	connCreateCmd.Flags().String("token", "", "Auth token — creates a secret automatically (token-based connectors)")
 	connCreateCmd.Flags().String("display-name", "", "Display name")
 	connCreateCmd.Flags().String("client-id", "", "OAuth client ID (optional — auto-registered if supported)")

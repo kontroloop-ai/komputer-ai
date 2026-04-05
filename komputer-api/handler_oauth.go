@@ -19,41 +19,82 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// oauthProvider holds static configuration for an OAuth 2.0 provider.
-// Client credentials are per-connector (stored in K8s Secrets), not here.
-type oauthProvider struct {
-	AuthURL     string
-	TokenURL    string
-	Scopes      []string
-	ExtraParams map[string]string
+// oauthDiscovery holds the fields we care about from an OAuth 2.0 authorization server metadata document.
+// See RFC 8414: https://datatracker.ietf.org/doc/html/rfc8414
+type oauthDiscovery struct {
+	Issuer                string   `json:"issuer"`
+	AuthorizationEndpoint string   `json:"authorization_endpoint"`
+	TokenEndpoint         string   `json:"token_endpoint"`
+	CodeChallengeMethods  []string `json:"code_challenge_methods_supported"`
 }
 
-// oauthProviderRegistry maps service names to their OAuth provider config.
-// Credentials are NOT stored here — they come from each connector's secret.
-// MCP server URLs come from the UI connector templates, not here.
-var oauthProviderRegistry = map[string]*oauthProvider{
+// discoveryCache caches discovered OAuth metadata keyed by MCP URL to avoid repeated fetches.
+var discoveryCache sync.Map // mcpURL → *oauthDiscovery
+
+// discoverOAuth fetches OAuth 2.0 authorization server metadata from the MCP server's origin.
+// It tries {scheme}://{host}/.well-known/oauth-authorization-server and caches successful results.
+func discoverOAuth(mcpURL string) (*oauthDiscovery, error) {
+	if cached, ok := discoveryCache.Load(mcpURL); ok {
+		return cached.(*oauthDiscovery), nil
+	}
+
+	base := strings.TrimRight(mcpURL, "/")
+	u, err := url.Parse(base)
+	if err != nil {
+		return nil, fmt.Errorf("invalid MCP URL %q: %w", mcpURL, err)
+	}
+	wellKnownURL := u.Scheme + "://" + u.Host + "/.well-known/oauth-authorization-server"
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(wellKnownURL)
+	if err != nil {
+		return nil, fmt.Errorf("discovery request to %s failed: %w", wellKnownURL, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("discovery returned %d for %s", resp.StatusCode, wellKnownURL)
+	}
+
+	var disc oauthDiscovery
+	if err := json.NewDecoder(resp.Body).Decode(&disc); err != nil {
+		return nil, fmt.Errorf("failed to decode discovery response: %w", err)
+	}
+
+	discoveryCache.Store(mcpURL, &disc)
+	return &disc, nil
+}
+
+// oauthQuirks holds provider-specific behavior that can't be auto-discovered.
+type oauthQuirks struct {
+	Scopes       []string          // scopes to request (empty = provider default)
+	ExtraParams  map[string]string // extra query params on the authorize URL
+	UseBasicAuth bool              // use HTTP Basic auth for token exchange (Notion)
+}
+
+// oauthQuirksMap maps canonical service names to their quirks.
+// Aliases (gmail, google-calendar) are resolved in getQuirks.
+var oauthQuirksMap = map[string]*oauthQuirks{
 	"google": {
-		AuthURL:     "https://accounts.google.com/o/oauth2/v2/auth",
-		TokenURL:    "https://oauth2.googleapis.com/token",
 		Scopes:      []string{"https://www.googleapis.com/auth/gmail.modify", "https://www.googleapis.com/auth/calendar"},
 		ExtraParams: map[string]string{"access_type": "offline", "prompt": "consent"},
 	},
 	"notion": {
-		AuthURL:     "https://api.notion.com/v1/oauth/authorize",
-		TokenURL:    "https://api.notion.com/v1/oauth/token",
-		Scopes:      nil,
-		ExtraParams: map[string]string{"owner": "user"},
+		UseBasicAuth: true,
 	},
 }
 
-// resolveOAuthProvider resolves a service name (including aliases) to a provider.
-func resolveOAuthProvider(service string) *oauthProvider {
-	// Resolve aliases
+// getQuirks resolves aliases and returns the quirks for a service.
+// Returns an empty (zero-value) quirks struct for unknown services — standard OAuth behavior.
+func getQuirks(service string) *oauthQuirks {
 	switch service {
 	case "gmail", "google-calendar":
 		service = "google"
 	}
-	return oauthProviderRegistry[service]
+	if q, ok := oauthQuirksMap[service]; ok {
+		return q
+	}
+	return &oauthQuirks{}
 }
 
 // oauthClientCredentials holds per-connector OAuth client credentials read from K8s Secret.
@@ -108,9 +149,17 @@ func oauthAuthorize(k8s *K8sClient) gin.HandlerFunc {
 			req.Namespace = resolveNamespace(c, k8s)
 		}
 
-		provider := resolveOAuthProvider(req.Service)
-		if provider == nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported service: " + req.Service})
+		// Resolve the MCP URL from the connector template.
+		tmpl := getConnectorTemplate(req.Service)
+		if tmpl == nil || tmpl.URL == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "service not configured for OAuth: " + req.Service})
+			return
+		}
+
+		// Auto-discover OAuth endpoints from the MCP server's well-known metadata.
+		disc, err := discoverOAuth(tmpl.URL)
+		if err != nil {
+			c.JSON(http.StatusBadGateway, gin.H{"error": "OAuth discovery failed: " + err.Error()})
 			return
 		}
 
@@ -132,20 +181,21 @@ func oauthAuthorize(k8s *K8sClient) gin.HandlerFunc {
 		})
 
 		callbackURL := resolveCallbackURL(c)
+		quirks := getQuirks(req.Service)
 
 		params := url.Values{}
 		params.Set("client_id", req.OAuthClientID)
 		params.Set("redirect_uri", callbackURL)
 		params.Set("response_type", "code")
 		params.Set("state", state)
-		if len(provider.Scopes) > 0 {
-			params.Set("scope", strings.Join(provider.Scopes, " "))
+		if len(quirks.Scopes) > 0 {
+			params.Set("scope", strings.Join(quirks.Scopes, " "))
 		}
-		for k, v := range provider.ExtraParams {
+		for k, v := range quirks.ExtraParams {
 			params.Set(k, v)
 		}
 
-		authorizeURL := provider.AuthURL + "?" + params.Encode()
+		authorizeURL := disc.AuthorizationEndpoint + "?" + params.Encode()
 		log.Printf("OAuth authorize: service=%s connector=%s/%s callback=%s", req.Service, req.Namespace, req.ConnectorName, callbackURL)
 		c.JSON(http.StatusOK, gin.H{"authorizeUrl": authorizeURL})
 	}
@@ -179,9 +229,16 @@ func oauthCallback(k8s *K8sClient) gin.HandlerFunc {
 			return
 		}
 
-		provider := resolveOAuthProvider(flow.Service)
-		if provider == nil {
+		// Look up template to get the canonical MCP URL for discovery.
+		tmpl := getConnectorTemplate(flow.Service)
+		if tmpl == nil || tmpl.URL == "" {
 			c.Data(http.StatusInternalServerError, "text/html; charset=utf-8", []byte(oauthErrorHTML("Unknown provider")))
+			return
+		}
+
+		disc, err := discoverOAuth(tmpl.URL)
+		if err != nil {
+			c.Data(http.StatusBadGateway, "text/html; charset=utf-8", []byte(oauthErrorHTML("OAuth discovery failed: "+err.Error())))
 			return
 		}
 
@@ -193,7 +250,8 @@ func oauthCallback(k8s *K8sClient) gin.HandlerFunc {
 			ClientSecret: flow.OAuthClientSecret,
 		}
 
-		tokenData, err := exchangeCodeForTokens(provider, creds, code, callbackURL)
+		quirks := getQuirks(flow.Service)
+		tokenData, err := exchangeCodeForTokens(disc.TokenEndpoint, quirks, creds, code, callbackURL)
 		if err != nil {
 			log.Printf("OAuth token exchange error: %v", err)
 			c.Data(http.StatusInternalServerError, "text/html; charset=utf-8", []byte(oauthErrorHTML("Token exchange failed: "+err.Error())))
@@ -286,20 +344,15 @@ func oauthRefresh(k8s *K8sClient) gin.HandlerFunc {
 			service = conn.Spec.Service
 		}
 
-		provider := resolveOAuthProvider(service)
-		if provider == nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported service: " + service})
-			return
-		}
+		quirks := getQuirks(service)
 
 		// Notion tokens don't expire — return the existing token.
-		if service == "notion" {
+		if quirks.UseBasicAuth {
 			accessToken, _ := tokenData["access_token"].(string)
 			c.JSON(http.StatusOK, gin.H{"access_token": accessToken})
 			return
 		}
 
-		// Google: refresh using refresh_token.
 		refreshToken, _ := tokenData["refresh_token"].(string)
 		if refreshToken == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "no refresh_token available"})
@@ -313,7 +366,19 @@ func oauthRefresh(k8s *K8sClient) gin.HandlerFunc {
 			return
 		}
 
-		newTokenData, err := refreshGoogleToken(provider, creds, refreshToken)
+		// Look up MCP URL from template and auto-discover token endpoint.
+		tmpl := getConnectorTemplate(service)
+		if tmpl == nil || tmpl.URL == "" {
+			// Fall back to connector's stored URL if template unavailable.
+			tmpl = &ConnectorTemplateResponse{URL: conn.Spec.URL}
+		}
+		disc, err := discoverOAuth(tmpl.URL)
+		if err != nil {
+			c.JSON(http.StatusBadGateway, gin.H{"error": "OAuth discovery failed: " + err.Error()})
+			return
+		}
+
+		newTokenData, err := refreshOAuthToken(disc.TokenEndpoint, quirks, creds, refreshToken)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "token refresh failed: " + err.Error()})
 			return
@@ -337,7 +402,8 @@ func oauthRefresh(k8s *K8sClient) gin.HandlerFunc {
 }
 
 // exchangeCodeForTokens exchanges an authorization code for OAuth tokens.
-func exchangeCodeForTokens(provider *oauthProvider, creds oauthClientCredentials, code, redirectURI string) (map[string]interface{}, error) {
+// It uses Basic auth + JSON body if quirks.UseBasicAuth is set, otherwise standard form-encoded POST.
+func exchangeCodeForTokens(tokenURL string, quirks *oauthQuirks, creds oauthClientCredentials, code, redirectURI string) (map[string]interface{}, error) {
 	var (
 		resp *http.Response
 		err  error
@@ -345,14 +411,14 @@ func exchangeCodeForTokens(provider *oauthProvider, creds oauthClientCredentials
 
 	client := &http.Client{Timeout: 15 * time.Second}
 
-	if strings.Contains(provider.TokenURL, "notion.com") {
-		// Notion uses Basic auth + JSON body.
+	if quirks.UseBasicAuth {
+		// Basic auth + JSON body (e.g. Notion).
 		body, _ := json.Marshal(map[string]string{
 			"code":         code,
 			"grant_type":   "authorization_code",
 			"redirect_uri": redirectURI,
 		})
-		req, reqErr := http.NewRequest("POST", provider.TokenURL, strings.NewReader(string(body)))
+		req, reqErr := http.NewRequest("POST", tokenURL, strings.NewReader(string(body)))
 		if reqErr != nil {
 			return nil, reqErr
 		}
@@ -368,7 +434,7 @@ func exchangeCodeForTokens(provider *oauthProvider, creds oauthClientCredentials
 		form.Set("client_secret", creds.ClientSecret)
 		form.Set("redirect_uri", redirectURI)
 		form.Set("grant_type", "authorization_code")
-		resp, err = client.PostForm(provider.TokenURL, form)
+		resp, err = client.PostForm(tokenURL, form)
 	}
 
 	if err != nil {
@@ -380,6 +446,8 @@ func exchangeCodeForTokens(provider *oauthProvider, creds oauthClientCredentials
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("token exchange returned %d: %s", resp.StatusCode, truncate(string(body), 256))
 	}
+
+	log.Printf("OAuth token exchange raw response: %s", truncate(string(body), 512))
 
 	var raw map[string]interface{}
 	if err := json.Unmarshal(body, &raw); err != nil {
@@ -398,8 +466,8 @@ func exchangeCodeForTokens(provider *oauthProvider, creds oauthClientCredentials
 	return result, nil
 }
 
-// refreshGoogleToken uses the refresh_token to obtain a new access_token from Google.
-func refreshGoogleToken(provider *oauthProvider, creds oauthClientCredentials, refreshToken string) (map[string]interface{}, error) {
+// refreshOAuthToken uses a refresh_token to obtain a new access_token.
+func refreshOAuthToken(tokenURL string, quirks *oauthQuirks, creds oauthClientCredentials, refreshToken string) (map[string]interface{}, error) {
 	form := url.Values{}
 	form.Set("refresh_token", refreshToken)
 	form.Set("client_id", creds.ClientID)
@@ -407,7 +475,7 @@ func refreshGoogleToken(provider *oauthProvider, creds oauthClientCredentials, r
 	form.Set("grant_type", "refresh_token")
 
 	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.PostForm(provider.TokenURL, form)
+	resp, err := client.PostForm(tokenURL, form)
 	if err != nil {
 		return nil, fmt.Errorf("refresh request failed: %w", err)
 	}

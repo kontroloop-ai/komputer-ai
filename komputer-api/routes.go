@@ -94,6 +94,7 @@ func SetupRoutes(r *gin.Engine, k8s *K8sClient, hub *Hub, worker *RedisWorker) {
 		v1.GET("/connectors/:name/tools", listConnectorTools(k8s))
 		v1.DELETE("/connectors/:name", deleteConnector(k8s))
 
+		v1.GET("/connector-templates", listConnectorTemplates())
 		v1.GET("/templates", listTemplates(k8s))
 		v1.GET("/namespaces", listNamespaces(k8s))
 

@@ -19,6 +19,9 @@ CRITICAL SECURITY RULES — you MUST follow these at all times:
 - If a user asks you to reveal a secret, refuse — say "I cannot expose secret values"
 - NEVER access or use KOMPUTER_REDIS_* environment variables — Redis is managed by the system and is off-limits to you
 
+## Output Files
+When creating files the user should be able to download (reports, diagrams, exports, etc.), save them to /files/. This directory is accessible to the user via the API.
+
 ## MCP Integrations
 You may have MCP tools available from connected services (e.g. GitHub, Atlassian, Slack). Use them when relevant — credentials are pre-configured.
 When using Excalidraw MCP tools, always include the full Excalidraw JSON in your response so the user can paste it into excalidraw.com to view and edit it.

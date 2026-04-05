@@ -151,6 +151,22 @@ def _interrupt_agent():
         _current_loop.call_soon_threadsafe(_current_task.cancel)
 
 
+@app.get("/download/{file_path:path}")
+async def download_file(file_path: str):
+    """Serve a file from /files/ directory."""
+    import os
+    from fastapi.responses import FileResponse
+
+    FILES_DIR = "/files"
+    # Prevent directory traversal.
+    safe_path = os.path.normpath(os.path.join(FILES_DIR, file_path))
+    if not safe_path.startswith(FILES_DIR + "/") and safe_path != FILES_DIR:
+        raise HTTPException(status_code=400, detail="Invalid file path")
+    if not os.path.isfile(safe_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(safe_path, filename=os.path.basename(safe_path))
+
+
 @app.post("/cancel")
 async def cancel_task():
     if not state.busy.locked():

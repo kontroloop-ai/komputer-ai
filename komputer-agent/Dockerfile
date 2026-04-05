@@ -23,7 +23,7 @@ COPY . .
 # Sudo allows agents to install packages at runtime (apt-get, pip, npm).
 RUN useradd -m -s /bin/bash komputer && \
     echo "komputer ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
-    mkdir -p /workspace && chown komputer:komputer /workspace
+    mkdir -p /workspace /files && chown komputer:komputer /workspace /files
 USER komputer
 
 WORKDIR /workspace

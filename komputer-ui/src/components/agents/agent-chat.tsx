@@ -7,6 +7,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { AgentEvent } from "@/lib/types";
 import { createAgent, cancelAgent } from "@/lib/api";
+import { getConfig } from "@/lib/config";
 import { CostBadge } from "@/components/shared/cost-badge";
 import { CopyButton } from "@/components/shared/copy-button";
 import { cn } from "@/lib/utils";
@@ -283,7 +284,16 @@ function UserBubble({ text, timestamp }: { text: string; timestamp: string }) {
   );
 }
 
-function AgentBubble({ text, timestamp, usage }: { text: string; timestamp: string; usage?: TokenUsage }) {
+// Replace /files/ paths in agent text with clickable download links.
+function linkifyFiles(text: string, agentName: string, namespace: string): string {
+  return text.replace(
+    /(?:`)?\/files\/([\w.\-\/]+)(?:`)?/g,
+    (_, filePath) => `[📥 ${filePath}](${getConfig().apiUrl}/api/v1/agents/${agentName}/download/${filePath}?namespace=${namespace})`
+  );
+}
+
+function AgentBubble({ text, timestamp, usage, agentName, namespace }: { text: string; timestamp: string; usage?: TokenUsage; agentName?: string; namespace?: string }) {
+  const displayText = agentName ? linkifyFiles(text, agentName, namespace || "default") : text;
   return (
     <motion.div
       className="group/msg flex justify-start"
@@ -296,7 +306,7 @@ function AgentBubble({ text, timestamp, usage }: { text: string; timestamp: stri
           <CopyButton text={text} />
         </div>
         <div className="prose-chat text-sm text-[var(--color-text)]">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{displayText}</ReactMarkdown>
         </div>
         <div className="mt-1 flex items-center gap-1.5">
           <span className="text-[10px] text-[var(--color-text-secondary)]">
@@ -927,6 +937,8 @@ export function AgentChat({
                       text={msg.text}
                       timestamp={msg.timestamp}
                       usage={msg.usage}
+                      agentName={agentName}
+                      namespace={agentNamespace}
                     />
                   );
                 case "thinking":

@@ -83,6 +83,7 @@ export function CreateConnectorModal({ open, onOpenChange, onCreated, initialTem
 
   const isCustom = selectedTemplate?.service === "custom";
   const isOAuth = selectedTemplate?.authType === "oauth";
+  const isNoAuth = selectedTemplate?.authType === "none";
   const isKnownTemplate = selectedTemplate && selectedTemplate.url && !isCustom;
 
   useEffect(() => {
@@ -116,7 +117,7 @@ export function CreateConnectorModal({ open, onOpenChange, onCreated, initialTem
     if (!name.trim()) return "Name is required.";
     if (!NAME_PATTERN.test(name)) return "Name must be lowercase letters, numbers, and hyphens only.";
     if (!url.trim()) return "URL is required.";
-    if (isKnownTemplate && !credential.trim()) return `${selectedTemplate.authLabel} is required.`;
+    if (isKnownTemplate && !isNoAuth && !credential.trim()) return `${selectedTemplate.authLabel} is required.`;
     return null;
   }
 
@@ -420,7 +421,7 @@ export function CreateConnectorModal({ open, onOpenChange, onCreated, initialTem
                       </>
                     )}
 
-                    {!isOAuth && (
+                    {!isOAuth && !isNoAuth && (
                       <div className="flex flex-col gap-2">
                         <Label htmlFor="conn-cred">{isKnownTemplate ? selectedTemplate.authLabel : "Auth Token"}</Label>
                         <Input

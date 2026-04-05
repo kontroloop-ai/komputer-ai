@@ -235,7 +235,7 @@ export interface ConnectorTemplate {
   displayName: string;
   description: string;
   url: string;
-  authType: "token" | "oauth";
+  authType: "token" | "oauth" | "none";
   authLabel: string;
   authPlaceholder: string;
   guideSteps: string[];

@@ -223,6 +223,20 @@ var connectorTemplates = []ConnectorTemplateResponse{
 		LogoUrl: "https://cdn.simpleicons.org/notion/white",
 	},
 	{
+		Service:         "excalidraw",
+		DisplayName:     "Excalidraw",
+		Description:     "Hand-drawn diagrams and whiteboard sketches.",
+		URL:             "https://mcp.excalidraw.com/mcp",
+		AuthType:        "none",
+		AuthLabel:       "",
+		AuthPlaceholder: "",
+		GuideSteps: []string{
+			"No authentication required — just click Connect.",
+		},
+		Color:   "#6965DB",
+		LogoUrl: "https://cdn.simpleicons.org/excalidraw/6965DB",
+	},
+	{
 		Service:         "custom",
 		DisplayName:     "Custom",
 		Description:     "Connect any MCP server by URL.",

@@ -229,3 +229,22 @@ export interface CreateSecretRequest {
   data: Record<string, string>;
   namespace?: string;
 }
+
+export interface ConnectorTemplate {
+  service: string;
+  displayName: string;
+  description: string;
+  url: string;
+  authType: "token" | "oauth";
+  authLabel: string;
+  authPlaceholder: string;
+  guideSteps: string[];
+  color: string;
+  logoUrl: string;
+  manifest?: string;
+  manifestAfterStep?: number;
+}
+
+export interface ConnectorTemplateListResponse {
+  templates: ConnectorTemplate[];
+}

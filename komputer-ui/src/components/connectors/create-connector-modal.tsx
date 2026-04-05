@@ -16,7 +16,8 @@ import { Input } from "@/components/kit/input";
 import { Label } from "@/components/kit/label";
 import { NamespaceSelector } from "@/components/shared/namespace-selector";
 import { createConnector, createSecretResource, getOAuthAuthorizeUrl } from "@/lib/api";
-import { CONNECTOR_TEMPLATES, type ConnectorTemplate } from "@/lib/connector-templates";
+import { useConnectorTemplates } from "@/hooks/use-connector-templates";
+import type { ConnectorTemplate } from "@/lib/types";
 import { ArrowLeft, Copy, Check, Plug } from "lucide-react";
 
 const NAME_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -68,6 +69,7 @@ type CreateConnectorModalProps = {
 };
 
 export function CreateConnectorModal({ open, onOpenChange, onCreated, initialTemplate }: CreateConnectorModalProps) {
+  const { templates, loading: templatesLoading } = useConnectorTemplates();
   const [step, setStep] = useState<"pick" | "form">(initialTemplate ? "form" : "pick");
   const [selectedTemplate, setSelectedTemplate] = useState<ConnectorTemplate | null>(initialTemplate ?? null);
   const [name, setName] = useState("");
@@ -272,7 +274,9 @@ export function CreateConnectorModal({ open, onOpenChange, onCreated, initialTem
                 </DialogDescription>
               </DialogHeader>
               <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 gap-3 overflow-y-auto">
-                {CONNECTOR_TEMPLATES.map((tpl, i) => (
+                {templatesLoading ? (
+                  <div className="col-span-3 flex items-center justify-center py-12 text-sm text-[var(--color-text-muted)]">Loading...</div>
+                ) : templates.map((tpl, i) => (
                   <motion.button
                     key={tpl.service}
                     type="button"

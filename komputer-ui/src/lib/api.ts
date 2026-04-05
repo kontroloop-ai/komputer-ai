@@ -22,6 +22,7 @@ import type {
   ConnectorListResponse,
   ConnectorResponse,
   CreateConnectorRequest,
+  ConnectorTemplateListResponse,
 } from './types';
 import { getConfig } from './config';
 
@@ -191,6 +192,10 @@ export const getOAuthAuthorizeUrl = (data: {
 // Templates
 export const listTemplates = (ns?: string) =>
   request<TemplateListResponse>(`/templates${ns ? `?namespace=${ns}` : ''}`);
+
+// Connector templates
+export const listConnectorTemplates = () =>
+  request<ConnectorTemplateListResponse>('/connector-templates');
 
 // Health
 export const listNamespaces = () =>

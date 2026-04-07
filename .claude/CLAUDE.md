@@ -47,8 +47,10 @@ When adding a new field to `KomputerAgentSpec` or `KomputerAgentStatus`, it must
 | 7 | **CLI** | `komputer-cli/cmd_agents.go` — add flag + include in request/display |
 | 8 | **UI types** | `komputer-ui/src/lib/types.ts` — update `AgentResponse` / `CreateAgentRequest` |
 | 9 | **UI components** | `komputer-ui/src/components/` — display/accept the field where relevant |
+| 10 | **Manager MCP tools** | `komputer-agent/manager_tools.py` — add the field as a parameter to the `create_agent` / `patch_agent` tool schemas so manager agents can pass it |
+| 11 | **Manager system prompt** | `komputer-api/prompts/manager.md` — if the field changes what managers can configure or how they should behave, document it in the prompt |
 
-Do not merge a new field unless all layers are updated. A missing layer means clients can't see or set the field.
+Do not merge a new field unless all layers are updated. A missing layer means clients can't see or set the field — and a missing MCP tool parameter means manager agents can't pass it either.
 
 ## 6. Full-Stack Feature Consistency
 

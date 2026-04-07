@@ -106,16 +106,20 @@ func (k *K8sClient) EnsureNamespace(ctx context.Context, ns string) error {
 
 // WakeAgent wakes a sleeping agent by patching its instructions and setting the lifecycle.
 // If lifecycle is empty, the agent stays running after task (default). If "Sleep", it sleeps again.
-func (k *K8sClient) WakeAgent(ctx context.Context, ns, name, instructions, model, lifecycle string) error {
+func (k *K8sClient) WakeAgent(ctx context.Context, ns, name, instructions, internalSystemPrompt, systemPrompt, model, lifecycle string) error {
 	agent := &komputerv1alpha1.KomputerAgent{}
 	key := types.NamespacedName{Name: name, Namespace: ns}
 	if err := k.client.Get(ctx, key, agent); err != nil {
 		return err
 	}
 
-	// Patch spec: update instructions and lifecycle
+	// Patch spec: update instructions, system prompts, and lifecycle
 	original := agent.DeepCopy()
 	agent.Spec.Instructions = instructions
+	agent.Spec.InternalSystemPrompt = internalSystemPrompt
+	if systemPrompt != "" {
+		agent.Spec.SystemPrompt = systemPrompt
+	}
 	agent.Spec.Lifecycle = komputerv1alpha1.AgentLifecycle(lifecycle)
 	if model != "" {
 		agent.Spec.Model = model
@@ -255,7 +259,7 @@ func (k *K8sClient) UpdateManagedSecret(ctx context.Context, ns, name string, da
 	return secret, nil
 }
 
-func (k *K8sClient) CreateAgent(ctx context.Context, ns, name, instructions, model, templateRef, role string, secretNames []string, memories []string, skills []string, connectors []string, lifecycle, officeManager string) (*komputerv1alpha1.KomputerAgent, error) {
+func (k *K8sClient) CreateAgent(ctx context.Context, ns, name, instructions, internalSystemPrompt, systemPrompt, model, templateRef, role string, secretNames []string, memories []string, skills []string, connectors []string, lifecycle, officeManager string) (*komputerv1alpha1.KomputerAgent, error) {
 	if model == "" {
 		model = "claude-sonnet-4-6"
 	}
@@ -272,16 +276,18 @@ func (k *K8sClient) CreateAgent(ctx context.Context, ns, name, instructions, mod
 			},
 		},
 		Spec: komputerv1alpha1.KomputerAgentSpec{
-			TemplateRef:   templateRef,
-			Instructions:  instructions,
-			Model:         model,
-			Role:          role,
-			Secrets:       secretNames,
-			Memories:      memories,
-			Skills:        skills,
-			Connectors:    connectors,
-			Lifecycle:     komputerv1alpha1.AgentLifecycle(lifecycle),
-			OfficeManager: officeManager,
+			TemplateRef:          templateRef,
+			Instructions:         instructions,
+			InternalSystemPrompt: internalSystemPrompt,
+			SystemPrompt:         systemPrompt,
+			Model:                model,
+			Role:                 role,
+			Secrets:              secretNames,
+			Memories:             memories,
+			Skills:               skills,
+			Connectors:           connectors,
+			Lifecycle:            komputerv1alpha1.AgentLifecycle(lifecycle),
+			OfficeManager:        officeManager,
 		},
 	}
 
@@ -394,10 +400,13 @@ func (k *K8sClient) CancelAgentTask(ctx context.Context, ns, podName, podIP stri
 }
 
 // ForwardTaskToAgent sends a task to an agent's FastAPI endpoint, falling back to kubectl exec.
-func (k *K8sClient) ForwardTaskToAgent(ctx context.Context, ns, podName, podIP, instructions, model, systemPrompt string) (int64, error) {
+func (k *K8sClient) ForwardTaskToAgent(ctx context.Context, ns, podName, podIP, instructions, model, internalSystemPrompt, systemPrompt string) (int64, error) {
 	bodyMap := map[string]string{"instructions": instructions}
 	if model != "" {
 		bodyMap["model"] = model
+	}
+	if internalSystemPrompt != "" {
+		bodyMap["internal_system_prompt"] = internalSystemPrompt
 	}
 	if systemPrompt != "" {
 		bodyMap["system_prompt"] = systemPrompt
@@ -620,7 +629,7 @@ func (k *K8sClient) DeleteSchedule(ctx context.Context, ns, name string) error {
 }
 
 // PatchAgentSpec patches mutable spec fields on a KomputerAgent CR.
-func (k *K8sClient) PatchAgentSpec(ctx context.Context, ns, agentName string, model, lifecycle, instructions, templateRef *string) error {
+func (k *K8sClient) PatchAgentSpec(ctx context.Context, ns, agentName string, model, lifecycle, instructions, templateRef, systemPrompt *string) error {
 	agent := &komputerv1alpha1.KomputerAgent{}
 	key := types.NamespacedName{Name: agentName, Namespace: ns}
 	if err := k.client.Get(ctx, key, agent); err != nil {
@@ -642,6 +651,10 @@ func (k *K8sClient) PatchAgentSpec(ctx context.Context, ns, agentName string, mo
 	}
 	if templateRef != nil && *templateRef != agent.Spec.TemplateRef {
 		agent.Spec.TemplateRef = *templateRef
+		changed = true
+	}
+	if systemPrompt != nil && *systemPrompt != agent.Spec.SystemPrompt {
+		agent.Spec.SystemPrompt = *systemPrompt
 		changed = true
 	}
 	if !changed {

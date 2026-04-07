@@ -632,6 +632,9 @@ func registerAgentCommands(root *cobra.Command) {
 			if lc, _ := cmd.Flags().GetString("lifecycle"); lc != "" {
 				body["lifecycle"] = lc
 			}
+			if sp, _ := cmd.Flags().GetString("system-prompt"); sp != "" {
+				body["systemPrompt"] = sp
+			}
 
 			data, status, err := apiRequest("POST", ep+"/api/v1/agents", body)
 			if err != nil {
@@ -774,6 +777,7 @@ func registerAgentCommands(root *cobra.Command) {
 	runCmd.Flags().String("model", "", "Claude model to use")
 	runCmd.Flags().StringSlice("secret", nil, "Secrets as KEY=VALUE (repeatable, e.g. --secret GITHUB=ghp_xxx)")
 	runCmd.Flags().String("lifecycle", "", "Agent lifecycle: Sleep (delete pod after task) or AutoDelete (delete agent after task)")
+	runCmd.Flags().String("system-prompt", "", "Custom system prompt to inject into the agent")
 	root.AddCommand(runCmd)
 
 	// ── chat (interactive) ──────────────────────────────────────────────

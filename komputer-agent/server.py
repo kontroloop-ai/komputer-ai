@@ -25,6 +25,7 @@ class TaskRequest(BaseModel):
     instructions: str
     model: Optional[str] = None
     lifecycle: Optional[str] = None
+    internal_system_prompt: Optional[str] = None
     system_prompt: Optional[str] = None
 
 
@@ -117,7 +118,9 @@ async def create_task(req: TaskRequest, background_tasks: BackgroundTasks):
             loop = asyncio.new_event_loop()
             state.active_loop = loop
             _current_loop = loop
-            _current_task = loop.create_task(run_agent(req.instructions, task_model, _publisher, system_prompt=req.system_prompt))
+            combined_parts = [p for p in [req.internal_system_prompt, req.system_prompt] if p]
+            combined_system_prompt = "\n\n".join(combined_parts) if combined_parts else None
+            _current_task = loop.create_task(run_agent(req.instructions, task_model, _publisher, system_prompt=combined_system_prompt))
             try:
                 loop.run_until_complete(_current_task)
             except asyncio.CancelledError:

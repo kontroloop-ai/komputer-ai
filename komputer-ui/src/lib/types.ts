@@ -15,6 +15,7 @@ export interface AgentResponse {
   skills?: string[];
   connectors?: string[];
   instructions?: string;
+  systemPrompt?: string;
   createdAt: string;
 }
 
@@ -93,6 +94,7 @@ export interface CreateAgentRequest {
   connectors?: string[];
   secretRefs?: string[];
   lifecycle?: '' | 'Sleep' | 'AutoDelete';
+  systemPrompt?: string;
 }
 
 export interface CreateScheduleRequest {
@@ -120,6 +122,7 @@ export interface PatchAgentRequest {
   memories?: string[];
   skills?: string[];
   connectors?: string[];
+  systemPrompt?: string;
 }
 
 export interface ConnectorResponse {

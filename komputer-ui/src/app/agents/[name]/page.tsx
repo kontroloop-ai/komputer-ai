@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { motion } from "framer-motion";
-import { Ban, Trash2, Zap, Moon, Save, Check, Plus } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Ban, Trash2, Zap, Moon, Save, Check, Plus, ChevronRight } from "lucide-react";
 import { CreateSecretModal } from "@/components/secrets/create-secret-modal";
 import { Button } from "@/components/kit/button";
 import { Badge } from "@/components/kit/badge";
@@ -473,6 +473,8 @@ function SettingsCard({ agent, agentNs, onSaved }: {
   const [model, setModel] = useState(agent.model);
   const [lifecycle, setLifecycle] = useState<string>(agent.lifecycle || "default");
   const instructions = agent.instructions ?? "";
+  const [systemPrompt, setSystemPrompt] = useState(agent.systemPrompt ?? "");
+  const [systemPromptOpen, setSystemPromptOpen] = useState(!!agent.systemPrompt);
   const [agentSecretRefs, setAgentSecretRefs] = useState<string[]>(agent.secrets ?? []);
   const [availableSecrets, setAvailableSecrets] = useState<{ name: string; namespace: string }[]>([]);
   const [showAllSecrets, setShowAllSecrets] = useState(false);
@@ -519,7 +521,8 @@ function SettingsCard({ agent, agentNs, onSaved }: {
   const skillsChanged = JSON.stringify(agentSkills.sort()) !== JSON.stringify((agent.skills ?? []).sort());
   const connectorsChanged = JSON.stringify(agentConnectors.sort()) !== JSON.stringify((agent.connectors ?? []).sort());
   const secretsChanged = JSON.stringify(agentSecretRefs.sort()) !== JSON.stringify((agent.secrets ?? []).sort());
-  const hasChanges = model !== agent.model || lifecycle !== agentLifecycle || secretsChanged || memoriesChanged || skillsChanged || connectorsChanged;
+  const systemPromptChanged = systemPrompt !== (agent.systemPrompt ?? "");
+  const hasChanges = model !== agent.model || lifecycle !== agentLifecycle || secretsChanged || memoriesChanged || skillsChanged || connectorsChanged || systemPromptChanged;
 
   async function handleSave() {
     setSaving(true);
@@ -533,6 +536,7 @@ function SettingsCard({ agent, agentNs, onSaved }: {
       if (memoriesChanged) patch.memories = agentMemories;
       if (skillsChanged) patch.skills = agentSkills;
       if (connectorsChanged) patch.connectors = agentConnectors;
+      if (systemPromptChanged) patch.systemPrompt = systemPrompt.trim() || "";
       const updated = await patchAgent(agent.name, patch, agentNs);
       setSaved(true);
       onSaved(updated);
@@ -552,6 +556,38 @@ function SettingsCard({ agent, agentNs, onSaved }: {
       transition={{ duration: 0.3, ease: "easeOut", delay: 0.2 }}
     >
       <h3 className="text-[11px] uppercase tracking-wider font-semibold text-[var(--color-text-muted)]">Settings</h3>
+
+      {/* Collapsible system prompt */}
+      <div className="flex flex-col">
+        <button
+          type="button"
+          className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors cursor-pointer"
+          onClick={() => setSystemPromptOpen(!systemPromptOpen)}
+        >
+          <ChevronRight className={`size-3.5 transition-transform duration-150 ${systemPromptOpen ? "rotate-90" : ""}`} />
+          System Prompt <span className="text-[var(--color-text-muted)] font-normal">(Optional)</span>
+        </button>
+        <AnimatePresence initial={false}>
+          {systemPromptOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.15, ease: "easeOut" }}
+              className="overflow-hidden"
+            >
+              <div className="pt-2">
+                <Textarea
+                  value={systemPrompt}
+                  onChange={(e) => setSystemPrompt(e.target.value)}
+                  placeholder="Custom instructions that define agent behavior, persona, or constraints..."
+                  style={{ minHeight: 100 }}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       <div className="flex flex-col gap-1.5">
         <Label>Instructions</Label>

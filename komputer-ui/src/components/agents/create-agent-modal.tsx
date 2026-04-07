@@ -45,6 +45,8 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
   const [name, setName] = useState("");
   const [namespace, setNamespace] = useState("default");
   const [instructions, setInstructions] = useState("");
+  const [systemPrompt, setSystemPrompt] = useState("");
+  const [systemPromptOpen, setSystemPromptOpen] = useState(false);
   const [model, setModel] = useState("claude-sonnet-4-6");
   const [lifecycle, setLifecycle] = useState("default");
   const [role, setRole] = useState<"manager" | "worker" | undefined>(undefined);
@@ -70,6 +72,7 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
     setName("");
     setNamespace("default");
     setInstructions("");
+    setSystemPrompt("");
     setModel("claude-sonnet-4-6");
     setLifecycle("default");
     setTemplateRef("default");
@@ -159,6 +162,7 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
         memories: selectedMemories.length > 0 ? selectedMemories : undefined,
         skills: selectedSkills.length > 0 ? selectedSkills : undefined,
         connectors: selectedConnectors.length > 0 ? selectedConnectors : undefined,
+        systemPrompt: systemPrompt.trim() || undefined,
       };
       await createAgent(req);
       const agentName = name.trim();
@@ -208,6 +212,39 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
                 />
               </div>
               <NamespaceSelector value={namespace} onChange={setNamespace} />
+            </div>
+
+            {/* Collapsible system prompt */}
+            <div className="flex flex-col">
+              <button
+                type="button"
+                className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors cursor-pointer"
+                onClick={() => setSystemPromptOpen(!systemPromptOpen)}
+              >
+                <ChevronRight className={`size-3.5 transition-transform duration-150 ${systemPromptOpen ? "rotate-90" : ""}`} />
+                System Prompt <span className="text-[var(--color-text-muted)] font-normal">(Optional)</span>
+              </button>
+              <AnimatePresence initial={false}>
+                {systemPromptOpen && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.15, ease: "easeOut" }}
+                    className="overflow-hidden"
+                  >
+                    <div className="pt-2">
+                      <Textarea
+                        id="agent-system-prompt"
+                        placeholder="Custom instructions that define agent behavior, persona, or constraints..."
+                        value={systemPrompt}
+                        onChange={(e) => setSystemPrompt(e.target.value)}
+                        style={{ minHeight: 100 }}
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             <div className="flex flex-col gap-1.5">

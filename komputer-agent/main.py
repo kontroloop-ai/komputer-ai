@@ -68,6 +68,11 @@ def main():
     instructions = os.getenv("KOMPUTER_INSTRUCTIONS", "")
     agent_name = os.getenv("KOMPUTER_AGENT_NAME", "unknown")
 
+    internal_system_prompt = os.getenv("KOMPUTER_INTERNAL_SYSTEM_PROMPT", "")
+    user_system_prompt = os.getenv("KOMPUTER_SYSTEM_PROMPT", "")
+    combined_prompt_parts = [p for p in [internal_system_prompt, user_system_prompt] if p]
+    combined_system_prompt = "\n\n".join(combined_prompt_parts) if combined_prompt_parts else None
+
     # Initialize runtime config from env vars.
     config.init()
 
@@ -102,7 +107,7 @@ def main():
         with state.busy:
             try:
                 state.active_loop.run_until_complete(
-                    run_agent(instructions, model, publisher)
+                    run_agent(instructions, model, publisher, system_prompt=combined_system_prompt)
                 )
             except asyncio.CancelledError:
                 publisher.publish("task_cancelled", {"reason": "Cancelled by signal"})

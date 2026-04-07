@@ -29,6 +29,7 @@ type CreateAgentRequest struct {
 	Connectors   []string `json:"connectors"`   // optional KomputerConnector names to attach
 	Lifecycle     string   `json:"lifecycle"`     // "", "Sleep", or "AutoDelete"
 	OfficeManager string   `json:"officeManager"` // set by manager MCP tool
+	SystemPrompt  string   `json:"systemPrompt"`  // optional custom system prompt
 }
 
 type AgentResponse struct {
@@ -47,20 +48,9 @@ type AgentResponse struct {
 	Memories        []string `json:"memories,omitempty"`     // KomputerMemory names attached to this agent
 	Skills          []string `json:"skills,omitempty"`       // KomputerSkill names attached to this agent
 	Connectors      []string `json:"connectors,omitempty"`   // KomputerConnector names attached to this agent
-	Instructions    string   `json:"instructions,omitempty"` // User task extracted from spec.instructions
+	Instructions    string   `json:"instructions,omitempty"` // User task (spec.instructions)
+	SystemPrompt    string   `json:"systemPrompt,omitempty"` // Custom system prompt (spec.systemPrompt)
 	CreatedAt       string   `json:"createdAt"`
-}
-
-// extractUserTask extracts the user's task from the full instructions string.
-// The system prompt prefix ends at "## Your Task\n" — everything after that marker is the user task.
-// If no marker is found, the full instructions are returned.
-func extractUserTask(instructions string) string {
-	const marker = "## Your Task\n"
-	idx := strings.Index(instructions, marker)
-	if idx == -1 {
-		return instructions
-	}
-	return strings.TrimSpace(instructions[idx+len(marker):])
 }
 
 // mergeDefaultSkills adds default skill names to the explicit list, deduplicating.
@@ -91,6 +81,7 @@ type PatchAgentRequest struct {
 	Memories     *[]string `json:"memories,omitempty"`    // memory names to attach
 	Skills       *[]string `json:"skills,omitempty"`      // skill names to attach
 	Connectors   *[]string `json:"connectors,omitempty"`  // connector names to attach
+	SystemPrompt *string   `json:"systemPrompt,omitempty"` // custom system prompt
 }
 
 // createOrTriggerAgent creates a new agent or sends a task to an existing one.
@@ -141,11 +132,11 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 		// (not as part of conversation history — replaced on each task, never accumulates).
 		instructions := req.Instructions
 
-		// Build system prompt — memory resolution happens after we know if agent exists
+		// Build internal system prompt — memory resolution happens after we know if agent exists
 		// (existing agents use CR memories, new agents use request memories)
-		buildSystemPrompt := func(memories []string) string {
+		buildInternalSystemPrompt := func(memories []string) string {
 			memorySection, _ := k8s.ResolveMemoryContent(c.Request.Context(), ns, memories)
-			agentHeader := fmt.Sprintf("\n---\n\n**Agent Name:** %s\n\n## Your Task\n", req.Name)
+			agentHeader := fmt.Sprintf("\n---\n\n**Agent Name:** %s", req.Name)
 			if role == "manager" {
 				return managerSystemPrompt + memorySection + agentHeader
 			}
@@ -166,7 +157,11 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 			if len(req.Memories) > 0 {
 				wakeMemories = req.Memories
 			}
-			if err := k8s.WakeAgent(c.Request.Context(), ns, req.Name, buildSystemPrompt(wakeMemories)+"\n\n"+instructions, req.Model, req.Lifecycle); err != nil {
+			wakeSystemPrompt := req.SystemPrompt
+				if wakeSystemPrompt == "" {
+					wakeSystemPrompt = existing.Spec.SystemPrompt
+				}
+				if err := k8s.WakeAgent(c.Request.Context(), ns, req.Name, instructions, buildInternalSystemPrompt(wakeMemories), wakeSystemPrompt, req.Model, req.Lifecycle); err != nil {
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to wake agent: " + err.Error()})
 					return
 				}
@@ -185,7 +180,8 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 					Memories:        existing.Spec.Memories,
 					Skills:          mergeDefaultSkills(existing.Spec.Skills, defaultSkills),
 					Connectors:      existing.Spec.Connectors,
-					Instructions:    extractUserTask(existing.Spec.Instructions),
+					Instructions:    existing.Spec.Instructions,
+					SystemPrompt:    existing.Spec.SystemPrompt,
 					CreatedAt:       existing.CreationTimestamp.UTC().Format(time.RFC3339),
 				})
 				return
@@ -212,7 +208,11 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 			if len(req.Memories) > 0 {
 				forwardMemories = req.Memories
 			}
-			cw, err := k8s.ForwardTaskToAgent(c.Request.Context(), ns, existing.Status.PodName, podIP, instructions, req.Model, buildSystemPrompt(forwardMemories))
+			forwardSystemPrompt := req.SystemPrompt
+			if forwardSystemPrompt == "" {
+				forwardSystemPrompt = existing.Spec.SystemPrompt
+			}
+			cw, err := k8s.ForwardTaskToAgent(c.Request.Context(), ns, existing.Status.PodName, podIP, instructions, req.Model, buildInternalSystemPrompt(forwardMemories), forwardSystemPrompt)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to forward task: " + err.Error()})
 				return
@@ -247,7 +247,8 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 				Memories:        existing.Spec.Memories,
 				Skills:          mergeDefaultSkills(existing.Spec.Skills, defaultSkills),
 				Connectors:      existing.Spec.Connectors,
-				Instructions:    extractUserTask(existing.Spec.Instructions),
+				Instructions:    existing.Spec.Instructions,
+				SystemPrompt:    existing.Spec.SystemPrompt,
 				CreatedAt:       existing.CreationTimestamp.UTC().Format(time.RFC3339),
 			})
 			return
@@ -258,7 +259,7 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 			return
 		}
 
-		agent, err := k8s.CreateAgent(c.Request.Context(), ns, req.Name, buildSystemPrompt(req.Memories)+"\n\n"+instructions, req.Model, req.TemplateRef, role, req.SecretRefs, req.Memories, req.Skills, req.Connectors, req.Lifecycle, req.OfficeManager)
+		agent, err := k8s.CreateAgent(c.Request.Context(), ns, req.Name, instructions, buildInternalSystemPrompt(req.Memories), req.SystemPrompt, req.Model, req.TemplateRef, role, req.SecretRefs, req.Memories, req.Skills, req.Connectors, req.Lifecycle, req.OfficeManager)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create agent: " + err.Error()})
 			return
@@ -275,7 +276,8 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 			Memories:     agent.Spec.Memories,
 			Skills:       mergeDefaultSkills(agent.Spec.Skills, defaultSkills),
 			Connectors:   agent.Spec.Connectors,
-			Instructions: extractUserTask(agent.Spec.Instructions),
+			Instructions: agent.Spec.Instructions,
+			SystemPrompt: agent.Spec.SystemPrompt,
 			CreatedAt:    agent.CreationTimestamp.UTC().Format(time.RFC3339),
 			TotalTokens:        agent.Status.TotalTokens,
 			ModelContextWindow: agent.Status.ModelContextWindow,
@@ -404,7 +406,8 @@ func getAgent(k8s *K8sClient) gin.HandlerFunc {
 			Memories:           agent.Spec.Memories,
 			Skills:             mergeDefaultSkills(agent.Spec.Skills, defaultSkills),
 			Connectors:         agent.Spec.Connectors,
-			Instructions:       extractUserTask(agent.Spec.Instructions),
+			Instructions:       agent.Spec.Instructions,
+			SystemPrompt:       agent.Spec.SystemPrompt,
 			CreatedAt:          agent.CreationTimestamp.UTC().Format(time.RFC3339),
 		})
 	}
@@ -509,7 +512,8 @@ func listAgents(k8s *K8sClient) gin.HandlerFunc {
 				Memories:           a.Spec.Memories,
 				Skills:             mergeDefaultSkills(a.Spec.Skills, defaultSkills),
 				Connectors:         a.Spec.Connectors,
-				Instructions:       extractUserTask(a.Spec.Instructions),
+				Instructions:       a.Spec.Instructions,
+				SystemPrompt:       a.Spec.SystemPrompt,
 				CreatedAt:          a.CreationTimestamp.UTC().Format(time.RFC3339),
 			})
 		}
@@ -542,13 +546,13 @@ func patchAgent(k8s *K8sClient) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: " + err.Error()})
 			return
 		}
-		if req.Model == nil && req.Lifecycle == nil && req.Instructions == nil && req.TemplateRef == nil && req.SecretRefs == nil && req.Memories == nil && req.Skills == nil && req.Connectors == nil {
+		if req.Model == nil && req.Lifecycle == nil && req.Instructions == nil && req.TemplateRef == nil && req.SecretRefs == nil && req.Memories == nil && req.Skills == nil && req.Connectors == nil && req.SystemPrompt == nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "no fields to update"})
 			return
 		}
 
 		// 1. Patch CR spec first — this is the source of truth.
-		if err := k8s.PatchAgentSpec(c.Request.Context(), ns, name, req.Model, req.Lifecycle, req.Instructions, req.TemplateRef); err != nil {
+		if err := k8s.PatchAgentSpec(c.Request.Context(), ns, name, req.Model, req.Lifecycle, req.Instructions, req.TemplateRef, req.SystemPrompt); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to patch agent: " + err.Error()})
 			return
 		}
@@ -663,7 +667,8 @@ func patchAgent(k8s *K8sClient) gin.HandlerFunc {
 			Secrets:            updated.Spec.Secrets,
 			Memories:           updated.Spec.Memories,
 			Skills:             mergeDefaultSkills(updated.Spec.Skills, defaultSkills),
-			Instructions:       extractUserTask(updated.Spec.Instructions),
+			Instructions:       updated.Spec.Instructions,
+			SystemPrompt:       updated.Spec.SystemPrompt,
 			Connectors:         updated.Spec.Connectors,
 			CreatedAt:          updated.CreationTimestamp.UTC().Format(time.RFC3339),
 		})

@@ -58,8 +58,14 @@ type KomputerAgentSpec struct {
 	// TemplateRef is the name of the KomputerAgentTemplate to use.
 	// +kubebuilder:default="default"
 	TemplateRef string `json:"templateRef,omitempty"`
-	// Instructions is the prompt/task for the Claude agent.
+	// Instructions is the user's task for the Claude agent.
 	Instructions string `json:"instructions"`
+	// InternalSystemPrompt is the built-in system prompt set by the API (role prompt + memories).
+	// +optional
+	InternalSystemPrompt string `json:"internalSystemPrompt,omitempty"`
+	// SystemPrompt is a custom system prompt provided by the user, appended to the internal prompt.
+	// +optional
+	SystemPrompt string `json:"systemPrompt,omitempty"`
 	// Model is the Claude model to use.
 	// +kubebuilder:default="claude-sonnet-4-6"
 	Model string `json:"model,omitempty"`

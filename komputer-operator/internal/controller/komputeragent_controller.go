@@ -536,6 +536,8 @@ func (r *KomputerAgentReconciler) buildPod(ctx context.Context, agent *komputerv
 	redis := config.Spec.Redis
 	envVars := []corev1.EnvVar{
 		{Name: "KOMPUTER_INSTRUCTIONS", Value: agent.Spec.Instructions},
+		{Name: "KOMPUTER_INTERNAL_SYSTEM_PROMPT", Value: agent.Spec.InternalSystemPrompt},
+		{Name: "KOMPUTER_SYSTEM_PROMPT", Value: agent.Spec.SystemPrompt},
 		{Name: "KOMPUTER_MODEL", Value: agent.Spec.Model},
 		{Name: "KOMPUTER_AGENT_NAME", Value: agent.Name},
 		{Name: "KOMPUTER_NAMESPACE", Value: agent.Namespace},

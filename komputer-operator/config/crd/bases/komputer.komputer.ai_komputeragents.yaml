@@ -63,7 +63,11 @@ spec:
                   type: string
                 type: array
               instructions:
-                description: Instructions is the prompt/task for the Claude agent.
+                description: Instructions is the user's task for the Claude agent.
+                type: string
+              internalSystemPrompt:
+                description: InternalSystemPrompt is the built-in system prompt set
+                  by the API (role prompt + memories).
                 type: string
               lifecycle:
                 description: |-
@@ -115,6 +119,10 @@ spec:
                 items:
                   type: string
                 type: array
+              systemPrompt:
+                description: SystemPrompt is a custom system prompt provided by the
+                  user, appended to the internal prompt.
+                type: string
               templateRef:
                 default: default
                 description: TemplateRef is the name of the KomputerAgentTemplate

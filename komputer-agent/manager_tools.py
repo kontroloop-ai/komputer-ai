@@ -52,6 +52,7 @@ async def _request(method: str, path: str, timeout: int = 10, **kwargs) -> dict:
             "lifecycle": {"type": "string", "enum": ["", "Sleep", "AutoDelete"], "description": "Post-task behavior. Empty=pod stays running, 'Sleep'=pod deleted/PVC kept, 'AutoDelete'=everything deleted."},
             "model": {"type": "string", "description": "Claude model override (optional)."},
             "templateRef": {"type": "string", "description": "Pod template name (optional, defaults to 'default')."},
+            "systemPrompt": {"type": "string", "description": "Custom system prompt defining the sub-agent's behavior, persona, or constraints (optional)."},
         },
         "required": ["name", "instructions"],
     },
@@ -71,6 +72,8 @@ async def create_agent(args):
         payload["model"] = args["model"]
     if args.get("templateRef"):
         payload["templateRef"] = args["templateRef"]
+    if args.get("systemPrompt"):
+        payload["systemPrompt"] = args["systemPrompt"]
 
     # Identify this agent as the office manager so the operator can create/join an Office.
     manager_name = os.environ.get("KOMPUTER_AGENT_NAME", "")

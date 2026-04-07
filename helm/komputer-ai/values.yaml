@@ -102,8 +102,12 @@ agent:
   defaultModel: claude-sonnet-4-6
   # -- Service account for agent pods (e.g. for kubectl access inside agents)
   serviceAccount:
-    # -- Set to true to create a ServiceAccount, Role, and RoleBinding for agent pods
+    # -- Set to true to create a ServiceAccount, Role/ClusterRole, and binding for agent pods
     create: false
+    # -- Use a ClusterRole instead of a namespace-scoped Role.
+    # Set to true when agents need access to cluster-wide resources (nodes, namespaces, CRDs, etc.)
+    # or need to operate across multiple namespaces. Default false = namespace-scoped Role.
+    clusterWide: false
     # -- RBAC rules granted to the agent service account.
     # Only used when serviceAccount.create is true.
     rules: []

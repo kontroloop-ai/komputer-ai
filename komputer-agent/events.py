@@ -72,12 +72,17 @@ class EventPublisher:
         log_entry = {**event, "payload": payload}
         print(json.dumps(log_entry), flush=True)
 
-        # For task_started: trim old messages and publish atomically.
+        # For task_started: trim old messages and publish atomically so the
+        # stream only contains events from the current task.
         # Uses XTRIM (not DELETE) to preserve the stream key and its consumer groups.
+        # SKIP the trim for steer continuations — they are part of an ongoing task,
+        # not a new one, so their preceding events must be kept.
         if event_type == "task_started":
+            is_steer = payload.get("steer", False)
             try:
                 pipe = self.client.pipeline(transaction=True)
-                pipe.xtrim(stream_key, maxlen=0)
+                if not is_steer:
+                    pipe.xtrim(stream_key, maxlen=0)
                 pipe.xadd(stream_key, event, maxlen=200, approximate=True)
                 pipe.execute()
             except redis.RedisError as e:

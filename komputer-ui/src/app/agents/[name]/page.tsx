@@ -65,13 +65,13 @@ export default function AgentDetailPage() {
   // Fetch event history on mount
   useEffect(() => {
     if (!agentName) return;
-    // If scrollTo is set, fetch all events so we can scroll to the target task.
-    const fetchLimit = scrollToTimestamp ? 0 : 50;
+    // If scrollTo is set, fetch many events so we can scroll to the target task.
+    const fetchLimit = scrollToTimestamp ? 200 : 50;
     getAgentEvents(agentName, fetchLimit, agentNs)
       .then((data: unknown) => {
         const arr = parseEventsResponse(data);
         setHistoryEvents(arr);
-        if (fetchLimit === 0 || arr.length < 50) setHasMoreEvents(false);
+        if (fetchLimit > 50 || arr.length < 50) setHasMoreEvents(false);
       })
       .catch(() => {});
   }, [agentName, agentNs, parseEventsResponse, scrollToTimestamp]);

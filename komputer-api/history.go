@@ -218,9 +218,9 @@ func GetAgentEventsAround(ctx context.Context, rdb *redis.Client, agentName stri
 	}
 
 	// lo is the index of the first event >= around.
-	// Heavy bias toward events after the target (task content follows the start).
-	before := limit / 10
-	after := limit - before
+	// Start exactly at the target — no events before it.
+	before := int64(0)
+	after := limit
 	start := lo - before
 	end := lo + after
 	if start < 0 {

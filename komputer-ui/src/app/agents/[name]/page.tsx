@@ -66,7 +66,7 @@ export default function AgentDetailPage() {
   // Fetch event history on mount
   useEffect(() => {
     if (!agentName) return;
-    const limit = taskFrom ? 200 : 50;
+    const limit = taskFrom ? 100 : 50;
     getAgentEvents(agentName, limit, agentNs, undefined, undefined, taskFrom)
       .then((data: unknown) => {
         const arr = parseEventsResponse(data);

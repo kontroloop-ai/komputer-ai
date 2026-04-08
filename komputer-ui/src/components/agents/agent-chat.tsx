@@ -723,7 +723,7 @@ export const MessageList = React.memo(function MessageList({ messages, agentName
 
         const msgTime = new Date(msg.timestamp).getTime();
         const isHighlighted = fromTime != null && toTime != null && msgTime >= fromTime && msgTime <= toTime;
-        const highlightClass = isHighlighted ? "border-l-2 border-amber-400/50 pl-2" : "";
+        const highlightClass = isHighlighted ? "ring-1 ring-amber-400/40 rounded-lg" : "";
         const highlightAttr = isHighlighted ? { "data-task-highlight": "" } : {};
 
         switch (msg.kind) {
@@ -949,8 +949,14 @@ export function AgentChat({
   const loadingOlderRef = useRef(loadingOlder);
   loadingOlderRef.current = loadingOlder;
 
+  // Re-run when messages first load (initialScrollDone becomes true).
+  const [observerReady, setObserverReady] = useState(false);
   useEffect(() => {
-    if (!initialScrollDone.current) return;
+    if (initialScrollDone.current && !observerReady) setObserverReady(true);
+  }, [messages.length, observerReady]);
+
+  useEffect(() => {
+    if (!observerReady) return;
     const sentinel = sentinelRef.current;
     const container = scrollContainerRef.current;
     if (!sentinel || !container) return;
@@ -964,7 +970,7 @@ export function AgentChat({
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [agentName]);
+  }, [observerReady, agentName]);
 
   const handleSend = useCallback(() => {
     const text = input.trim();

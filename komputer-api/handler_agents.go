@@ -888,8 +888,9 @@ func parseSessionJSONL(raw []byte, agentName string, limit int64) []AgentEvent {
 			if text == "" {
 				continue
 			}
-			// Skip IDE context messages (file open, selection, etc.) — not real user input.
-			if strings.HasPrefix(text, "<ide_") || strings.HasPrefix(text, "<system-reminder") {
+			// Skip IDE context messages, interruption markers, and system messages.
+			if strings.HasPrefix(text, "<ide_") || strings.HasPrefix(text, "<system-reminder") ||
+				text == "[Request interrupted by user]" {
 				continue
 			}
 			// The agent prepends the system prompt to user messages joined by "\n\n".
@@ -946,14 +947,21 @@ func parseSessionJSONL(raw []byte, agentName string, limit int64) []AgentEvent {
 				switch btype {
 				case "text":
 					text, _ := b["text"].(string)
-					if text != "" {
-						events = append(events, AgentEvent{
-							AgentName: agentName,
-							Type:      "text",
-							Timestamp: timestamp,
-							Payload:   map[string]interface{}{"content": text},
-						})
+					if text == "" {
+						break
 					}
+					// Skip compaction summaries and stub responses from JSONL.
+					if strings.Contains(text, "read the full transcript at:") ||
+						strings.Contains(text, "Continue the conversation from where it left off") ||
+						text == "No response requested." {
+						break
+					}
+					events = append(events, AgentEvent{
+						AgentName: agentName,
+						Type:      "text",
+						Timestamp: timestamp,
+						Payload:   map[string]interface{}{"content": text},
+					})
 				case "thinking":
 					thinking, _ := b["thinking"].(string)
 					if thinking != "" {

@@ -43,6 +43,7 @@ export function AgentTaskBreakdown({ agents }: { agents: AgentResponse[] }) {
 
   const agentsWithCost = agents
     .filter((a) => parseFloat(a.totalCostUSD || "0") > 0)
+    .filter((a, i, arr) => arr.findIndex((b) => b.name === a.name) === i)
     .sort((a, b) => parseFloat(b.totalCostUSD || "0") - parseFloat(a.totalCostUSD || "0"));
 
   const fetchBreakdown = async (name: string, refresh = false) => {

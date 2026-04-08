@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence, useAnimation } from "framer-motion";
 import ReactMarkdown from "react-markdown";
@@ -39,6 +39,8 @@ type AgentChatProps = {
   hasMoreEvents?: boolean;
   loadingOlder?: boolean;
   onLoadOlder?: () => void;
+  scrollContainerRef?: React.RefObject<HTMLElement | null>;
+  scrollSnapshotRef?: React.RefObject<number | null>;
 };
 
 // --- Message types derived from events ---
@@ -698,6 +700,48 @@ function ErrorBar({ message }: { message: string }) {
   );
 }
 
+// --- Memoized message list — skips re-render when only input state changes ---
+
+const MessageList = React.memo(function MessageList({ messages, agentName, agentNamespace }: { messages: ChatMessage[]; agentName?: string; agentNamespace?: string }) {
+  const userTextCount: Record<string, number> = {};
+  return (
+    <>
+      {messages.map((msg, i) => {
+        const key = (() => {
+          if (msg.kind === "user") {
+            const slug = msg.text.slice(0, 80);
+            const n = (userTextCount[slug] = (userTextCount[slug] ?? 0) + 1);
+            return `user-${slug}-${n}`;
+          }
+          return `${msg.kind}-${msg.timestamp}-${i}`;
+        })();
+        switch (msg.kind) {
+          case "user":
+            return <UserBubble key={key} text={msg.text} timestamp={msg.timestamp} />;
+          case "text":
+            return <AgentBubble key={key} text={msg.text} timestamp={msg.timestamp} usage={msg.usage} agentName={agentName} namespace={agentNamespace} />;
+          case "thinking":
+            return <ThinkingBubble key={key} text={msg.text} />;
+          case "tool":
+            return (
+              <motion.div key={key} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: "easeOut" }}>
+                {msg.toolName === "Skill"
+                  ? <SkillCard skillName={msg.description ?? "skill"} args={msg.command} />
+                  : <ToolCard toolName={msg.toolName} description={msg.description} command={msg.command} input={msg.input} output={msg.output} />}
+              </motion.div>
+            );
+          case "completed":
+            return <CompletedDivider key={key} costUSD={msg.costUSD} duration={msg.duration} turns={msg.turns} inputTokens={msg.inputTokens} outputTokens={msg.outputTokens} cacheReadTokens={msg.cacheReadTokens} cacheCreationTokens={msg.cacheCreationTokens} />;
+          case "cancelled":
+            return <CancelledDivider key={key} />;
+          case "error":
+            return <ErrorBar key={key} message={msg.message} />;
+        }
+      })}
+    </>
+  );
+});
+
 // --- Main component ---
 
 export function AgentChat({
@@ -712,6 +756,8 @@ export function AgentChat({
   hasMoreEvents,
   loadingOlder,
   onLoadOlder,
+  scrollContainerRef: parentScrollRef,
+  scrollSnapshotRef,
 }: AgentChatProps) {
   const [input, setInputRaw] = useState(() => {
     if (typeof window === "undefined") return "";
@@ -757,10 +803,16 @@ export function AgentChat({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const eventCountAtSend = useRef(events.length);
-  const prevMessagesLenRef = useRef(0);
   const forceScrollToBottom = useRef(false);
 
-  const serverMessages = eventsToChatMessages(events);
+  // Expose scroll container to parent for scrollHeight snapshots.
+  useEffect(() => {
+    if (parentScrollRef && scrollContainerRef.current) {
+      (parentScrollRef as { current: HTMLElement | null }).current = scrollContainerRef.current;
+    }
+  });
+
+  const serverMessages = useMemo(() => eventsToChatMessages(events), [events]);
 
   // Derive working state from events (primary) with polled taskStatus as fallback
   const eventBasedWorking = (() => {
@@ -789,9 +841,9 @@ export function AgentChat({
 
   // Build messages: merge server messages with local user messages that server didn't echo.
   // Pending message is shown instantly, then replaced by the server echo (same render, no duplicate).
-  const messages: ChatMessage[] = (() => {
+  const messages: ChatMessage[] = useMemo(() => {
     const serverUserTexts = new Set(
-      serverMessages.filter((m) => m.kind === "user").map((m) => m.text.trim())
+      serverMessages.filter((m): m is ChatMessage & { kind: "user"; text: string } => m.kind === "user").map((m) => m.text.trim())
     );
     const missingUserMessages = localUserMessages.filter(
       (m) => m.kind === "user"
@@ -811,7 +863,7 @@ export function AgentChat({
     }
 
     return all.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-  })();
+  }, [serverMessages, localUserMessages, pendingText, pendingTimestamp]);
 
   const lastInputTokens = (() => {
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -822,34 +874,16 @@ export function AgentChat({
     return undefined;
   })();
 
-  // Preserve scroll position when older messages are prepended
-  useEffect(() => {
+  // Restore scroll position when older messages are prepended.
+  // Parent snapshots scrollHeight BEFORE state update; useLayoutEffect runs
+  // AFTER DOM update but BEFORE paint — so user sees no jump.
+  useLayoutEffect(() => {
     const container = scrollContainerRef.current;
-    if (!container) return;
-    const prevLen = prevMessagesLenRef.current;
-    const curLen = messages.length;
-    // If messages were added at the top (prepended), restore scroll position
-    if (prevLen > 0 && curLen > prevLen) {
-      const delta = curLen - prevLen;
-      // Check if scroll was near the top (user was scrolling up to load more)
-      // We use a threshold to avoid interfering with normal bottom-scroll
-      if (container.scrollTop < 200) {
-        // Defer to after DOM paint
-        requestAnimationFrame(() => {
-          // Measure the height of newly prepended items
-          const children = container.querySelector("[data-messages]")?.children;
-          if (children) {
-            let addedHeight = 0;
-            for (let i = 0; i < delta && i < children.length; i++) {
-              addedHeight += (children[i] as HTMLElement).offsetHeight + 12; // 12 = gap-3
-            }
-            container.scrollTop = addedHeight;
-          }
-        });
-      }
-    }
-    prevMessagesLenRef.current = curLen;
-  }, [messages.length]);
+    const snapshot = scrollSnapshotRef?.current;
+    if (!container || snapshot == null) return;
+    container.scrollTop = container.scrollHeight - snapshot;
+    (scrollSnapshotRef as { current: number | null }).current = null;
+  });
 
   // Auto-scroll: snap to bottom on initial load, then smooth-scroll only when near bottom
   const initialScrollDone = useRef(false);
@@ -1017,98 +1051,7 @@ export function AgentChat({
                 </div>
               </div>
             )}
-            <AnimatePresence initial={false}>
-            {(() => {
-              // Count occurrences of each user text so same-content messages get unique but stable keys.
-              const userTextCount: Record<string, number> = {};
-              return messages.map((msg, i) => {
-              const key = (() => {
-                if (msg.kind === "user") {
-                  // Stable key survives pending→server handoff (no timestamp).
-                  // Counter suffix handles duplicate content like "check now".
-                  const slug = msg.text.slice(0, 80);
-                  const n = (userTextCount[slug] = (userTextCount[slug] ?? 0) + 1);
-                  return `user-${slug}-${n}`;
-                }
-                return `${msg.kind}-${msg.timestamp}-${i}`;
-              })();
-              switch (msg.kind) {
-                case "user":
-                  return (
-                    <UserBubble
-                      key={key}
-                      text={msg.text}
-                      timestamp={msg.timestamp}
-                    />
-                  );
-                case "text":
-                  return (
-                    <AgentBubble
-                      key={key}
-                      text={msg.text}
-                      timestamp={msg.timestamp}
-                      usage={msg.usage}
-                      agentName={agentName}
-                      namespace={agentNamespace}
-                    />
-                  );
-                case "thinking":
-                  return (
-                    <ThinkingBubble
-                      key={key}
-                      text={msg.text}
-                    />
-                  );
-                case "tool":
-                  return (
-                    <motion.div
-                      key={key}
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.2, ease: "easeOut" }}
-                    >
-                      {msg.toolName === "Skill" ? (
-                        <SkillCard
-                          skillName={msg.description ?? "skill"}
-                          args={msg.command}
-                        />
-                      ) : (
-                        <ToolCard
-                          toolName={msg.toolName}
-                          description={msg.description}
-                          command={msg.command}
-                          input={msg.input}
-                          output={msg.output}
-                        />
-                      )}
-                    </motion.div>
-                  );
-                case "completed":
-                  return (
-                    <CompletedDivider
-                      key={key}
-                      costUSD={msg.costUSD}
-                      duration={msg.duration}
-                      turns={msg.turns}
-                      inputTokens={msg.inputTokens}
-                      outputTokens={msg.outputTokens}
-                      cacheReadTokens={msg.cacheReadTokens}
-                      cacheCreationTokens={msg.cacheCreationTokens}
-                    />
-                  );
-                case "cancelled":
-                  return <CancelledDivider key={key} />;
-                case "error":
-                  return (
-                    <ErrorBar
-                      key={key}
-                      message={msg.message}
-                    />
-                  );
-              }
-            });
-            })()}
-            </AnimatePresence>
+            <MessageList messages={messages} agentName={agentName} agentNamespace={agentNamespace} />
             <AnimatePresence>
             {showThinking && (
               <motion.div

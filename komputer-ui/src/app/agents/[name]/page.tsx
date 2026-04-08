@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Ban, Trash2, Zap, Moon, Save, Check, Plus, ChevronRight } from "lucide-react";
@@ -74,10 +74,23 @@ export default function AgentDetailPage() {
   }, [agentName, agentNs, parseEventsResponse]);
 
   // Load older events (called when user scrolls to top)
+  const historyEventsRef = useRef(historyEvents);
+  historyEventsRef.current = historyEvents;
+  const loadingOlderRef = useRef(false);
+  const hasMoreEventsRef = useRef(hasMoreEvents);
+  hasMoreEventsRef.current = hasMoreEvents;
+
+  // Ref for the chat scroll container — set by AgentChat via callback.
+  const scrollContainerRef = useRef<HTMLElement | null>(null);
+  // Snapshot of scrollHeight taken BEFORE new messages are added to state.
+  const scrollSnapshotRef = useRef<number | null>(null);
+
   const loadOlderEvents = useCallback(async () => {
-    if (!agentName || loadingOlder || !hasMoreEvents) return;
-    const oldestTimestamp = historyEvents.length > 0 ? historyEvents[0].timestamp : undefined;
+    if (!agentName || loadingOlderRef.current || !hasMoreEventsRef.current) return;
+    const oldest = historyEventsRef.current;
+    const oldestTimestamp = oldest.length > 0 ? oldest[0].timestamp : undefined;
     if (!oldestTimestamp) return;
+    loadingOlderRef.current = true;
     setLoadingOlder(true);
     try {
       const data = await getAgentEvents(agentName, 50, agentNs, oldestTimestamp);
@@ -85,15 +98,20 @@ export default function AgentDetailPage() {
       if (older.length === 0) {
         setHasMoreEvents(false);
       } else {
+        // Snapshot scrollHeight BEFORE React updates the DOM.
+        if (scrollContainerRef.current) {
+          scrollSnapshotRef.current = scrollContainerRef.current.scrollHeight;
+        }
         setHistoryEvents((prev) => [...older, ...prev]);
         if (older.length < 50) setHasMoreEvents(false);
       }
     } catch {
       // Silently fail, user can scroll up again to retry
     } finally {
+      loadingOlderRef.current = false;
       setLoadingOlder(false);
     }
-  }, [agentName, agentNs, historyEvents, loadingOlder, hasMoreEvents, parseEventsResponse]);
+  }, [agentName, agentNs, parseEventsResponse]);
 
   // Merge history + WS events, dedup by timestamp+type, sorted by time.
   // History events take precedence (listed first), so WS duplicates are dropped.
@@ -353,6 +371,8 @@ export default function AgentDetailPage() {
             hasMoreEvents={hasMoreEvents}
             loadingOlder={loadingOlder}
             onLoadOlder={loadOlderEvents}
+            scrollContainerRef={scrollContainerRef}
+            scrollSnapshotRef={scrollSnapshotRef}
           />
           <SubAgentPanel agentName={agent.name} events={events} namespace={agentNs} />
         </TabsContent>

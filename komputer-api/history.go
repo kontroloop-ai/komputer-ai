@@ -1,0 +1,131 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/redis/go-redis/v9"
+)
+
+// GetAgentEvents reads events from the agent's persistent history list.
+// Returns the last `limit` events in chronological order.
+func GetAgentEvents(ctx context.Context, rdb *redis.Client, agentName string, limit int64, streamPrefix string) ([]AgentEvent, error) {
+	return GetAgentEventsBefore(ctx, rdb, agentName, limit, "", streamPrefix)
+}
+
+// GetAgentEventsBefore returns up to `limit` events for the agent.
+// When `before` is non-empty it must be an RFC-3339 timestamp; only events
+// before that value are returned. Uses binary search on the Redis list index
+// to avoid fetching the entire list on each page.
+func GetAgentEventsBefore(ctx context.Context, rdb *redis.Client, agentName string, limit int64, before string, streamPrefix string) ([]AgentEvent, error) {
+	historyKey := fmt.Sprintf("komputer-history:%s", agentName)
+
+	if before == "" {
+		// No cursor — return the last `limit` events.
+		vals, err := rdb.LRange(ctx, historyKey, -limit, -1).Result()
+		if err != nil {
+			return nil, fmt.Errorf("lrange: %w", err)
+		}
+		events := make([]AgentEvent, 0, len(vals))
+		for _, raw := range vals {
+			var ev AgentEvent
+			if err := json.Unmarshal([]byte(raw), &ev); err != nil {
+				continue
+			}
+			events = append(events, ev)
+		}
+		return events, nil
+	}
+
+	// Cursor-based pagination: find the index of the first event at or after
+	// the `before` timestamp using binary search, then fetch `limit` events
+	// ending just before that index.
+	beforeTime, err := time.Parse(time.RFC3339Nano, before)
+	if err != nil {
+		return nil, fmt.Errorf("invalid before timestamp: %w", err)
+	}
+
+	total, err := rdb.LLen(ctx, historyKey).Result()
+	if err != nil || total == 0 {
+		return []AgentEvent{}, nil
+	}
+
+	// Binary search for the cutoff index: the first event whose timestamp >= before.
+	lo, hi := int64(0), total
+	for lo < hi {
+		mid := (lo + hi) / 2
+		raw, err := rdb.LIndex(ctx, historyKey, mid).Result()
+		if err != nil {
+			lo = mid + 1
+			continue
+		}
+		var ev AgentEvent
+		if err := json.Unmarshal([]byte(raw), &ev); err != nil {
+			lo = mid + 1
+			continue
+		}
+		evTime, err := time.Parse(time.RFC3339Nano, ev.Timestamp)
+		if err != nil {
+			lo = mid + 1
+			continue
+		}
+		if evTime.Before(beforeTime) {
+			lo = mid + 1
+		} else {
+			hi = mid
+		}
+	}
+
+	// lo is now the index of the first event >= before.
+	// We want `limit` events ending at lo-1.
+	end := lo - 1
+	start := end - limit + 1
+	if start < 0 {
+		start = 0
+	}
+	if end < 0 {
+		return []AgentEvent{}, nil
+	}
+
+	vals, err := rdb.LRange(ctx, historyKey, start, end).Result()
+	if err != nil {
+		return nil, fmt.Errorf("lrange: %w", err)
+	}
+
+	events := make([]AgentEvent, 0, len(vals))
+	for _, raw := range vals {
+		var ev AgentEvent
+		if err := json.Unmarshal([]byte(raw), &ev); err != nil {
+			continue
+		}
+		events = append(events, ev)
+	}
+	return events, nil
+}
+
+// DeleteAgentStream removes an agent's event stream and history from Redis.
+func DeleteAgentStream(ctx context.Context, rdb *redis.Client, agentName string, streamPrefix string) error {
+	streamKey := fmt.Sprintf("%s:%s", streamPrefix, agentName)
+	historyKey := fmt.Sprintf("komputer-history:%s", agentName)
+	if err := rdb.Del(ctx, streamKey, historyKey).Err(); err != nil {
+		return fmt.Errorf("delete stream/history for %s: %w", agentName, err)
+	}
+	return nil
+}
+
+// ListAgentStreams returns agent names that have active event streams.
+func ListAgentStreams(ctx context.Context, rdb *redis.Client, streamPrefix string) ([]string, error) {
+	streams, err := scanStreams(ctx, rdb, streamPrefix+":*")
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(streams))
+	for _, s := range streams {
+		name := strings.TrimPrefix(s, streamPrefix+":")
+		names = append(names, name)
+	}
+	return names, nil
+}

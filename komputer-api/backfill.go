@@ -110,6 +110,18 @@ func backfillRedisHistory(rdb *redis.Client, agentName string, events []AgentEve
 //   - Background task notifications ("*(Background task completed") → skipped
 //   - System prompt prefix stripped from first user message per turn
 // ---------------------------------------------------------------------------
+// outputRatePerM returns the output token price per 1M tokens for a model.
+func outputRatePerM(model string) float64 {
+	switch {
+	case strings.Contains(model, "opus"):
+		return 75.0
+	case strings.Contains(model, "haiku"):
+		return 4.0
+	default:
+		return 15.0
+	}
+}
+
 // estimateCostUSD calculates dollar cost from token counts and model pricing.
 func estimateCostUSD(model string, inputTokens, outputTokens, cacheRead, cacheCreate float64) float64 {
 	// Pricing per 1M tokens (as of 2026-04)
@@ -144,6 +156,7 @@ func convertSessionJSONL(raw []byte, agentName string, limit int64, model string
 	var turnCostUSD float64          // accumulated cost across all API calls in the turn
 	var turnInputTokens, turnOutputTokens, turnCacheRead, turnCacheCreation float64 // for display
 	var turnAssistantMessages int
+	var prevCallInput, prevCallCacheRead, prevCallCacheCreate float64 // detect same API call
 	var pendingCancel *AgentEvent // deferred cancel — emitted only if not followed by a steer
 	var lastToolWasSkill bool      // true if the last assistant tool_use was "Skill" — next user message is skill content, skip it
 	firstTurn := true
@@ -175,6 +188,9 @@ func convertSessionJSONL(raw []byte, agentName string, limit int64, model string
 		turnCacheRead = 0
 		turnCacheCreation = 0
 		turnAssistantMessages = 0
+		prevCallInput = 0
+		prevCallCacheRead = 0
+		prevCallCacheCreate = 0
 	}
 
 	for _, line := range strings.Split(string(raw), "\n") {
@@ -204,6 +220,9 @@ func convertSessionJSONL(raw []byte, agentName string, limit int64, model string
 					turnCacheRead = 0
 					turnCacheCreation = 0
 					turnAssistantMessages = 0
+		prevCallInput = 0
+		prevCallCacheRead = 0
+		prevCallCacheCreate = 0
 				} else {
 					emitTaskCompleted()
 				}
@@ -329,26 +348,43 @@ func convertSessionJSONL(raw []byte, agentName string, limit int64, model string
 		} else if role == "assistant" {
 			lastAssistantTimestamp = timestamp
 			turnAssistantMessages++
-			// Calculate cost per API call and sum. Each call is billed independently.
+			// Calculate cost per unique API call. The JSONL logs thinking + response
+			// as separate entries with identical input/cache tokens. Only count
+			// input/cache cost when the context changes (new API call). Always count output.
 			if usage, ok := msg["usage"].(map[string]interface{}); ok {
 				var inp, out, cr, cc float64
 				if v, ok := usage["input_tokens"].(float64); ok {
 					inp = v
-					turnInputTokens += v
 				}
 				if v, ok := usage["output_tokens"].(float64); ok {
 					out = v
-					turnOutputTokens += v
+					turnOutputTokens += out
 				}
 				if v, ok := usage["cache_read_input_tokens"].(float64); ok {
 					cr = v
-					turnCacheRead += v
 				}
 				if v, ok := usage["cache_creation_input_tokens"].(float64); ok {
 					cc = v
-					turnCacheCreation += v
 				}
-				turnCostUSD += estimateCostUSD(model, inp, out, cr, cc)
+				// Detect new API call: input context changed from previous message.
+				newCall := inp != prevCallInput || cr != prevCallCacheRead || cc != prevCallCacheCreate
+				prevCallInput = inp
+				prevCallCacheRead = cr
+				prevCallCacheCreate = cc
+				// Use per-message model from JSONL (may differ from CR spec).
+				msgModel, _ := msg["model"].(string)
+				if msgModel == "" {
+					msgModel = model // fallback to CR spec model
+				}
+				if newCall {
+					turnInputTokens += inp
+					turnCacheRead += cr
+					turnCacheCreation += cc
+					turnCostUSD += estimateCostUSD(msgModel, inp, out, cr, cc)
+				} else {
+					// Same API call — only output tokens are new.
+					turnCostUSD += (out * outputRatePerM(msgModel)) / 1_000_000
+				}
 			}
 			content, _ := msg["content"].([]interface{})
 			if content == nil {

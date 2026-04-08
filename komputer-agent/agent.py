@@ -71,9 +71,21 @@ def _write_skills(skills: dict[str, str | dict[str, str]]):
         (skill_dir / "SKILL.md").write_text(content)
 
 
+async def _wait_for_steer(queue: asyncio.Queue, timeout: float) -> bool:
+    """Wait up to `timeout` seconds for a steer message. Returns True if one arrived."""
+    try:
+        msg = await asyncio.wait_for(queue.get(), timeout=timeout)
+        # Put it back so the caller can get_nowait()
+        await queue.put(msg)
+        return True
+    except asyncio.TimeoutError:
+        return False
+
+
 async def run_agent(instructions: str, model: str, publisher, system_prompt: str = None):
     """Run a Claude agent with the given instructions using the Claude Agent SDK."""
     import state
+    state.interrupted = False
     session_id = _load_session_id()
 
     # Strip system prompt from the event — only show the user's task
@@ -173,19 +185,20 @@ async def run_agent(instructions: str, model: str, publisher, system_prompt: str
     from prompts import build_prompt
     full_prompt = build_prompt(instructions)
 
+    # Create a fresh queue for this session and register it in shared state
+    # so server.py can push steer messages from the FastAPI thread.
+    session_steer_queue: asyncio.Queue = asyncio.Queue()
+    state.steer_queue = session_steer_queue
+
     result = None
+    last_usage = None
 
-    async with ClaudeSDKClient(options=options) as client:
-        # Register the client so signal handlers can interrupt it.
-        state.set_active_client(client)
-
-        await client.query(full_prompt)
-
-
-        last_usage = None  # Track last assistant message's usage for context size
+    async def process_responses(client):
+        """Read all responses until ResultMessage, publishing events along the way."""
+        nonlocal result, last_usage
         async for message in client.receive_response():
             if isinstance(message, AssistantMessage):
-                usage = message.usage  # dict | None, keys: input_tokens, output_tokens, cache_*
+                usage = message.usage
                 last_usage = usage
                 for block in message.content:
                     if isinstance(block, TextBlock):
@@ -201,19 +214,56 @@ async def run_agent(instructions: str, model: str, publisher, system_prompt: str
             elif isinstance(message, ResultMessage):
                 result = message
 
+    async with ClaudeSDKClient(options=options) as client:
+        # Register the client so signal handlers can interrupt it.
+        state.set_active_client(client)
+
+        # Send initial task and process responses.
+        await client.query(full_prompt)
+        await process_responses(client)
+
+        # Loop: check for steer messages after each turn.
+        # If a steer interrupted the current turn, pick it up immediately.
+        # Otherwise wait briefly for late-arriving steers.
+        while True:
+            # If steered, the current turn was interrupted — pick up the steer right away.
+            if state.steered:
+                state.steered = False
+            elif not session_steer_queue.empty():
+                pass  # Steer arrived exactly as task finished
+            elif not await _wait_for_steer(session_steer_queue, timeout=1.0):
+                break  # No steer within grace period — we're done
+
+            steer_msg = session_steer_queue.get_nowait()
+            if steer_msg is None:
+                break
+
+            # Process the steer as a continuation — no task_completed between turns.
+            result = None
+            await client.query(steer_msg)
+            await process_responses(client)
+
         if result:
             # Persist session ID for future tasks
             _save_session_id(result.session_id)
-            publisher.publish("task_completed", {
-                "cost_usd": result.total_cost_usd,
-                "duration_ms": result.duration_ms,
-                "turns": result.num_turns,
-                "stop_reason": result.stop_reason,
-                "session_id": result.session_id,
-                "usage": result.usage,
-                "last_usage": last_usage,
-                "context_window": _fetch_context_window(model),
-            })
+
+            if state.interrupted:
+                publisher.publish("task_cancelled", {"reason": "Cancelled by user"})
+                state.interrupted = False
+            else:
+                publisher.publish("task_completed", {
+                    "cost_usd": result.total_cost_usd,
+                    "duration_ms": result.duration_ms,
+                    "turns": result.num_turns,
+                    "stop_reason": result.stop_reason,
+                    "session_id": result.session_id,
+                    "usage": result.usage,
+                    "last_usage": last_usage,
+                    "context_window": _fetch_context_window(model),
+                })
+
+    # Clear the queue reference so server.py won't try to push to a dead queue.
+    state.steer_queue = None
 
     return result
 

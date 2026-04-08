@@ -100,7 +100,42 @@ async def apply_config(req: ConfigRequest):
 @app.post("/task")
 async def create_task(req: TaskRequest, background_tasks: BackgroundTasks):
     if state.busy.locked():
-        raise HTTPException(status_code=409, detail="Agent is busy with another task")
+        # Agent is already running — try to steer it with the new message.
+        # state.steer_queue is set by run_agent once the session is live;
+        # if it's still None the session is just starting, so reject gracefully.
+        if state.steer_queue is None or state.active_loop is None or state.active_loop.is_closed():
+            raise HTTPException(status_code=409, detail="Agent is busy and not yet ready to accept follow-up messages")
+
+        try:
+            # Thread-safe push: active_loop belongs to the agent thread.
+            future = asyncio.run_coroutine_threadsafe(
+                state.steer_queue.put(req.instructions),
+                state.active_loop,
+            )
+            future.result(timeout=5.0)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to queue steer message: {e}")
+
+        # Interrupt the current task so the agent picks up the steer immediately
+        # instead of waiting for the current turn to finish.
+        state.steered = True
+        if state.active_client and state.active_loop and not state.active_loop.is_closed():
+            async def _do_steer_interrupt():
+                try:
+                    await state.active_client.interrupt()
+                except Exception:
+                    pass
+            state.active_loop.call_soon_threadsafe(
+                lambda: asyncio.ensure_future(_do_steer_interrupt())
+            )
+
+        # Publish a user_message event so the stream reflects the steer.
+        if _publisher:
+            _publisher.publish("user_message", {"content": req.instructions, "steer": True})
+
+        return {"status": "steered", "instructions": req.instructions[:100]}
+
+    # Agent is idle — start a new session as normal.
 
     # Apply any config overrides from the task request before starting.
     config_updates = {k: v for k, v in {"model": req.model, "lifecycle": req.lifecycle}.items() if v is not None}
@@ -128,6 +163,7 @@ async def create_task(req: TaskRequest, background_tasks: BackgroundTasks):
             finally:
                 state.set_active_client(None)
                 state.active_loop = None
+                state.steer_queue = None
                 _current_task = None
                 _current_loop = None
                 loop.close()
@@ -139,6 +175,7 @@ async def create_task(req: TaskRequest, background_tasks: BackgroundTasks):
 
 def _interrupt_agent():
     """Interrupt the Claude SDK client and cancel the asyncio task."""
+    state.interrupted = True
     # First: tell the Claude SDK subprocess to stop gracefully
     if state.active_client and state.active_loop and not state.active_loop.is_closed():
         async def _do_interrupt():

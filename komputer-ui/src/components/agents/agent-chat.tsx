@@ -898,7 +898,7 @@ export function AgentChat({
 
   const handleSend = useCallback(() => {
     const text = input.trim();
-    if (!text || isWorking) return;
+    if (!text) return;
 
     const ts = new Date().toISOString();
     setInput("");
@@ -916,7 +916,7 @@ export function AgentChat({
     createAgent({ name: agentName, instructions: text, namespace: agentNamespace, lifecycle })
       .then((res) => { if (res.modelContextWindow) setContextWindow(res.modelContextWindow); })
       .catch(() => setPendingText(null));
-  }, [input, isWorking, agentName, agentNamespace, lifecycle, events.length]);
+  }, [input, agentName, agentNamespace, lifecycle, events.length]);
 
   const handleCancel = useCallback(async () => {
     if (!isWorking || cancelling) return;
@@ -1167,12 +1167,20 @@ export function AgentChat({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={cancelling ? "Cancelling..." : isWorking ? "Agent is working..." : "Send a message..."}
+              placeholder={cancelling ? "Cancelling..." : isWorking ? "Send a follow-up message..." : "Send a message..."}
               rows={1}
               className="field-sizing-content max-h-24 min-h-10 w-full resize-none break-all overflow-y-auto rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-secondary)] focus:border-[var(--color-brand-blue)] focus:outline-none"
             />
           </div>
-          {isWorking || cancelling ? (
+          <button
+            type="button"
+            onClick={handleSend}
+            disabled={!input.trim()}
+            className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--color-brand-blue)] text-white transition-opacity hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <ArrowUp className="size-4" />
+          </button>
+          {(isWorking || cancelling) && (
             <div className="group/stop relative shrink-0">
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/stop:opacity-100 transition-opacity duration-150 pointer-events-none">
                 <div className="whitespace-nowrap rounded-md bg-[var(--color-surface-raised)] border border-[var(--color-border)] px-2 py-1 text-[11px] text-[var(--color-text-secondary)]">
@@ -1188,15 +1196,6 @@ export function AgentChat({
                 <Square className="size-3.5 fill-current" />
               </button>
             </div>
-          ) : (
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={!input.trim()}
-              className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--color-brand-blue)] text-white transition-opacity hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              <ArrowUp className="size-4" />
-            </button>
           )}
           {/* Lifecycle menu */}
           <div className="relative" ref={lifecycleRef}>

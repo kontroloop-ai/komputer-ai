@@ -116,11 +116,24 @@ async def create_task(req: TaskRequest, background_tasks: BackgroundTasks):
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to queue steer message: {e}")
 
+        # Interrupt the current task so the agent picks up the steer immediately
+        # instead of waiting for the current turn to finish.
+        state.steered = True
+        if state.active_client and state.active_loop and not state.active_loop.is_closed():
+            async def _do_steer_interrupt():
+                try:
+                    await state.active_client.interrupt()
+                except Exception:
+                    pass
+            state.active_loop.call_soon_threadsafe(
+                lambda: asyncio.ensure_future(_do_steer_interrupt())
+            )
+
         # Publish a user_message event so the stream reflects the steer.
         if _publisher:
             _publisher.publish("user_message", {"content": req.instructions, "steer": True})
 
-        return {"status": "queued", "instructions": req.instructions[:100]}
+        return {"status": "steered", "instructions": req.instructions[:100]}
 
     # Agent is idle — start a new session as normal.
 
@@ -162,6 +175,7 @@ async def create_task(req: TaskRequest, background_tasks: BackgroundTasks):
 
 def _interrupt_agent():
     """Interrupt the Claude SDK client and cancel the asyncio task."""
+    state.interrupted = True
     # First: tell the Claude SDK subprocess to stop gracefully
     if state.active_client and state.active_loop and not state.active_loop.is_closed():
         async def _do_interrupt():

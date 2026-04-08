@@ -192,10 +192,8 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 				return
 			}
 
-			if existing.Status.TaskStatus == komputerv1alpha1.AgentTaskInProgress {
-				c.JSON(http.StatusConflict, gin.H{"error": "agent is busy with another task"})
-				return
-			}
+			// If the agent is busy, the message is queued as a steer (follow-up).
+			// The agent's /task endpoint handles both new tasks and steers.
 
 			podIP, err := k8s.GetAgentPodIP(c.Request.Context(), ns, existing.Status.PodName)
 			if err != nil {

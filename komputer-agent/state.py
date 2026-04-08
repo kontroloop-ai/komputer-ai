@@ -17,6 +17,14 @@ shutdown = threading.Event()
 # Messages pushed here are yielded to the SDK's streaming input generator in order.
 steer_queue: asyncio.Queue | None = None
 
+# Set to True when an interrupt/cancel is requested — run_agent checks this
+# to decide whether to publish task_cancelled vs task_completed.
+interrupted = False
+
+# Set to True when a steer interrupts the current task — run_agent skips
+# task_cancelled/task_completed and proceeds directly to the steer message.
+steered = False
+
 
 def set_active_client(client):
     """Register or clear the active SDK client."""

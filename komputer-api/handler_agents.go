@@ -457,8 +457,15 @@ func getAgentEvents(worker *RedisWorker, k8s *K8sClient) gin.HandlerFunc {
 		}
 
 		before := c.Query("before") // RFC-3339 cursor for pagination
+		around := c.Query("around") // RFC-3339 timestamp to center results on
 
-		events, err := GetAgentEventsBefore(c.Request.Context(), worker.Rdb, name, limit, before, worker.StreamPrefix)
+		var events []AgentEvent
+		var err error
+		if around != "" {
+			events, err = GetAgentEventsAround(c.Request.Context(), worker.Rdb, name, limit, around, worker.StreamPrefix)
+		} else {
+			events, err = GetAgentEventsBefore(c.Request.Context(), worker.Rdb, name, limit, before, worker.StreamPrefix)
+		}
 		if err != nil {
 			events = nil
 		}

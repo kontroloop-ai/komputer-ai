@@ -111,6 +111,74 @@ func GetAgentEventsBefore(ctx context.Context, rdb *redis.Client, agentName stri
 	return events, nil
 }
 
+// GetAgentEventsAround returns events centered on a timestamp.
+// Uses binary search to find the target, then fetches limit/2 before and limit/2 after.
+func GetAgentEventsAround(ctx context.Context, rdb *redis.Client, agentName string, limit int64, around string, streamPrefix string) ([]AgentEvent, error) {
+	historyKey := fmt.Sprintf("komputer-history:%s", agentName)
+
+	aroundTime, err := time.Parse(time.RFC3339Nano, around)
+	if err != nil {
+		return nil, fmt.Errorf("invalid around timestamp: %w", err)
+	}
+
+	total, err := rdb.LLen(ctx, historyKey).Result()
+	if err != nil || total == 0 {
+		return []AgentEvent{}, nil
+	}
+
+	// Binary search for the index closest to the target timestamp.
+	lo, hi := int64(0), total
+	for lo < hi {
+		mid := (lo + hi) / 2
+		raw, err := rdb.LIndex(ctx, historyKey, mid).Result()
+		if err != nil {
+			lo = mid + 1
+			continue
+		}
+		var ev AgentEvent
+		if err := json.Unmarshal([]byte(raw), &ev); err != nil {
+			lo = mid + 1
+			continue
+		}
+		evTime, err := time.Parse(time.RFC3339Nano, ev.Timestamp)
+		if err != nil {
+			lo = mid + 1
+			continue
+		}
+		if evTime.Before(aroundTime) {
+			lo = mid + 1
+		} else {
+			hi = mid
+		}
+	}
+
+	// lo is the index of the first event >= around. Center the window on it.
+	half := limit / 2
+	start := lo - half
+	end := lo + half
+	if start < 0 {
+		start = 0
+	}
+	if end >= total {
+		end = total - 1
+	}
+
+	vals, err := rdb.LRange(ctx, historyKey, start, end).Result()
+	if err != nil {
+		return nil, fmt.Errorf("lrange: %w", err)
+	}
+
+	events := make([]AgentEvent, 0, len(vals))
+	for _, raw := range vals {
+		var ev AgentEvent
+		if err := json.Unmarshal([]byte(raw), &ev); err != nil {
+			continue
+		}
+		events = append(events, ev)
+	}
+	return events, nil
+}
+
 // DeleteAgentStream removes an agent's event stream and history from Redis.
 func DeleteAgentStream(ctx context.Context, rdb *redis.Client, agentName string, streamPrefix string) error {
 	streamKey := fmt.Sprintf("%s:%s", streamPrefix, agentName)

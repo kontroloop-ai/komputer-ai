@@ -714,19 +714,15 @@ export const MessageList = React.memo(function MessageList({ messages, agentName
   const [highlightVisible, setHighlightVisible] = useState(!!highlightFrom);
   const fadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Fade the border 2s after the user scrolls past the BOTTOM of the highlighted block.
-  // We observe a sentinel div placed at the end of the highlight wrapper.
+  // Fade the border 2s after the user scrolls to see the end of the highlighted task.
   const highlightEndRef = useCallback((node: HTMLDivElement | null) => {
     if (!node || fadeTimerRef.current) return;
     const container = node.closest("[data-messages]")?.parentElement;
     if (!container) return;
-    let wasVisible = false;
     const observer = new IntersectionObserver(
       (entries) => {
-        const visible = entries[0].isIntersecting;
-        // Wait until the bottom sentinel has been seen, then scrolled past.
-        if (visible) wasVisible = true;
-        if (wasVisible && !visible && !fadeTimerRef.current) {
+        // Trigger when the bottom sentinel becomes visible (user reached task end).
+        if (entries[0].isIntersecting && !fadeTimerRef.current) {
           fadeTimerRef.current = setTimeout(() => {
             setHighlightVisible(false);
             const url = new URL(window.location.href);
@@ -792,7 +788,7 @@ export const MessageList = React.memo(function MessageList({ messages, agentName
       <div
         key={`hl-${highlightBuf[0].idx}`}
         data-task-highlight=""
-        className={`rounded-lg p-2 flex flex-col gap-3 transition-all duration-500 ${highlightVisible ? "border-2 border-amber-400/30" : "border-2 border-transparent"}`}
+        className={`rounded-lg py-1 flex flex-col gap-3 transition-all duration-500 ${highlightVisible ? "border-2 border-amber-400/30" : "border-2 border-transparent"}`}
       >
         {highlightBuf.map(({ msg, idx }) => renderMsg(msg, idx))}
         <div ref={highlightEndRef} className="h-0" />

@@ -81,7 +81,7 @@ func buildCostBreakdown(events []AgentEvent) CostBreakdownResponse {
 				idx++
 			}
 
-		case "task_completed":
+		case "task_completed", "task_cancelled":
 			if current != nil {
 				current.CompletedAt = ev.Timestamp
 				if costRaw, ok := ev.Payload["cost_usd"].(float64); ok {

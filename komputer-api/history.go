@@ -25,7 +25,12 @@ func GetAgentEventsBefore(ctx context.Context, rdb *redis.Client, agentName stri
 
 	if before == "" {
 		// No cursor — return the last `limit` events.
-		vals, err := rdb.LRange(ctx, historyKey, -limit, -1).Result()
+		// When limit <= 0, fetch all events.
+		start := -limit
+		if limit <= 0 {
+			start = 0
+		}
+		vals, err := rdb.LRange(ctx, historyKey, start, -1).Result()
 		if err != nil {
 			return nil, fmt.Errorf("lrange: %w", err)
 		}

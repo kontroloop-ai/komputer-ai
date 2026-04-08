@@ -23,6 +23,7 @@ import type {
   ConnectorResponse,
   CreateConnectorRequest,
   ConnectorTemplateListResponse,
+  CostBreakdownResponse,
 } from './types';
 import { getConfig } from './config';
 
@@ -65,6 +66,9 @@ export const cancelAgent = (name: string, ns?: string) =>
 
 export const getAgentEvents = (name: string, limit = 50, ns?: string, before?: string, source?: 'session' | 'redis') =>
   request<AgentEvent[]>(`/agents/${name}/events?limit=${limit}${ns ? `&namespace=${ns}` : ''}${before ? `&before=${encodeURIComponent(before)}` : ''}${source ? `&source=${source}` : ''}`);
+
+export const getAgentCostBreakdown = (name: string, ns?: string) =>
+  request<CostBreakdownResponse>(`/agents/${name}/cost${ns ? `?namespace=${ns}` : ''}`);
 
 // Offices
 export const listOffices = (ns?: string) =>

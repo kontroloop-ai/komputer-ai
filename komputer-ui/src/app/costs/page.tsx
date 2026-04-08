@@ -7,6 +7,7 @@ import { Info, ArrowUpDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/kit/card";
 import { AnimatePresence, motion } from "framer-motion";
 import { TopSpendersChart } from "@/components/costs/cost-charts";
+import { AgentTaskBreakdown } from "@/components/costs/agent-task-breakdown";
 import { EmptyState } from "@/components/shared/empty-state";
 import { SkeletonTable } from "@/components/shared/loading-skeleton";
 import { useAgents } from "@/hooks/use-agents";
@@ -112,7 +113,7 @@ export default function CostsPage() {
             </Card>
 
             {/* Stats row */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Card className="border-[var(--color-border)] bg-[var(--color-surface)]">
                 <CardHeader>
                   <CardTitle className="text-xs uppercase tracking-wider text-[var(--color-text-secondary)]">
@@ -150,21 +151,6 @@ export default function CostsPage() {
                 </CardContent>
               </Card>
 
-              <Card className="border-[var(--color-border)] bg-[var(--color-surface)]">
-                <CardHeader>
-                  <CardTitle className="text-xs uppercase tracking-wider text-[var(--color-text-secondary)]">
-                    Agents with Cost
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-lg font-semibold text-[var(--color-text)] font-mono">
-                    {agentsWithCost.length}
-                    <span className="text-sm font-normal text-[var(--color-text-secondary)]">
-                      {" "}/ {agents.length}
-                    </span>
-                  </p>
-                </CardContent>
-              </Card>
             </div>
 
             {/* Top spenders chart */}
@@ -178,6 +164,9 @@ export default function CostsPage() {
                 <TopSpendersChart agents={agents} />
               </CardContent>
             </Card>
+
+            {/* Task breakdown by agent */}
+            <AgentTaskBreakdown agents={agents} />
 
             {/* Cost breakdown cards */}
             {agentsWithCost.length > 0 && (

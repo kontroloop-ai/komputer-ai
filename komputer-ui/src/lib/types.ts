@@ -251,3 +251,26 @@ export interface ConnectorTemplate {
 export interface ConnectorTemplateListResponse {
   templates: ConnectorTemplate[];
 }
+
+export interface TaskBreakdown {
+  index: number;
+  startedAt: string;
+  completedAt?: string;
+  instruction: string;
+  costUSD: number;
+  durationMs: number;
+  turns: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreateTokens: number;
+  steer?: boolean;
+}
+
+export interface CostBreakdownResponse {
+  agent: string;
+  tasks: TaskBreakdown[];
+  totalCost: number;
+  taskCount: number;
+  cachedAt?: string;
+}

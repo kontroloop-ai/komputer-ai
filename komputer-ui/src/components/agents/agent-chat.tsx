@@ -712,61 +712,76 @@ export const MessageList = React.memo(function MessageList({ messages, agentName
   const fromTime = highlightFrom ? new Date(highlightFrom).getTime() : null;
   const toTime = highlightTo ? new Date(highlightTo).getTime() : null;
 
-  return (
-    <>
-      {messages.map((msg, i) => {
-        const key = (() => {
-          if (msg.kind === "user") {
-            const slug = msg.text.slice(0, 80);
-            const n = (userTextCount[slug] = (userTextCount[slug] ?? 0) + 1);
-            return `user-${slug}-${n}`;
-          }
-          return `${msg.kind}-${msg.timestamp}-${i}`;
-        })();
+  function renderMsg(msg: ChatMessage, i: number) {
+    const key = (() => {
+      if (msg.kind === "user") {
+        const slug = msg.text.slice(0, 80);
+        const n = (userTextCount[slug] = (userTextCount[slug] ?? 0) + 1);
+        return `user-${slug}-${n}`;
+      }
+      return `${msg.kind}-${msg.timestamp}-${i}`;
+    })();
+    switch (msg.kind) {
+      case "user":
+        return <div key={key}><UserBubble text={msg.text} timestamp={msg.timestamp} /></div>;
+      case "text":
+        return <AgentBubble key={key} text={msg.text} timestamp={msg.timestamp} usage={msg.usage} agentName={agentName} namespace={agentNamespace} />;
+      case "thinking":
+        return <ThinkingBubble key={key} text={msg.text} />;
+      case "tool":
+        return (
+          <motion.div key={key} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: "easeOut" }}>
+            {msg.toolName === "Skill"
+              ? <SkillCard skillName={msg.description ?? "skill"} args={msg.command} />
+              : <ToolCard toolName={msg.toolName} description={msg.description} command={msg.command} input={msg.input} output={msg.output} />}
+          </motion.div>
+        );
+      case "completed":
+        return <CompletedDivider key={key} costUSD={msg.costUSD} duration={msg.duration} turns={msg.turns} inputTokens={msg.inputTokens} outputTokens={msg.outputTokens} cacheReadTokens={msg.cacheReadTokens} cacheCreationTokens={msg.cacheCreationTokens} />;
+      case "cancelled":
+        return <CancelledDivider key={key} />;
+      case "error":
+        return <ErrorBar key={key} message={msg.message} />;
+    }
+  }
 
-        const msgTime = new Date(msg.timestamp).getTime();
-        const isHighlighted = fromTime != null && toTime != null && msgTime >= fromTime && msgTime <= toTime;
-        const highlightAttr = isHighlighted ? { "data-task-highlight": "" } : {};
-        // First/last highlighted messages get top/bottom borders for a single group border effect.
-        const isFirstHighlight = isHighlighted && (i === 0 || (() => {
-          const prevTime = new Date(messages[i - 1].timestamp).getTime();
-          return !(fromTime != null && toTime != null && prevTime >= fromTime && prevTime <= toTime);
-        })());
-        const isLastHighlight = isHighlighted && (i === messages.length - 1 || (() => {
-          const nextTime = new Date(messages[i + 1].timestamp).getTime();
-          return !(fromTime != null && toTime != null && nextTime >= fromTime && nextTime <= toTime);
-        })());
-        const highlightClass = isHighlighted
-          ? `border-l-2 border-r-2 border-amber-400/30 px-2 ${isFirstHighlight ? "border-t-2 rounded-t-lg pt-2" : ""} ${isLastHighlight ? "border-b-2 rounded-b-lg pb-2" : ""}`
-          : "";
+  // Group messages: highlighted ones go into a single wrapper div.
+  if (fromTime == null || toTime == null) {
+    return <>{messages.map((msg, i) => renderMsg(msg, i))}</>;
+  }
 
-        switch (msg.kind) {
-          case "user":
-            return <div key={key} className={highlightClass} {...highlightAttr}><UserBubble text={msg.text} timestamp={msg.timestamp} /></div>;
-          case "text":
-            return <div key={key} className={highlightClass} {...highlightAttr}><AgentBubble text={msg.text} timestamp={msg.timestamp} usage={msg.usage} agentName={agentName} namespace={agentNamespace} /></div>;
-          case "thinking":
-            return <div key={key} className={highlightClass} {...highlightAttr}><ThinkingBubble text={msg.text} /></div>;
-          case "tool":
-            return (
-              <div key={key} className={highlightClass} {...highlightAttr}>
-                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: "easeOut" }}>
-                  {msg.toolName === "Skill"
-                    ? <SkillCard skillName={msg.description ?? "skill"} args={msg.command} />
-                    : <ToolCard toolName={msg.toolName} description={msg.description} command={msg.command} input={msg.input} output={msg.output} />}
-                </motion.div>
-              </div>
-            );
-          case "completed":
-            return <div key={key} className={highlightClass} {...highlightAttr}><CompletedDivider costUSD={msg.costUSD} duration={msg.duration} turns={msg.turns} inputTokens={msg.inputTokens} outputTokens={msg.outputTokens} cacheReadTokens={msg.cacheReadTokens} cacheCreationTokens={msg.cacheCreationTokens} /></div>;
-          case "cancelled":
-            return <div key={key} className={highlightClass} {...highlightAttr}><CancelledDivider /></div>;
-          case "error":
-            return <div key={key} className={highlightClass} {...highlightAttr}><ErrorBar message={msg.message} /></div>;
-        }
-      })}
-    </>
-  );
+  const elements: React.ReactNode[] = [];
+  let highlightBuf: { msg: ChatMessage; idx: number }[] = [];
+
+  const flushHighlight = () => {
+    if (highlightBuf.length === 0) return;
+    elements.push(
+      <div
+        key={`hl-${highlightBuf[0].idx}`}
+        data-task-highlight=""
+        className="border-2 border-amber-400/30 rounded-lg p-2 flex flex-col gap-3"
+      >
+        {highlightBuf.map(({ msg, idx }) => renderMsg(msg, idx))}
+      </div>
+    );
+    highlightBuf = [];
+  };
+
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    const msgTime = new Date(msg.timestamp).getTime();
+    const isHighlighted = msgTime >= fromTime && msgTime <= toTime;
+
+    if (isHighlighted) {
+      highlightBuf.push({ msg, idx: i });
+    } else {
+      flushHighlight();
+      elements.push(renderMsg(msg, i));
+    }
+  }
+  flushHighlight();
+
+  return <>{elements}</>;
 });
 
 // --- Main component ---

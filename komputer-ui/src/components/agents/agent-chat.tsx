@@ -711,6 +711,35 @@ export const MessageList = React.memo(function MessageList({ messages, agentName
   const userTextCount: Record<string, number> = {};
   const fromTime = highlightFrom ? new Date(highlightFrom).getTime() : null;
   const toTime = highlightTo ? new Date(highlightTo).getTime() : null;
+  const [highlightVisible, setHighlightVisible] = useState(!!highlightFrom);
+  const fadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Ref callback: observe when the highlight wrapper scrolls out of view, then fade after 2s.
+  const highlightRef = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return;
+    const container = node.closest("[data-messages]")?.parentElement;
+    if (!container) return;
+    let wasVisible = true;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const isVisible = entries[0].isIntersecting;
+        // Trigger fade when user scrolls past (was visible, now not)
+        if (wasVisible && !isVisible && !fadeTimerRef.current) {
+          fadeTimerRef.current = setTimeout(() => {
+            setHighlightVisible(false);
+          }, 2000);
+        }
+        if (isVisible && fadeTimerRef.current) {
+          clearTimeout(fadeTimerRef.current);
+          fadeTimerRef.current = null;
+        }
+        wasVisible = isVisible;
+      },
+      { root: container, threshold: 0 }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   function renderMsg(msg: ChatMessage, i: number) {
     const key = (() => {
@@ -758,8 +787,9 @@ export const MessageList = React.memo(function MessageList({ messages, agentName
     elements.push(
       <div
         key={`hl-${highlightBuf[0].idx}`}
+        ref={highlightRef}
         data-task-highlight=""
-        className="border-2 border-amber-400/30 rounded-lg p-2 flex flex-col gap-3"
+        className={`rounded-lg p-2 flex flex-col gap-3 transition-all duration-500 ${highlightVisible ? "border-2 border-amber-400/30" : "border-2 border-transparent"}`}
       >
         {highlightBuf.map(({ msg, idx }) => renderMsg(msg, idx))}
       </div>

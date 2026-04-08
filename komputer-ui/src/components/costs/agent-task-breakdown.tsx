@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import { ArrowUpDown, RefreshCw } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowUpDown, RefreshCw, Flame } from "lucide-react";
 import { Tooltip } from "@/components/kit/tooltip";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/kit/card";
 import {
@@ -38,7 +38,7 @@ export function AgentTaskBreakdown({ agents }: { agents: AgentResponse[] }) {
   const [breakdown, setBreakdown] = useState<CostBreakdownResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sortKey, setSortKey] = useState<SortKey>("index");
+  const [sortKey, setSortKey] = useState<SortKey>("costUSD");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const agentsWithCost = agents
@@ -194,45 +194,59 @@ export function AgentTaskBreakdown({ agents }: { agents: AgentResponse[] }) {
 
             {/* Task list — max 10 visible, scroll for the rest */}
             <div className="space-y-1 max-h-[440px] overflow-y-auto">
-              {sortedTasks.map((task) => (
-                <motion.div
-                  key={task.index}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  onClick={() => {
-                    const params = new URLSearchParams();
-                    params.set("taskFrom", task.startedAt);
-                    if (task.completedAt) params.set("taskTo", task.completedAt);
-                    router.push(`/agents/${selectedAgent}?${params.toString()}`);
-                  }}
-                  title="Click to see task messages"
-                  className={`flex items-center gap-3 rounded-md px-3 py-2 text-xs transition-colors cursor-pointer hover:bg-[var(--color-surface-hover)] ${
-                    mostExpensiveTask?.index === task.index
-                      ? "border border-amber-500/20 bg-amber-500/5"
-                      : ""
-                  }`}
-                >
-                  <span className="w-6 text-right font-mono text-[var(--color-text-muted)]">
-                    #{task.index + 1}
-                  </span>
-                  <span className="flex-1 min-w-0 truncate text-[var(--color-text)]" title={task.instruction}>
-                    {task.steer && <span className="mr-1.5 text-[var(--color-brand-violet)]">steer</span>}
-                    {task.instruction || "—"}
-                  </span>
-                  <span className="shrink-0 font-mono text-[var(--color-brand-blue)] w-20 text-right">
-                    ${task.costUSD.toFixed(4)}
-                  </span>
-                  <span className="shrink-0 w-16 text-right text-[var(--color-text-secondary)]">
-                    {task.durationMs > 0 ? formatDuration(task.durationMs) : "—"}
-                  </span>
-                  <span className="shrink-0 w-16 text-right font-mono text-[var(--color-text-muted)]">
-                    {task.inputTokens > 0 ? formatTokens(task.inputTokens + task.outputTokens) : "—"}
-                  </span>
-                  <span className="shrink-0 w-12 text-right text-[var(--color-text-muted)]">
-                    {task.turns > 0 ? `${task.turns}t` : "—"}
-                  </span>
-                </motion.div>
-              ))}
+              <AnimatePresence mode="popLayout">
+                {sortedTasks.map((task, i) => {
+                  const isMostExpensive = mostExpensiveTask?.index === task.index;
+                  return (
+                    <motion.div
+                      key={task.index}
+                      layout
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 8 }}
+                      transition={{ duration: 0.2, delay: i * 0.02 }}
+                      onClick={() => {
+                        const params = new URLSearchParams();
+                        params.set("taskFrom", task.startedAt);
+                        if (task.completedAt) params.set("taskTo", task.completedAt);
+                        router.push(`/agents/${selectedAgent}?${params.toString()}`);
+                      }}
+                      title="Click to see task messages"
+                      className={`flex items-center gap-3 rounded-md px-3 py-2 text-xs transition-colors cursor-pointer hover:bg-[var(--color-surface-hover)] ${
+                        isMostExpensive
+                          ? "border border-amber-500/20 bg-amber-500/5"
+                          : ""
+                      }`}
+                    >
+                      <span className="w-6 text-right font-mono text-[var(--color-text-muted)]">
+                        #{task.index + 1}
+                      </span>
+                      <span className="flex-1 min-w-0 truncate text-[var(--color-text)]" title={task.instruction}>
+                        {task.steer && <span className="mr-1.5 text-[var(--color-brand-violet)]">steer</span>}
+                        {task.instruction || "—"}
+                      </span>
+                      {isMostExpensive && (
+                        <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-400">
+                          <Flame className="size-2.5" />
+                          most expensive
+                        </span>
+                      )}
+                      <span className="shrink-0 font-mono text-[var(--color-brand-blue)] w-20 text-right">
+                        ${task.costUSD.toFixed(4)}
+                      </span>
+                      <span className="shrink-0 w-16 text-right text-[var(--color-text-secondary)]">
+                        {task.durationMs > 0 ? formatDuration(task.durationMs) : "—"}
+                      </span>
+                      <span className="shrink-0 w-16 text-right font-mono text-[var(--color-text-muted)]">
+                        {task.inputTokens > 0 ? formatTokens(task.inputTokens + task.outputTokens) : "—"}
+                      </span>
+                      <span className="shrink-0 w-12 text-right text-[var(--color-text-muted)]">
+                        {task.turns > 0 ? `${task.turns}t` : "—"}
+                      </span>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
             </div>
           </div>
         ) : null}

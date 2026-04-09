@@ -36,6 +36,21 @@
 
 ---
 
+## Key Features
+
+- **Persistent agents** — each agent runs in its own pod with a persistent workspace that survives restarts and sleep cycles
+- **Manager/worker orchestration** — managers create and coordinate sub-agents, delegate tasks, and synthesize results
+- **Steer mid-task** — send follow-up messages to a running agent without restarting, seamlessly redirecting its work
+- **MCP connectors** — connect agents to external tools (Slack, GitHub, Atlassian, Notion, Google Workspace) via OAuth or token auth
+- **Skills and memories** — attach reusable knowledge and capabilities to agents as Kubernetes CRDs
+- **Custom system prompts** — configure agent behavior, persona, and constraints separately from task instructions
+- **Scheduling** — cron-based recurring tasks with timezone support and auto-cleanup
+- **Cost tracking and analysis** — real-time cost per task, context window monitoring, per-agent cost breakdown with task-level drill-down
+- **Session history resilience** — if Redis is wiped, full conversation history is recovered from the agent's session data with proper event conversion
+- **CLI, UI, and API** — manage everything from the terminal, browser, or programmatically
+
+---
+
 ## Components
 
 | Component | Language | Description |

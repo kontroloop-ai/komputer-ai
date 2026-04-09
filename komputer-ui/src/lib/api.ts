@@ -23,6 +23,7 @@ import type {
   ConnectorResponse,
   CreateConnectorRequest,
   ConnectorTemplateListResponse,
+  CostBreakdownResponse,
 } from './types';
 import { getConfig } from './config';
 
@@ -63,8 +64,16 @@ export const deleteAgent = (name: string, ns?: string) =>
 export const cancelAgent = (name: string, ns?: string) =>
   request<void>(`/agents/${name}/cancel${ns ? `?namespace=${ns}` : ''}`, { method: 'POST' });
 
-export const getAgentEvents = (name: string, limit = 50, ns?: string, before?: string, source?: 'session' | 'redis') =>
-  request<AgentEvent[]>(`/agents/${name}/events?limit=${limit}${ns ? `&namespace=${ns}` : ''}${before ? `&before=${encodeURIComponent(before)}` : ''}${source ? `&source=${source}` : ''}`);
+export const getAgentEvents = (name: string, limit = 50, ns?: string, before?: string, source?: 'session' | 'redis', around?: string, after?: string) =>
+  request<AgentEvent[]>(`/agents/${name}/events?limit=${limit}${ns ? `&namespace=${ns}` : ''}${before ? `&before=${encodeURIComponent(before)}` : ''}${source ? `&source=${source}` : ''}${around ? `&around=${encodeURIComponent(around)}` : ''}${after ? `&after=${encodeURIComponent(after)}` : ''}`);
+
+export const getAgentCostBreakdown = (name: string, ns?: string, refresh?: boolean) => {
+  const params = new URLSearchParams();
+  if (ns) params.set("namespace", ns);
+  if (refresh) params.set("refresh", "true");
+  const qs = params.toString();
+  return request<CostBreakdownResponse>(`/agents/${name}/cost${qs ? `?${qs}` : ''}`);
+};
 
 // Offices
 export const listOffices = (ns?: string) =>

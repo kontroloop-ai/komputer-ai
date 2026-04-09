@@ -77,7 +77,7 @@ export interface ScheduleListResponse {
 export interface AgentEvent {
   agentName: string;
   namespace?: string;
-  type: 'task_started' | 'user_message' | 'thinking' | 'tool_call' | 'tool_result' | 'text' | 'task_completed' | 'task_cancelled' | 'error';
+  type: 'task_started' | 'user_message' | 'thinking' | 'tool_call' | 'tool_result' | 'text' | 'task_completed' | 'task_cancelled' | 'compaction' | 'error';
   timestamp: string;
   payload: Record<string, any>;
 }
@@ -250,4 +250,28 @@ export interface ConnectorTemplate {
 
 export interface ConnectorTemplateListResponse {
   templates: ConnectorTemplate[];
+}
+
+export interface TaskBreakdown {
+  index: number;
+  startedAt: string;
+  completedAt?: string;
+  instruction: string;
+  costUSD: number;
+  durationMs: number;
+  turns: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreateTokens: number;
+  steer?: boolean;
+  events: AgentEvent[];
+}
+
+export interface CostBreakdownResponse {
+  agent: string;
+  tasks: TaskBreakdown[];
+  totalCost: number;
+  taskCount: number;
+  cachedAt?: string;
 }

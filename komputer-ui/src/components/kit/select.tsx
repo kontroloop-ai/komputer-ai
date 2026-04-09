@@ -344,10 +344,10 @@ export function SelectItem({
       onMouseEnter={() => setHighlightedIndex(index)}
       {...props}
     >
-      <span className="truncate">{children}</span>
-      {isSelected && (
-        <Check className="h-4 w-4 shrink-0 text-[var(--color-brand-blue)]" />
-      )}
+      <span className="w-5 shrink-0">
+        {isSelected && <Check className="h-4 w-4 text-[var(--color-brand-blue)]" />}
+      </span>
+      <span className="truncate flex-1 flex items-center">{children}</span>
     </div>
   );
 }

@@ -41,6 +41,11 @@ type AgentChatProps = {
   onLoadOlder?: () => void;
   scrollContainerRef?: React.RefObject<HTMLElement | null>;
   scrollSnapshotRef?: React.RefObject<number | null>;
+  highlightTaskFrom?: string;
+  highlightTaskTo?: string;
+  hasNewerEvents?: boolean;
+  loadingNewer?: boolean;
+  onLoadNewer?: () => void;
 };
 
 // --- Message types derived from events ---
@@ -79,9 +84,10 @@ type ChatMessage =
       timestamp: string;
     }
   | { kind: "error"; message: string; timestamp: string }
-  | { kind: "cancelled"; timestamp: string };
+  | { kind: "cancelled"; timestamp: string }
+  | { kind: "compaction"; timestamp: string };
 
-function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
+export function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
   const messages: ChatMessage[] = [];
   for (const event of events) {
     switch (event.type) {
@@ -199,6 +205,9 @@ function eventsToChatMessages(events: AgentEvent[]): ChatMessage[] {
       }
       case "task_cancelled":
         messages.push({ kind: "cancelled", timestamp: event.timestamp });
+        break;
+      case "compaction":
+        messages.push({ kind: "compaction", timestamp: event.timestamp });
         break;
       case "error":
         messages.push({
@@ -692,6 +701,16 @@ function CancelledDivider() {
   );
 }
 
+function CompactionDivider() {
+  return (
+    <div className="flex items-center gap-3 py-2">
+      <div className="flex-1 border-t border-purple-400/20" />
+      <span className="text-xs font-medium text-purple-400">Context compacted</span>
+      <div className="flex-1 border-t border-purple-400/20" />
+    </div>
+  );
+}
+
 function ErrorBar({ message }: { message: string }) {
   return (
     <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
@@ -702,44 +721,113 @@ function ErrorBar({ message }: { message: string }) {
 
 // --- Memoized message list — skips re-render when only input state changes ---
 
-const MessageList = React.memo(function MessageList({ messages, agentName, agentNamespace }: { messages: ChatMessage[]; agentName?: string; agentNamespace?: string }) {
+export const MessageList = React.memo(function MessageList({ messages, agentName, agentNamespace, highlightFrom, highlightTo }: { messages: ChatMessage[]; agentName?: string; agentNamespace?: string; highlightFrom?: string; highlightTo?: string }) {
   const userTextCount: Record<string, number> = {};
-  return (
-    <>
-      {messages.map((msg, i) => {
-        const key = (() => {
-          if (msg.kind === "user") {
-            const slug = msg.text.slice(0, 80);
-            const n = (userTextCount[slug] = (userTextCount[slug] ?? 0) + 1);
-            return `user-${slug}-${n}`;
-          }
-          return `${msg.kind}-${msg.timestamp}-${i}`;
-        })();
-        switch (msg.kind) {
-          case "user":
-            return <UserBubble key={key} text={msg.text} timestamp={msg.timestamp} />;
-          case "text":
-            return <AgentBubble key={key} text={msg.text} timestamp={msg.timestamp} usage={msg.usage} agentName={agentName} namespace={agentNamespace} />;
-          case "thinking":
-            return <ThinkingBubble key={key} text={msg.text} />;
-          case "tool":
-            return (
-              <motion.div key={key} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: "easeOut" }}>
-                {msg.toolName === "Skill"
-                  ? <SkillCard skillName={msg.description ?? "skill"} args={msg.command} />
-                  : <ToolCard toolName={msg.toolName} description={msg.description} command={msg.command} input={msg.input} output={msg.output} />}
-              </motion.div>
-            );
-          case "completed":
-            return <CompletedDivider key={key} costUSD={msg.costUSD} duration={msg.duration} turns={msg.turns} inputTokens={msg.inputTokens} outputTokens={msg.outputTokens} cacheReadTokens={msg.cacheReadTokens} cacheCreationTokens={msg.cacheCreationTokens} />;
-          case "cancelled":
-            return <CancelledDivider key={key} />;
-          case "error":
-            return <ErrorBar key={key} message={msg.message} />;
+  const fromTime = highlightFrom ? new Date(highlightFrom).getTime() : null;
+  const toTime = highlightTo ? new Date(highlightTo).getTime() : null;
+  const [highlightVisible, setHighlightVisible] = useState(!!highlightFrom);
+  const fadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Fade the border 2s after the user scrolls to see the end of the highlighted task.
+  const highlightEndRef = useCallback((node: HTMLDivElement | null) => {
+    if (!node || fadeTimerRef.current) return;
+    const container = node.closest("[data-messages]")?.parentElement;
+    if (!container) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Trigger when the bottom sentinel becomes visible (user reached task end).
+        if (entries[0].isIntersecting && !fadeTimerRef.current) {
+          fadeTimerRef.current = setTimeout(() => {
+            setHighlightVisible(false);
+            const url = new URL(window.location.href);
+            if (url.searchParams.has("taskFrom")) {
+              url.searchParams.delete("taskFrom");
+              url.searchParams.delete("taskTo");
+              url.searchParams.delete("taskEvents");
+              window.history.replaceState(null, "", url.pathname + (url.search || ""));
+            }
+          }, 2000);
+          observer.disconnect();
         }
-      })}
-    </>
-  );
+      },
+      { root: container, threshold: 0 }
+    );
+    observer.observe(node);
+  }, []);
+
+  function renderMsg(msg: ChatMessage, i: number) {
+    const key = (() => {
+      if (msg.kind === "user") {
+        const slug = msg.text.slice(0, 80);
+        const n = (userTextCount[slug] = (userTextCount[slug] ?? 0) + 1);
+        return `user-${slug}-${n}`;
+      }
+      return `${msg.kind}-${msg.timestamp}-${i}`;
+    })();
+    switch (msg.kind) {
+      case "user":
+        return <div key={key}><UserBubble text={msg.text} timestamp={msg.timestamp} /></div>;
+      case "text":
+        return <AgentBubble key={key} text={msg.text} timestamp={msg.timestamp} usage={msg.usage} agentName={agentName} namespace={agentNamespace} />;
+      case "thinking":
+        return <ThinkingBubble key={key} text={msg.text} />;
+      case "tool":
+        return (
+          <motion.div key={key} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: "easeOut" }}>
+            {msg.toolName === "Skill"
+              ? <SkillCard skillName={msg.description ?? "skill"} args={msg.command} />
+              : <ToolCard toolName={msg.toolName} description={msg.description} command={msg.command} input={msg.input} output={msg.output} />}
+          </motion.div>
+        );
+      case "completed":
+        return <CompletedDivider key={key} costUSD={msg.costUSD} duration={msg.duration} turns={msg.turns} inputTokens={msg.inputTokens} outputTokens={msg.outputTokens} cacheReadTokens={msg.cacheReadTokens} cacheCreationTokens={msg.cacheCreationTokens} />;
+      case "cancelled":
+        return <CancelledDivider key={key} />;
+      case "compaction":
+        return <CompactionDivider key={key} />;
+      case "error":
+        return <ErrorBar key={key} message={msg.message} />;
+    }
+  }
+
+  // Group messages: highlighted ones go into a single wrapper div.
+  if (fromTime == null || toTime == null) {
+    return <>{messages.map((msg, i) => renderMsg(msg, i))}</>;
+  }
+
+  const elements: React.ReactNode[] = [];
+  let highlightBuf: { msg: ChatMessage; idx: number }[] = [];
+
+  const flushHighlight = () => {
+    if (highlightBuf.length === 0) return;
+    elements.push(
+      <div
+        key={`hl-${highlightBuf[0].idx}`}
+        data-task-highlight=""
+        className={`rounded-lg px-3 py-2 flex flex-col gap-3 transition-all duration-500 ${highlightVisible ? "border-2 border-amber-400/30" : "border-2 border-transparent"}`}
+      >
+        {highlightBuf.map(({ msg, idx }) => renderMsg(msg, idx))}
+        <div ref={highlightEndRef} className="h-0" />
+      </div>
+    );
+    highlightBuf = [];
+  };
+
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    const msgTime = new Date(msg.timestamp).getTime();
+    const isHighlighted = msgTime >= fromTime && msgTime <= toTime;
+
+    if (isHighlighted) {
+      highlightBuf.push({ msg, idx: i });
+    } else {
+      flushHighlight();
+      elements.push(renderMsg(msg, i));
+    }
+  }
+  flushHighlight();
+
+  return <>{elements}</>;
 });
 
 // --- Main component ---
@@ -758,6 +846,11 @@ export function AgentChat({
   onLoadOlder,
   scrollContainerRef: parentScrollRef,
   scrollSnapshotRef,
+  highlightTaskFrom,
+  highlightTaskTo,
+  hasNewerEvents,
+  loadingNewer,
+  onLoadNewer,
 }: AgentChatProps) {
   const [input, setInputRaw] = useState(() => {
     if (typeof window === "undefined") return "";
@@ -799,6 +892,7 @@ export function AgentChat({
       : []
   );
   const bottomRef = useRef<HTMLDivElement>(null);
+  const bottomSentinelRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -897,9 +991,19 @@ export function AgentChat({
     prevMsgCountRef.current = messages.length;
 
     if (!initialScrollDone.current) {
-      // First render with messages — snap to bottom instantly (no smooth)
-      bottomRef.current?.scrollIntoView();
       initialScrollDone.current = true;
+      if (highlightTaskFrom) {
+        // Scroll to the first highlighted message.
+        requestAnimationFrame(() => {
+          const firstHighlight = container.querySelector("[data-task-highlight]") as HTMLElement | null;
+          if (firstHighlight) {
+            firstHighlight.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        });
+      } else {
+        // Normal: snap to bottom
+        bottomRef.current?.scrollIntoView();
+      }
       return;
     }
 
@@ -915,24 +1019,62 @@ export function AgentChat({
     }
   }, [messages.length]);
 
-  // IntersectionObserver to trigger loading older events when sentinel is visible
-  // Only attach after the initial scroll to bottom is done, to avoid immediately loading all pages.
+  // IntersectionObserver to trigger loading older events when sentinel is visible.
+  // Uses refs for all guards so the observer identity is stable (no cascade re-creates).
+  const onLoadOlderRef = useRef(onLoadOlder);
+  onLoadOlderRef.current = onLoadOlder;
+  const hasMoreRef = useRef(hasMoreEvents);
+  hasMoreRef.current = hasMoreEvents;
+  const loadingOlderRef = useRef(loadingOlder);
+  loadingOlderRef.current = loadingOlder;
+
+  // Re-run when messages first load (initialScrollDone becomes true).
+  const [observerReady, setObserverReady] = useState(false);
   useEffect(() => {
-    if (!initialScrollDone.current) return;
+    if (initialScrollDone.current && !observerReady) setObserverReady(true);
+  }, [messages.length, observerReady]);
+
+  useEffect(() => {
+    if (!observerReady) return;
     const sentinel = sentinelRef.current;
     const container = scrollContainerRef.current;
-    if (!sentinel || !container || !onLoadOlder) return;
+    if (!sentinel || !container) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMoreEvents && !loadingOlder) {
-          onLoadOlder();
+        if (entries[0].isIntersecting && hasMoreRef.current && !loadingOlderRef.current && onLoadOlderRef.current) {
+          onLoadOlderRef.current();
         }
       },
       { root: container, threshold: 0.1 }
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [hasMoreEvents, loadingOlder, onLoadOlder]);
+  }, [observerReady, agentName]);
+
+  // Observer for loading newer events (bottom sentinel).
+  const onLoadNewerRef = useRef(onLoadNewer);
+  onLoadNewerRef.current = onLoadNewer;
+  const hasNewerRef = useRef(hasNewerEvents);
+  hasNewerRef.current = hasNewerEvents;
+  const loadingNewerRef = useRef(loadingNewer);
+  loadingNewerRef.current = loadingNewer;
+
+  useEffect(() => {
+    if (!observerReady || !hasNewerEvents) return;
+    const sentinel = bottomSentinelRef.current;
+    const container = scrollContainerRef.current;
+    if (!sentinel || !container) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNewerRef.current && !loadingNewerRef.current && onLoadNewerRef.current) {
+          onLoadNewerRef.current();
+        }
+      },
+      { root: container, threshold: 0.1 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [observerReady, hasNewerEvents, agentName]);
 
   const handleSend = useCallback(() => {
     const text = input.trim();
@@ -1051,7 +1193,7 @@ export function AgentChat({
                 </div>
               </div>
             )}
-            <MessageList messages={messages} agentName={agentName} agentNamespace={agentNamespace} />
+            <MessageList messages={messages} agentName={agentName} agentNamespace={agentNamespace} highlightFrom={highlightTaskFrom} highlightTo={highlightTaskTo} />
             <AnimatePresence>
             {showThinking && (
               <motion.div
@@ -1082,6 +1224,14 @@ export function AgentChat({
               </motion.div>
             )}
             </AnimatePresence>
+            {hasNewerEvents && (
+              <div ref={bottomSentinelRef} className="h-1 shrink-0" />
+            )}
+            {loadingNewer && (
+              <div className="flex justify-center py-2">
+                <span className="text-xs text-[var(--color-text-muted)]">Loading...</span>
+              </div>
+            )}
             <div ref={bottomRef} />
           </div>
         )}

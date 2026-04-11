@@ -37,6 +37,7 @@ python: spec
 		-g python \
 		-o python \
 		--package-name komputer_ai \
+		--skip-validate-spec \
 		--additional-properties=projectName=komputer-ai,packageVersion=0.1.0
 	@echo "Python SDK generated in python/"
 

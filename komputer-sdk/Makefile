@@ -10,7 +10,7 @@ SPEC_SWAGGER := $(API_DIR)/docs/swagger.json
 SPEC_OPENAPI := openapi.yaml
 GENERATOR := npx @openapitools/openapi-generator-cli
 
-.PHONY: all spec python go typescript clean swagger
+.PHONY: all spec python go typescript clean swagger test test-integration
 
 all: python
 
@@ -47,6 +47,14 @@ go: spec
 
 typescript: spec
 	@echo "TypeScript SDK generation not yet implemented"
+
+# Run unit tests (no server needed)
+test:
+	cd python && pip install -e . -q && pytest tests/ --ignore=tests/integration -v
+
+# Run integration tests (requires KOMPUTER_API_URL or localhost:8080)
+test-integration:
+	cd python && pip install -e . -q && pytest tests/integration -v
 
 clean:
 	rm -rf python/komputer_ai python/docs python/test python/*.egg-info

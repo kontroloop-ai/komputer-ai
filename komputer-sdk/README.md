@@ -37,6 +37,20 @@ with KomputerClient("http://localhost:8080") as client:
     print(agents)
 ```
 
+## Testing
+
+```bash
+cd komputer-sdk
+
+# Unit tests (no server needed)
+make test
+
+# Integration tests (requires a running komputer-ai instance)
+KOMPUTER_API_URL=http://localhost:8080 make test-integration
+```
+
+Integration tests create and delete real resources (agents, memories, skills, etc.) prefixed with `sdk-test-`. They clean up after themselves.
+
 ## Structure
 
 ```

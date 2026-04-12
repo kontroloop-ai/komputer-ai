@@ -62,9 +62,6 @@ Name | Type | Description  | Notes
 
 [**SecretResponse**](SecretResponse.md)
 
-### Authorization
-
-No authorization required
 
 ### HTTP request headers
 
@@ -133,9 +130,6 @@ Name | Type | Description  | Notes
 
 **Dict[str, str]**
 
-### Authorization
-
-No authorization required
 
 ### HTTP request headers
 
@@ -204,9 +198,6 @@ Name | Type | Description  | Notes
 
 [**SecretListResponse**](SecretListResponse.md)
 
-### Authorization
-
-No authorization required
 
 ### HTTP request headers
 
@@ -277,9 +268,6 @@ Name | Type | Description  | Notes
 
 **Dict[str, str]**
 
-### Authorization
-
-No authorization required
 
 ### HTTP request headers
 

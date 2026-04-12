@@ -62,9 +62,6 @@ Name | Type | Description  | Notes
 
 void (empty response body)
 
-### Authorization
-
-No authorization required
 
 ### HTTP request headers
 
@@ -126,9 +123,6 @@ Name | Type | Description  | Notes
 
 **Dict[str, str]**
 
-### Authorization
-
-No authorization required
 
 ### HTTP request headers
 
@@ -199,9 +193,6 @@ Name | Type | Description  | Notes
 
 [**AgentResponse**](AgentResponse.md)
 
-### Authorization
-
-No authorization required
 
 ### HTTP request headers
 
@@ -272,9 +263,6 @@ Name | Type | Description  | Notes
 
 **Dict[str, str]**
 
-### Authorization
-
-No authorization required
 
 ### HTTP request headers
 
@@ -344,9 +332,6 @@ Name | Type | Description  | Notes
 
 [**AgentResponse**](AgentResponse.md)
 
-### Authorization
-
-No authorization required
 
 ### HTTP request headers
 
@@ -417,9 +402,6 @@ Name | Type | Description  | Notes
 
 **Dict[str, object]**
 
-### Authorization
-
-No authorization required
 
 ### HTTP request headers
 
@@ -487,9 +469,6 @@ Name | Type | Description  | Notes
 
 [**AgentListResponse**](AgentListResponse.md)
 
-### Authorization
-
-No authorization required
 
 ### HTTP request headers
 
@@ -561,9 +540,6 @@ Name | Type | Description  | Notes
 
 [**AgentResponse**](AgentResponse.md)
 
-### Authorization
-
-No authorization required
 
 ### HTTP request headers
 

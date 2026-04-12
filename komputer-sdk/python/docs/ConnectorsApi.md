@@ -63,9 +63,6 @@ Name | Type | Description  | Notes
 
 [**ConnectorResponse**](ConnectorResponse.md)
 
-### Authorization
-
-No authorization required
 
 ### HTTP request headers
 
@@ -134,9 +131,6 @@ Name | Type | Description  | Notes
 
 **Dict[str, str]**
 
-### Authorization
-
-No authorization required
 
 ### HTTP request headers
 
@@ -205,9 +199,6 @@ Name | Type | Description  | Notes
 
 [**ConnectorResponse**](ConnectorResponse.md)
 
-### Authorization
-
-No authorization required
 
 ### HTTP request headers
 
@@ -276,9 +267,6 @@ Name | Type | Description  | Notes
 
 **Dict[str, object]**
 
-### Authorization
-
-No authorization required
 
 ### HTTP request headers
 
@@ -346,9 +334,6 @@ Name | Type | Description  | Notes
 
 **Dict[str, object]**
 
-### Authorization
-
-No authorization required
 
 ### HTTP request headers
 

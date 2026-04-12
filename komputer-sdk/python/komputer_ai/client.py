@@ -27,7 +27,7 @@ from komputer_ai.api.skills_api import SkillsApi
 from komputer_ai.api.templates_api import TemplatesApi
 from komputer_ai.api.agents_ws import AgentEventStream
 from komputer_ai.models import (
-    CreateAgentRequest, CreateConnectorRequest, CreateMemoryRequest, CreateScheduleRequest, CreateSecretRequest, CreateSkillRequest, PatchAgentRequest, PatchMemoryRequest, PatchScheduleRequest, PatchSkillRequest, UpdateSecretRequest,
+    CreateAgentRequest, CreateConnectorRequest, CreateMemoryRequest, CreateScheduleAgentSpec, CreateScheduleRequest, CreateSecretRequest, CreateSkillRequest, PatchAgentRequest, PatchMemoryRequest, PatchScheduleRequest, PatchSkillRequest, UpdateSecretRequest,
 )
 
 
@@ -115,7 +115,7 @@ class KomputerClient:
     def list_schedules(self):
         return self.schedules.list_schedules()
 
-    def create_schedule(self, name: str, instructions: str, schedule: str, *, agent: Optional[str] = None, agent_name: Optional[str] = None, auto_delete: Optional[bool] = None, keep_agents: Optional[bool] = None, namespace: Optional[str] = None, timezone: Optional[str] = None):
+    def create_schedule(self, name: str, instructions: str, schedule: str, *, agent: Optional[CreateScheduleAgentSpec] = None, agent_name: Optional[str] = None, auto_delete: Optional[bool] = None, keep_agents: Optional[bool] = None, namespace: Optional[str] = None, timezone: Optional[str] = None):
         return self.schedules.create_schedule(CreateScheduleRequest(agent=agent, agent_name=agent_name, auto_delete=auto_delete, instructions=instructions, keep_agents=keep_agents, name=name, namespace=namespace, schedule=schedule, timezone=timezone))
 
     def get_schedule(self, name: str):

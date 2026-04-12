@@ -12,7 +12,7 @@ GENERATOR := npx @openapitools/openapi-generator-cli
 
 .PHONY: all spec python client go typescript clean swagger test test-integration
 
-all: python
+all: python go typescript
 
 # Step 1: Regenerate swagger from Go annotations
 swagger:
@@ -43,16 +43,37 @@ python: spec
 	python generate_client.py
 	@echo "Python SDK generated in python/"
 
-# Regenerate just the kwargs client wrapper (no spec/SDK regeneration)
+# Step 4: Generate Go SDK
+go: spec
+	rm -rf go/komputer
+	$(GENERATOR) generate \
+		-i $(SPEC_OPENAPI) \
+		-g go \
+		-o go/komputer \
+		--package-name komputer \
+		--skip-validate-spec \
+		--git-user-id kontroloop-ai \
+		--git-repo-id komputer-ai \
+		--additional-properties=packageVersion=0.1.0,isGoSubmodule=true
+	sed -i.bak 's|komputer-ai/komputer$$|komputer-ai/komputer-sdk/go/komputer|' go/komputer/go.mod && rm -f go/komputer/go.mod.bak
+	python generate_client.py go
+	@echo "Go SDK generated in go/"
+
+# Step 5: Generate TypeScript SDK
+typescript: spec
+	rm -rf typescript/src
+	$(GENERATOR) generate \
+		-i $(SPEC_OPENAPI) \
+		-g typescript-fetch \
+		-o typescript \
+		--skip-validate-spec \
+		--additional-properties=npmName=komputer-ai,npmVersion=0.1.0,supportsES6=true
+	python generate_client.py typescript
+	@echo "TypeScript SDK generated in typescript/"
+
+# Regenerate just the client wrappers (no spec/SDK regeneration)
 client:
 	python generate_client.py
-
-# Placeholder targets for future SDKs
-go: spec
-	@echo "Go SDK generation not yet implemented"
-
-typescript: spec
-	@echo "TypeScript SDK generation not yet implemented"
 
 # Run unit tests (no server needed)
 test:

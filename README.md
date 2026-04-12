@@ -77,6 +77,8 @@
    3. [komputer-agent](komputer-agent/README.md) — Agent runtime, Claude SDK integration, manager tools, event format
    4. [komputer-cli](komputer-cli/README.md) — CLI commands, flags, usage examples
    5. [komputer-ui](komputer-ui/README.md) — Web dashboard, pages, configuration, development
+   6. [komputer-sdk](komputer-sdk/README.md) — Python SDK, generation pipeline, testing
+   7. [Helm Chart](helm/komputer-ai/README.md) — Chart values, custom installation, external Redis
 
 ## Installation
 
@@ -143,23 +145,39 @@ komputer login http://localhost:8080
 komputer run my-agent "Write a haiku about Kubernetes"
 ```
 
-### Custom installation
+For custom installation options (external Redis, resource limits, etc.), see the [Helm Chart docs](helm/komputer-ai/README.md). For building from source, see [Local Development](docs/local-development.md).
 
-For external Redis, custom resource limits, or other configuration:
+## Python SDK
 
 ```bash
-# Use external Redis
-helm install komputer-ai oci://ghcr.io/kontroloop-ai/charts/komputer-ai \
-  --set anthropicApiKeySecret.name=anthropic-api-key \
-  --set redis.enabled=false \
-  --set externalRedis.address=redis.prod:6379 \
-  --namespace komputer-ai
-
-# See all options
-helm show values oci://ghcr.io/kontroloop-ai/charts/komputer-ai
+pip install komputer-ai    # or: cd komputer-sdk/python && pip install -e .
 ```
 
-For building from source, see the [Local Development](docs/local-development.md) guide.
+```python
+from komputer_ai.client import KomputerClient
+from komputer_ai.models import CreateAgentRequest
+
+client = KomputerClient("http://localhost:8080")
+
+# Create an agent and give it a task
+client.agents.create_agent(CreateAgentRequest(
+    name="my-agent",
+    instructions="Analyze our Kubernetes cluster and suggest cost optimizations",
+    model="claude-sonnet-4-6",
+))
+
+# Stream events as the agent works
+for event in client.watch_agent("my-agent"):
+    if event.type == "text":
+        print(event.payload.get("content", ""))
+    elif event.type == "tool_use":
+        print(f"  -> using {event.payload.get('name')}")
+    elif event.type == "task_completed":
+        print(f"\nDone — cost: ${event.payload.get('cost_usd')}")
+        break
+```
+
+Full SDK reference in [komputer-sdk/](komputer-sdk/).
 
 ## Custom Resources
 
@@ -311,38 +329,6 @@ komputer delete <name> [name...]    # Delete one or more agents
 --connector <name>                  # Attach a KomputerConnector (repeatable)
 --system-prompt <text>              # Custom system prompt for the agent
 ```
-
-## Python SDK
-
-```bash
-pip install komputer-ai    # or: cd komputer-sdk/python && pip install -e .
-```
-
-```python
-from komputer_ai.client import KomputerClient
-from komputer_ai.models import CreateAgentRequest
-
-client = KomputerClient("http://localhost:8080")
-
-# Create an agent and give it a task
-client.agents.create_agent(CreateAgentRequest(
-    name="my-agent",
-    instructions="Analyze our Kubernetes cluster and suggest cost optimizations",
-    model="claude-sonnet-4-6",
-))
-
-# Stream events as the agent works
-for event in client.watch_agent("my-agent"):
-    if event.type == "text":
-        print(event.payload.get("content", ""))
-    elif event.type == "tool_use":
-        print(f"  -> using {event.payload.get('name')}")
-    elif event.type == "task_completed":
-        print(f"\nDone — cost: ${event.payload.get('cost_usd')}")
-        break
-```
-
-Full SDK reference in [komputer-sdk/](komputer-sdk/).
 
 ### Secrets
 

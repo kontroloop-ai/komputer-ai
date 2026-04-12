@@ -24,6 +24,7 @@
 
 # Preserve hand-written files
 komputer_ai/client.py
+komputer_ai/api/agents_ws.py
 
 # Skip CI files we don't use
 .travis.yml

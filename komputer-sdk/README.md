@@ -2,7 +2,7 @@
 
 Auto-generated client libraries for the komputer.ai REST API.
 
-## Python SDK
+## Python
 
 ```bash
 pip install komputer-ai    # or: cd komputer-sdk/python && pip install -e .
@@ -20,10 +20,6 @@ client.create_agent(
     model="claude-sonnet-4-6",
 )
 
-# Attach a memory
-client.create_memory(name="context", content="We run a 50-node GKE cluster.")
-client.patch_agent("my-agent", memories=["context"])
-
 # Stream events as the agent works
 for event in client.watch_agent("my-agent"):
     if event.type == "text":
@@ -31,12 +27,77 @@ for event in client.watch_agent("my-agent"):
     elif event.type == "task_completed":
         break
 
-# List and clean up
-agents = client.list_agents()
-client.delete_agent("my-agent")
+# Attach a memory
+client.create_memory(name="context", content="We run a 50-node GKE cluster.")
+client.patch_agent("my-agent", memories=["context"])
 ```
 
-All methods accept keyword arguments directly — no model objects needed. For advanced use cases, the generated API clients are still available via `client.agents`, `client.memories`, etc.
+## TypeScript
+
+```bash
+cd komputer-sdk/typescript && npm install && npm run build
+```
+
+```typescript
+import { KomputerClient } from "komputer-ai";
+
+const client = new KomputerClient("http://localhost:8080");
+
+// Create an agent
+const agent = await client.createAgent({
+  name: "my-agent",
+  instructions: "Analyze our Kubernetes cluster",
+  model: "claude-sonnet-4-6",
+});
+
+// Attach a memory and skill
+await client.createMemory({ name: "context", content: "We run a 50-node GKE cluster." });
+await client.patchAgent({ name: "my-agent", memories: ["context"] });
+
+// List and clean up
+const agents = await client.listAgents();
+await client.deleteAgent("my-agent");
+```
+
+## Go
+
+```bash
+go get github.com/kontroloop-ai/komputer-ai/komputer-sdk/go/client
+```
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+
+    client "github.com/kontroloop-ai/komputer-ai/komputer-sdk/go/client"
+    komputer "github.com/kontroloop-ai/komputer-ai/komputer-sdk/go/komputer"
+)
+
+func main() {
+    c := client.New("http://localhost:8080")
+    ctx := context.Background()
+
+    // Create an agent
+    agent, _, _ := c.CreateAgent(ctx, "my-agent", "Analyze our cluster",
+        client.CreateAgentOpts{Model: komputer.PtrString("claude-sonnet-4-6")})
+    fmt.Println(agent.Name)
+
+    // Attach a memory
+    c.CreateMemory(ctx, "context", "We run a 50-node GKE cluster.")
+    c.PatchAgent(ctx, "my-agent",
+        client.PatchAgentOpts{Memories: []string{"context"}})
+
+    // List and clean up
+    agents, _, _ := c.ListAgents(ctx)
+    fmt.Println(len(agents.Agents))
+    c.DeleteAgent(ctx, "my-agent")
+}
+```
+
+All methods accept flat parameters — no model objects needed. For advanced use cases, the generated API clients are available via `client.agents` (Python), `client._agents` (TypeScript), or `client.api` (Go).
 
 ## Regenerating
 
@@ -45,10 +106,15 @@ When the API changes, regenerate the SDKs:
 ```bash
 cd komputer-sdk
 
-# Regenerate everything (swagger → openapi → SDK + client wrapper)
-make python
+# Regenerate all SDKs
+make all
 
-# Regenerate just the kwargs client wrapper
+# Or one at a time
+make python
+make go
+make typescript
+
+# Regenerate just the client wrappers (no spec regeneration)
 make client
 
 # Just regenerate the OpenAPI spec
@@ -59,40 +125,53 @@ make spec
 
 - [swag](https://github.com/swaggo/swag) — `go install github.com/swaggo/swag/cmd/swag@v1.16.6`
 - [openapi-generator-cli](https://openapi-generator.tech/) — via `npx` (included in the Makefile)
-- Node.js + npx (for openapi-generator-cli)
+- Node.js + npx
 - Python 3.10+ (for `generate_client.py`)
+- Go 1.23+
 
 ## Testing
 
 ```bash
 cd komputer-sdk
 
-# Unit tests (no server needed)
+# Python unit tests
 make test
 
-# Integration tests (requires a running komputer-ai instance)
+# Python integration tests (requires a running komputer-ai instance)
 KOMPUTER_API_URL=http://localhost:8080 make test-integration
+
+# Go tests
+cd go/client && go test ./...
+
+# TypeScript tests
+cd typescript && npx vitest run
 ```
 
-Integration tests create and delete real resources (agents, memories, skills, etc.) prefixed with `sdk-test-`. They clean up after themselves.
+Integration tests create and delete real resources prefixed with `sdk-test-`. They clean up after themselves.
 
 ## Structure
 
 ```
 komputer-sdk/
 ├── Makefile              # Generation pipeline
-├── generate_client.py    # Generates kwargs-style client wrapper from OpenAPI spec
-├── openapi.yaml          # Generated OpenAPI 3.0 spec (committed for reference)
-├── python/               # Python SDK
+├── generate_client.py    # Generates convenience wrappers for all languages
+├── openapi.yaml          # Generated OpenAPI 3.0 spec
+├── python/
 │   ├── komputer_ai/
-│   │   ├── client.py     # Auto-generated kwargs convenience client
-│   │   ├── api/          # Generated API classes (model-based)
-│   │   │   └── agents_ws.py  # Hand-written WebSocket streaming
-│   │   └── models/       # Generated request/response models
+│   │   ├── client.py         # Auto-generated convenience client
+│   │   ├── api/              # Generated API classes
+│   │   │   └── agents_ws.py  # WebSocket streaming (hand-written)
+│   │   └── models/           # Generated request/response models
 │   └── tests/
-│       ├── test_client.py    # Client wrapper + API method tests
-│       ├── test_models.py    # Model serialization tests
-│       └── integration/      # Integration tests (requires live API)
-├── go/                   # Go SDK (future)
-└── typescript/           # TypeScript SDK (future)
+├── go/
+│   ├── client/
+│   │   ├── client.go         # Auto-generated convenience client
+│   │   └── client_test.go
+│   └── komputer/             # Generated Go API package
+├── typescript/
+│   └── src/
+│       ├── client.ts         # Auto-generated convenience client
+│       ├── client.test.ts
+│       ├── apis/             # Generated API classes
+│       └── models/           # Generated request/response models
 ```

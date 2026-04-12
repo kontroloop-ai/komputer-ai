@@ -342,7 +342,7 @@ def go_type(field, pointer=False):
 
 
 def generate_go(operations):
-    output_path = Path(__file__).parent / "go" / "client.go"
+    output_path = Path(__file__).parent / "go" / "client" / "client.go"
     methods_by_tag = {}
 
     for op in operations:
@@ -421,6 +421,7 @@ def generate_go(operations):
 
         # Determine return type
         resp_ref = None
+        resp_map_type = None
         responses = op["operation"].get("responses", {})
         for code in ["200", "201"]:
             resp = responses.get(code, {})
@@ -428,9 +429,18 @@ def generate_go(operations):
             if "$ref" in content:
                 resp_ref = get_model_class_name(content["$ref"])
                 break
+            elif content.get("type") == "object":
+                addl = content.get("additionalProperties", {})
+                if isinstance(addl, dict) and addl.get("type") == "string":
+                    resp_map_type = "map[string]string"
+                else:
+                    resp_map_type = "map[string]interface{}"
+                break
 
         if resp_ref:
             return_type = f"(*komputer.{resp_ref}, *http.Response, error)"
+        elif resp_map_type:
+            return_type = f"({resp_map_type}, *http.Response, error)"
         else:
             return_type = "(*http.Response, error)"
 

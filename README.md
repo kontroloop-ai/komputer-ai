@@ -60,7 +60,7 @@
 | [komputer-agent](komputer-agent/) | Python | The agent runtime — runs Claude with bash/web tools in a persistent workspace |
 | [komputer-cli](komputer-cli/) | Go | Beautiful CLI for interacting with the platform |
 | [komputer-ui](komputer-ui/) | TypeScript | Web dashboard for managing agents, offices, schedules, memories, skills, connectors, and costs |
-| [komputer-sdk](komputer-sdk/) | Python | Auto-generated SDK for the REST API + WebSocket streaming |
+| [komputer-sdk](komputer-sdk/) | Python, Go, TypeScript | Auto-generated SDKs for the REST API + WebSocket streaming |
 
 
 ## Documentation

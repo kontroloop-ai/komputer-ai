@@ -75,9 +75,17 @@ typescript: spec
 client:
 	python generate_client.py
 
-# Run unit tests (no server needed)
-test:
+# Run all unit tests
+test: test-python test-go test-typescript
+
+test-python:
 	cd python && pip install -e . -q && pytest tests/ --ignore=tests/integration -v
+
+test-go:
+	cd go/client && go test -v ./...
+
+test-typescript:
+	cd typescript && npx vitest run
 
 # Run integration tests (requires KOMPUTER_API_URL or localhost:8080)
 test-integration:

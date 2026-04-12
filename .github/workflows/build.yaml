@@ -322,12 +322,20 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Test SDK
+      - name: Test SDK (Python)
         if: needs.changes.outputs.api == 'true' || needs.changes.outputs.sdk == 'true' || needs.changes.outputs.is_tag == 'true'
         run: |
           cd komputer-sdk/python
           pip install -e . -q
           pytest tests/ --ignore=tests/integration -v
+
+      - name: Test SDK (Go)
+        if: needs.changes.outputs.api == 'true' || needs.changes.outputs.sdk == 'true' || needs.changes.outputs.is_tag == 'true'
+        run: cd komputer-sdk/go/client && go test -v ./...
+
+      - name: Test SDK (TypeScript)
+        if: needs.changes.outputs.api == 'true' || needs.changes.outputs.sdk == 'true' || needs.changes.outputs.is_tag == 'true'
+        run: cd komputer-sdk/typescript && npm ci && npx vitest run
 
   helm:
     name: Publish Helm Chart

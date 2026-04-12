@@ -146,21 +146,21 @@ func (c *Client) PatchAgent(ctx context.Context, name string, opts ...PatchAgent
 	return c.api.AgentsAPI.PatchAgent(ctx, name).Request(req).Execute()
 }
 
-func (c *Client) DeleteAgent(ctx context.Context, name string) (*http.Response, error) {
+func (c *Client) DeleteAgent(ctx context.Context, name string) (map[string]string, *http.Response, error) {
 	return c.api.AgentsAPI.DeleteAgent(ctx, name).Execute()
 }
 
-func (c *Client) CancelAgentTask(ctx context.Context, name string) (*http.Response, error) {
+func (c *Client) CancelAgentTask(ctx context.Context, name string) (map[string]string, *http.Response, error) {
 	return c.api.AgentsAPI.CancelAgentTask(ctx, name).Execute()
 }
 
-func (c *Client) GetAgentEvents(ctx context.Context, name string) (*http.Response, error) {
+func (c *Client) GetAgentEvents(ctx context.Context, name string) (map[string]interface{}, *http.Response, error) {
 	return c.api.AgentsAPI.GetAgentEvents(ctx, name).Execute()
 }
 
 // --- Memories ---
 
-func (c *Client) ListMemories(ctx context.Context) (*http.Response, error) {
+func (c *Client) ListMemories(ctx context.Context) (map[string]interface{}, *http.Response, error) {
 	return c.api.MemoriesAPI.ListMemories(ctx).Execute()
 }
 
@@ -210,13 +210,13 @@ func (c *Client) PatchMemory(ctx context.Context, name string, opts ...PatchMemo
 	return c.api.MemoriesAPI.PatchMemory(ctx, name).Request(req).Execute()
 }
 
-func (c *Client) DeleteMemory(ctx context.Context, name string) (*http.Response, error) {
+func (c *Client) DeleteMemory(ctx context.Context, name string) (map[string]string, *http.Response, error) {
 	return c.api.MemoriesAPI.DeleteMemory(ctx, name).Execute()
 }
 
 // --- Skills ---
 
-func (c *Client) ListSkills(ctx context.Context) (*http.Response, error) {
+func (c *Client) ListSkills(ctx context.Context) (map[string]interface{}, *http.Response, error) {
 	return c.api.SkillsAPI.ListSkills(ctx).Execute()
 }
 
@@ -263,7 +263,7 @@ func (c *Client) PatchSkill(ctx context.Context, name string, opts ...PatchSkill
 	return c.api.SkillsAPI.PatchSkill(ctx, name).Request(req).Execute()
 }
 
-func (c *Client) DeleteSkill(ctx context.Context, name string) (*http.Response, error) {
+func (c *Client) DeleteSkill(ctx context.Context, name string) (map[string]string, *http.Response, error) {
 	return c.api.SkillsAPI.DeleteSkill(ctx, name).Execute()
 }
 
@@ -332,7 +332,7 @@ func (c *Client) PatchSchedule(ctx context.Context, name string, opts ...PatchSc
 	return c.api.SchedulesAPI.PatchSchedule(ctx, name).Request(req).Execute()
 }
 
-func (c *Client) DeleteSchedule(ctx context.Context, name string) (*http.Response, error) {
+func (c *Client) DeleteSchedule(ctx context.Context, name string) (map[string]string, *http.Response, error) {
 	return c.api.SchedulesAPI.DeleteSchedule(ctx, name).Execute()
 }
 
@@ -364,7 +364,7 @@ type UpdateSecretOpts struct {
 	Namespace *string
 }
 
-func (c *Client) UpdateSecret(ctx context.Context, name string, data map[string]string, opts ...UpdateSecretOpts) (*http.Response, error) {
+func (c *Client) UpdateSecret(ctx context.Context, name string, data map[string]string, opts ...UpdateSecretOpts) (map[string]string, *http.Response, error) {
 	req := komputer.UpdateSecretRequest{
 		Data: data,
 	}
@@ -377,13 +377,13 @@ func (c *Client) UpdateSecret(ctx context.Context, name string, data map[string]
 	return c.api.SecretsAPI.UpdateSecret(ctx, name).Request(req).Execute()
 }
 
-func (c *Client) DeleteSecret(ctx context.Context, name string) (*http.Response, error) {
+func (c *Client) DeleteSecret(ctx context.Context, name string) (map[string]string, *http.Response, error) {
 	return c.api.SecretsAPI.DeleteSecret(ctx, name).Execute()
 }
 
 // --- Connectors ---
 
-func (c *Client) ListConnectors(ctx context.Context) (*http.Response, error) {
+func (c *Client) ListConnectors(ctx context.Context) (map[string]interface{}, *http.Response, error) {
 	return c.api.ConnectorsAPI.ListConnectors(ctx).Execute()
 }
 
@@ -438,11 +438,11 @@ func (c *Client) GetConnector(ctx context.Context, name string) (*komputer.Conne
 	return c.api.ConnectorsAPI.GetConnector(ctx, name).Execute()
 }
 
-func (c *Client) DeleteConnector(ctx context.Context, name string) (*http.Response, error) {
+func (c *Client) DeleteConnector(ctx context.Context, name string) (map[string]string, *http.Response, error) {
 	return c.api.ConnectorsAPI.DeleteConnector(ctx, name).Execute()
 }
 
-func (c *Client) ListConnectorTools(ctx context.Context, name string) (*http.Response, error) {
+func (c *Client) ListConnectorTools(ctx context.Context, name string) (map[string]interface{}, *http.Response, error) {
 	return c.api.ConnectorsAPI.ListConnectorTools(ctx, name).Execute()
 }
 
@@ -456,17 +456,17 @@ func (c *Client) GetOffice(ctx context.Context, name string) (*komputer.OfficeRe
 	return c.api.OfficesAPI.GetOffice(ctx, name).Execute()
 }
 
-func (c *Client) DeleteOffice(ctx context.Context, name string) (*http.Response, error) {
+func (c *Client) DeleteOffice(ctx context.Context, name string) (map[string]string, *http.Response, error) {
 	return c.api.OfficesAPI.DeleteOffice(ctx, name).Execute()
 }
 
-func (c *Client) GetOfficeEvents(ctx context.Context, name string) (*http.Response, error) {
+func (c *Client) GetOfficeEvents(ctx context.Context, name string) (map[string]interface{}, *http.Response, error) {
 	return c.api.OfficesAPI.GetOfficeEvents(ctx, name).Execute()
 }
 
 // --- Templates ---
 
-func (c *Client) ListTemplates(ctx context.Context) (*http.Response, error) {
+func (c *Client) ListTemplates(ctx context.Context) (map[string]interface{}, *http.Response, error) {
 	return c.api.TemplatesAPI.ListTemplates(ctx).Execute()
 }
 

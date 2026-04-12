@@ -1,4 +1,4 @@
-"""Integration tests for skills CRUD lifecycle."""
+"""Integration tests for skills."""
 
 import pytest
 from komputer_ai.models import MainCreateSkillRequest, MainPatchSkillRequest
@@ -21,7 +21,7 @@ def _safe_delete(client, name):
         pass
 
 
-class TestSkillsCRUD:
+class TestSkills:
     def test_create_skill(self, client):
         req = MainCreateSkillRequest(
             name=SKILL_NAME,

@@ -1,4 +1,4 @@
-"""Integration tests for memories CRUD lifecycle."""
+"""Integration tests for memories."""
 
 import pytest
 from komputer_ai.models import MainCreateMemoryRequest, MainPatchMemoryRequest
@@ -22,7 +22,7 @@ def _safe_delete(client, name):
         pass
 
 
-class TestMemoriesCRUD:
+class TestMemories:
     def test_create_memory(self, client):
         req = MainCreateMemoryRequest(
             name=MEMORY_NAME,

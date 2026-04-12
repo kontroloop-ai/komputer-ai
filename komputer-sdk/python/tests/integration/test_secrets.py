@@ -1,4 +1,4 @@
-"""Integration tests for secrets CRUD lifecycle."""
+"""Integration tests for secrets."""
 
 import pytest
 from komputer_ai.models import MainCreateSecretRequest, MainUpdateSecretRequest
@@ -21,7 +21,7 @@ def _safe_delete(client, name):
         pass
 
 
-class TestSecretsCRUD:
+class TestSecrets:
     def test_create_secret(self, client):
         req = MainCreateSecretRequest(
             name=SECRET_NAME,

@@ -2,9 +2,11 @@ package client
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"os"
 	"testing"
+	"time"
 )
 
 // skipIfNoAPI skips the test if the komputer API is not reachable.
@@ -27,6 +29,80 @@ func newTestClient(t *testing.T) (*Client, context.Context) {
 	t.Helper()
 	url := skipIfNoAPI(t)
 	return New(url), context.Background()
+}
+
+// --- Agents E2E ---
+
+func TestIntegration_AgentE2E(t *testing.T) {
+	c, ctx := newTestClient(t)
+	name := "sdk-test-go-e2e"
+
+	// Clean up before and after — best effort.
+	c.DeleteAgent(ctx, name) //nolint:errcheck
+	defer c.DeleteAgent(context.Background(), name) //nolint:errcheck
+
+	// Create the agent without a lifecycle opt so it actually runs.
+	_, _, err := c.CreateAgent(ctx, name, "Reply with exactly: hello sdk",
+		CreateAgentOpts{Model: PtrString("claude-sonnet-4-6")})
+	if err != nil {
+		t.Fatalf("CreateAgent: %v", err)
+	}
+
+	// Watch the agent — prefetches history and opens a live WebSocket.
+	stream, err := c.WatchAgent(ctx, name)
+	if err != nil {
+		t.Fatalf("WatchAgent: %v", err)
+	}
+	defer stream.Close()
+
+	// Collect events until task_completed or timeout.
+	watchCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
+	defer cancel()
+
+	var (
+		gotText      bool
+		gotCompleted bool
+	)
+
+	for {
+		// Honour context cancellation between reads.
+		select {
+		case <-watchCtx.Done():
+			t.Fatalf("timed out waiting for task_completed (gotText=%v)", gotText)
+		default:
+		}
+
+		event, err := stream.Next()
+		if err != nil {
+			// A context cancellation surfaces as a websocket close error.
+			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+				t.Fatalf("stream cancelled before task_completed (gotText=%v): %v", gotText, err)
+			}
+			// Any other read error after we already got task_completed is fine.
+			if gotCompleted {
+				break
+			}
+			t.Fatalf("stream.Next: %v", err)
+		}
+
+		switch event.Type {
+		case "text":
+			gotText = true
+		case "task_completed":
+			gotCompleted = true
+		}
+
+		if gotCompleted {
+			break
+		}
+	}
+
+	if !gotText {
+		t.Error("expected at least one event with Type == \"text\", got none")
+	}
+	if !gotCompleted {
+		t.Error("expected an event with Type == \"task_completed\", got none")
+	}
 }
 
 // --- Memories ---

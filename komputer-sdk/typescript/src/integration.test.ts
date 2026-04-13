@@ -9,6 +9,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import type { AgentEvent } from "./client";
 import { KomputerClient } from "./client";
 
 declare const process: { env: Record<string, string | undefined> };
@@ -295,4 +296,66 @@ describe("Secrets idempotent create", () => {
     const found = items.some((s: any) => s.name === name);
     expect(found).toBe(true);
   });
+});
+
+// ---------------------------------------------------------------------------
+// Agent E2E
+// ---------------------------------------------------------------------------
+
+describe("Agent E2E", () => {
+  const name = "sdk-test-ts-e2e";
+
+  beforeAll(async () => {
+    await tryDelete(() => client.deleteAgent(name));
+  }, 30_000);
+
+  afterAll(async () => {
+    await tryDelete(() => client.deleteAgent(name));
+  }, 30_000);
+
+  it(
+    "creates an agent, receives text and task_completed events",
+    async () => {
+      // Create the agent — no lifecycle so it runs immediately.
+      await client.createAgent({
+        name,
+        instructions: "Reply with exactly: hello sdk",
+        model: "claude-sonnet-4-6",
+      });
+
+      const stream = await client.watchAgent(name);
+
+      // Safety net: close the stream after 90 s so the test doesn't hang.
+      const safetyTimer = setTimeout(() => {
+        stream.close();
+      }, 90_000);
+
+      const collectedEvents: AgentEvent[] = [];
+      let timedOut = false;
+
+      try {
+        for await (const event of stream) {
+          collectedEvents.push(event);
+          if (event.type === "task_completed") {
+            break;
+          }
+        }
+      } catch {
+        timedOut = true;
+      } finally {
+        clearTimeout(safetyTimer);
+        stream.close();
+      }
+
+      const textEvents = collectedEvents.filter((e) => e.type === "text");
+      const completedEvents = collectedEvents.filter(
+        (e) => e.type === "task_completed"
+      );
+
+      expect(timedOut).toBe(false);
+      expect(textEvents.length).toBeGreaterThan(0);
+      expect(completedEvents.length).toBeGreaterThan(0);
+    },
+    120_000
+  );
 });

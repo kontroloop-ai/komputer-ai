@@ -1,11 +1,16 @@
 """Integration tests for agents."""
 
+import queue
+import threading
+import time
+
 import pytest
 
 
 AGENT_NAME = "sdk-test-agent"
 MEMORY_NAME = "sdk-test-agent-memory"
 SKILL_NAME = "sdk-test-agent-skill"
+E2E_AGENT_NAME = "sdk-test-e2e"
 
 
 @pytest.fixture(autouse=True)
@@ -177,3 +182,73 @@ class TestAgentWatch:
 
         with client.watch_agent(AGENT_NAME) as stream:
             assert stream is not None
+
+
+class TestAgentE2E:
+    """End-to-end test: create an agent, stream its events, verify task completes."""
+
+    E2E_TIMEOUT = 120  # seconds to wait for the agent to finish
+
+    def test_agent_runs_and_completes(self, client):
+        # Ensure clean state before the test.
+        _safe_delete_agent(client, E2E_AGENT_NAME)
+
+        client.create_agent(
+            name=E2E_AGENT_NAME,
+            instructions="Reply with exactly: hello sdk",
+            model="claude-sonnet-4-6",
+        )
+
+        collected_events = []
+        stream = None
+
+        try:
+            stream = client.watch_agent(E2E_AGENT_NAME)
+
+            event_queue = queue.Queue()
+
+            def _drain(s, q):
+                """Read events from the stream and push them onto the queue."""
+                try:
+                    for event in s:
+                        q.put(event)
+                        if event.type == "task_completed":
+                            break
+                except Exception as exc:
+                    q.put(exc)
+
+            reader = threading.Thread(target=_drain, args=(stream, event_queue), daemon=True)
+            reader.start()
+
+            deadline = time.monotonic() + self.E2E_TIMEOUT
+            while time.monotonic() < deadline:
+                try:
+                    item = event_queue.get(timeout=1)
+                except queue.Empty:
+                    # No event yet — keep waiting until deadline.
+                    continue
+
+                if isinstance(item, Exception):
+                    raise item
+
+                collected_events.append(item)
+
+                if item.type == "task_completed":
+                    break
+
+            reader.join(timeout=5)
+
+        finally:
+            if stream is not None:
+                stream.close()
+            _safe_delete_agent(client, E2E_AGENT_NAME)
+
+        event_types = {e.type for e in collected_events}
+
+        assert "text" in event_types, (
+            f"Expected at least one 'text' event, got: {sorted(event_types)}"
+        )
+        assert "task_completed" in event_types, (
+            f"Expected a 'task_completed' event within {self.E2E_TIMEOUT}s, "
+            f"got: {sorted(event_types)}"
+        )

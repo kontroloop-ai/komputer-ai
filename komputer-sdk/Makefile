@@ -32,8 +32,6 @@ spec: swagger
 
 # Step 3: Generate Python SDK
 python: spec
-	@cp python/komputer_ai/api/agents_ws.py /tmp/_agents_ws.py 2>/dev/null || true
-	rm -rf python/komputer_ai python/docs python/test
 	$(GENERATOR) generate \
 		-i $(SPEC_OPENAPI) \
 		-g python \
@@ -41,13 +39,11 @@ python: spec
 		--package-name komputer_ai \
 		--skip-validate-spec \
 		--additional-properties=projectName=komputer-ai-sdk,packageVersion=0.1.0
-	@cp /tmp/_agents_ws.py python/komputer_ai/api/agents_ws.py 2>/dev/null && rm /tmp/_agents_ws.py || true
 	python generate_client.py python
 	@echo "Python SDK generated in python/"
 
 # Step 4: Generate Go SDK
 go: spec
-	rm -rf go/internal
 	$(GENERATOR) generate \
 		-i $(SPEC_OPENAPI) \
 		-g go \
@@ -64,15 +60,12 @@ go: spec
 
 # Step 5: Generate TypeScript SDK
 typescript: spec
-	@cp typescript/src/watch.ts /tmp/_watch.ts 2>/dev/null || true
-	rm -rf typescript/src
 	$(GENERATOR) generate \
 		-i $(SPEC_OPENAPI) \
 		-g typescript-fetch \
 		-o typescript \
 		--skip-validate-spec \
 		--additional-properties=npmName=@komputer-ai/sdk,npmVersion=0.1.0,supportsES6=true
-	@cp /tmp/_watch.ts typescript/src/watch.ts 2>/dev/null && rm /tmp/_watch.ts || true
 	python generate_client.py typescript
 	@echo "TypeScript SDK generated in typescript/"
 

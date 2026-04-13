@@ -47,7 +47,7 @@
 - **Scheduling** — cron-based recurring tasks with timezone support and auto-cleanup
 - **Cost tracking and analysis** — real-time cost per task, context window monitoring, per-agent cost breakdown with task-level drill-down
 - **Session history resilience** — if Redis is wiped, full conversation history is recovered from the agent's session data with proper event conversion
-- **SDKs for Python, Go, and TypeScript** — auto-generated typed clients with WebSocket streaming, flat kwargs, and full API coverage
+- **SDKs for Python, Go, and TypeScript** — create agents, send tasks, and stream results with a few lines of code
 - **CLI, UI, and API** — manage everything from the terminal, browser, or programmatically
 
 ---
@@ -61,7 +61,7 @@
 | [komputer-agent](komputer-agent/) | Python | The agent runtime — runs Claude with bash/web tools in a persistent workspace |
 | [komputer-cli](komputer-cli/) | Go | Beautiful CLI for interacting with the platform |
 | [komputer-ui](komputer-ui/) | TypeScript | Web dashboard for managing agents, offices, schedules, memories, skills, connectors, and costs |
-| [komputer-sdk](komputer-sdk/) | Python, Go, TypeScript | Auto-generated SDKs for the REST API + WebSocket streaming |
+| [komputer-sdk](komputer-sdk/) | Python, Go, TypeScript | Typed SDKs for the REST API + WebSocket streaming |
 
 
 ## Documentation

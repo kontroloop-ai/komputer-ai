@@ -1,6 +1,6 @@
 # komputer-ai SDK
 
-Auto-generated client libraries for the komputer.ai REST API.
+Official client libraries for the komputer.ai REST API and WebSocket streaming.
 
 ## Python
 
@@ -50,13 +50,15 @@ const agent = await client.createAgent({
   model: "claude-sonnet-4-6",
 });
 
-// Attach a memory and skill
+// Stream events
+for await (const event of client.watchAgent("my-agent")) {
+  if (event.type === "text") console.log(event.payload.content);
+  if (event.type === "task_completed") break;
+}
+
+// Attach a memory
 await client.createMemory({ name: "context", content: "We run a 50-node GKE cluster." });
 await client.patchAgent({ name: "my-agent", memories: ["context"] });
-
-// List and clean up
-const agents = await client.listAgents();
-await client.deleteAgent("my-agent");
 ```
 
 ## Go
@@ -85,19 +87,16 @@ func main() {
         client.CreateAgentOpts{Model: komputer.PtrString("claude-sonnet-4-6")})
     fmt.Println(agent.Name)
 
-    // Attach a memory
-    c.CreateMemory(ctx, "context", "We run a 50-node GKE cluster.")
-    c.PatchAgent(ctx, "my-agent",
-        client.PatchAgentOpts{Memories: []string{"context"}})
-
-    // List and clean up
-    agents, _, _ := c.ListAgents(ctx)
-    fmt.Println(len(agents.Agents))
-    c.DeleteAgent(ctx, "my-agent")
+    // Stream events
+    stream, _ := c.WatchAgent("my-agent")
+    defer stream.Close()
+    for {
+        event, err := stream.Next()
+        if err != nil { break }
+        fmt.Println(event.Type, event.Payload)
+    }
 }
 ```
-
-All methods accept flat parameters — no model objects needed. For advanced use cases, the generated API clients are available via `client.agents` (Python), `client._agents` (TypeScript), or `client.api` (Go).
 
 ## Regenerating
 
@@ -113,20 +112,13 @@ make all
 make python
 make go
 make typescript
-
-# Regenerate just the client wrappers (no spec regeneration)
-make client
-
-# Just regenerate the OpenAPI spec
-make spec
 ```
 
 ### Prerequisites
 
 - [swag](https://github.com/swaggo/swag) — `go install github.com/swaggo/swag/cmd/swag@v1.16.6`
-- [openapi-generator-cli](https://openapi-generator.tech/) — via `npx` (included in the Makefile)
-- Node.js + npx
-- Python 3.10+ (for `generate_client.py`)
+- Node.js + npx (for openapi-generator-cli)
+- Python 3.10+
 - Go 1.23+
 
 ## Testing
@@ -134,44 +126,38 @@ make spec
 ```bash
 cd komputer-sdk
 
-# Python unit tests
+# All unit tests
 make test
 
-# Python integration tests (requires a running komputer-ai instance)
+# Integration tests (requires a running komputer-ai instance)
 KOMPUTER_API_URL=http://localhost:8080 make test-integration
-
-# Go tests
-cd go/client && go test ./...
-
-# TypeScript tests
-cd typescript && npx vitest run
 ```
-
-Integration tests create and delete real resources prefixed with `sdk-test-`. They clean up after themselves.
 
 ## Structure
 
 ```
 komputer-sdk/
-├── Makefile              # Generation pipeline
-├── generate_client.py    # Generates convenience wrappers for all languages
-├── openapi.yaml          # Generated OpenAPI 3.0 spec
+├── Makefile
+├── generate_client.py
+├── openapi.yaml
 ├── python/
 │   ├── komputer_ai/
-│   │   ├── client.py         # Auto-generated convenience client
-│   │   ├── api/              # Generated API classes
-│   │   │   └── agents_ws.py  # WebSocket streaming (hand-written)
-│   │   └── models/           # Generated request/response models
+│   │   ├── client.py
+│   │   ├── api/
+│   │   │   └── agents_ws.py    # WebSocket streaming
+│   │   └── models/
 │   └── tests/
 ├── go/
 │   ├── client/
-│   │   ├── client.go         # Auto-generated convenience client
+│   │   ├── client.go
+│   │   ├── watch.go            # WebSocket streaming
 │   │   └── client_test.go
-│   └── komputer/             # Generated Go API package
+│   └── komputer/
 ├── typescript/
 │   └── src/
-│       ├── client.ts         # Auto-generated convenience client
+│       ├── client.ts
+│       ├── watch.ts            # WebSocket streaming
 │       ├── client.test.ts
-│       ├── apis/             # Generated API classes
-│       └── models/           # Generated request/response models
+│       ├── apis/
+│       └── models/
 ```

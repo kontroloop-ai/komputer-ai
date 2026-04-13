@@ -8,6 +8,10 @@
  *   npx vitest run src/integration.test.ts
  */
 
+// WebSocket polyfill for Node.js (vitest runs in Node which has no global WebSocket)
+import WebSocket from "ws";
+(globalThis as any).WebSocket = WebSocket;
+
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { AgentEvent } from "./client";
 import { KomputerClient } from "./client";

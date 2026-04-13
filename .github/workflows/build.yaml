@@ -12,8 +12,9 @@ env:
   IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}
 
 permissions:
-  contents: read
+  contents: write
   packages: write
+  id-token: write
 
 jobs:
   changes:
@@ -312,6 +313,69 @@ jobs:
       - name: Test UI
         if: needs.changes.outputs.ui == 'true' || needs.changes.outputs.is_tag == 'true'
         run: cd komputer-ui && npm ci && npm test
+
+  sdk:
+    name: SDK
+    needs: [changes]
+    if: needs.changes.outputs.api == 'true' || needs.changes.outputs.is_tag == 'true'
+    uses: ./.github/workflows/sdk.yaml
+    with:
+      is_tag: ${{ needs.changes.outputs.is_tag }}
+
+  publish-sdk-python:
+    name: Publish Python SDK
+    needs: [changes, sdk]
+    if: needs.changes.outputs.is_tag == 'true' && needs.sdk.result == 'success'
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build package
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          # Convert to PEP 440: v0.1.0-beta → 0.1.0b0, v0.1.0-test → 0.1.0.dev0
+          VERSION=$(echo "$VERSION" | sed 's/-alpha/.a0/;s/-beta/.b0/;s/-rc/.rc0/;s/-.*/.dev0/')
+          cd komputer-sdk/python
+          sed -i "s/^version = .*/version = \"${VERSION}\"/" pyproject.toml
+          pip install build -q
+          python -m build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: komputer-sdk/python/dist/
+
+  publish-sdk-npm:
+    name: Publish TypeScript SDK
+    needs: [changes, sdk]
+    if: needs.changes.outputs.is_tag == 'true' && needs.sdk.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Build and publish
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          cd komputer-sdk/typescript
+          npm version ${VERSION} --no-git-tag-version
+          npm ci
+          npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   helm:
     name: Publish Helm Chart

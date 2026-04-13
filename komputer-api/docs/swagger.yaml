@@ -17,7 +17,7 @@ definitions:
       createdAt:
         type: string
       instructions:
-        description: User task extracted from spec.instructions
+        description: User task (spec.instructions)
         type: string
       lastTaskCostUSD:
         type: string
@@ -50,6 +50,9 @@ definitions:
         type: array
       status:
         type: string
+      systemPrompt:
+        description: Custom system prompt (spec.systemPrompt)
+        type: string
       taskStatus:
         type: string
       totalCostUSD:
@@ -69,6 +72,8 @@ definitions:
         type: string
       authSecretName:
         type: string
+      authType:
+        type: string
       createdAt:
         type: string
       displayName:
@@ -76,6 +81,9 @@ definitions:
       name:
         type: string
       namespace:
+        type: string
+      oauthStatus:
+        description: '"pending", "connected", ""'
         type: string
       service:
         type: string
@@ -124,6 +132,9 @@ definitions:
         items:
           type: string
         type: array
+      systemPrompt:
+        description: optional custom system prompt
+        type: string
       templateRef:
         type: string
     required:
@@ -136,11 +147,20 @@ definitions:
         type: string
       authSecretName:
         type: string
+      authType:
+        description: '"token" or "oauth"'
+        type: string
       displayName:
         type: string
       name:
         type: string
       namespace:
+        type: string
+      oauthClientId:
+        description: OAuth client ID (stored in secret)
+        type: string
+      oauthClientSecret:
+        description: OAuth client secret (stored in secret)
         type: string
       service:
         type: string
@@ -328,6 +348,9 @@ definitions:
         items:
           type: string
         type: array
+      systemPrompt:
+        description: custom system prompt
+        type: string
       templateRef:
         type: string
     type: object
@@ -472,6 +495,7 @@ paths:
   /agents:
     get:
       description: Returns all agents with their current status in the specified namespace.
+      operationId: listAgents
       parameters:
       - description: Kubernetes namespace
         in: query
@@ -499,6 +523,7 @@ paths:
       description: |-
         Creates a new agent or sends a task to an existing idle agent (upsert by name).
         If the agent doesn't exist, it is created. If it exists and is idle, the task is forwarded.
+      operationId: createAgent
       parameters:
       - description: Agent creation request
         in: body
@@ -510,11 +535,7 @@ paths:
       - application/json
       responses:
         "200":
-          description: Task forwarded to existing agent
-          schema:
-            $ref: '#/definitions/main.AgentResponse'
-        "201":
-          description: Agent created
+          description: Agent created or task forwarded
           schema:
             $ref: '#/definitions/main.AgentResponse'
         "400":
@@ -541,6 +562,7 @@ paths:
   /agents/{name}:
     delete:
       description: Deletes the agent CR, pod, PVC, secrets, and Redis event stream.
+      operationId: deleteAgent
       parameters:
       - description: Agent name
         in: path
@@ -577,6 +599,7 @@ paths:
       - agents
     get:
       description: Returns the current status and metadata for a single agent.
+      operationId: getAgent
       parameters:
       - description: Agent name
         in: path
@@ -614,6 +637,7 @@ paths:
       - application/json
       description: Updates model, lifecycle, instructions, secretRefs, memories, skills,
         or connectors on an existing agent.
+      operationId: patchAgent
       parameters:
       - description: Agent name
         in: path
@@ -656,6 +680,7 @@ paths:
     post:
       description: Gracefully cancels the currently running task. The agent pod stays
         alive for future tasks.
+      operationId: cancelAgentTask
       parameters:
       - description: Agent name
         in: path
@@ -700,6 +725,7 @@ paths:
     get:
       description: Returns recent events from the agent's Redis stream in chronological
         order.
+      operationId: getAgentEvents
       parameters:
       - description: Agent name
         in: path
@@ -757,6 +783,7 @@ paths:
     get:
       description: Returns all connectors with attached agent counts in the specified
         namespace.
+      operationId: listConnectors
       parameters:
       - description: Kubernetes namespace
         in: query
@@ -784,6 +811,7 @@ paths:
       - application/json
       description: Creates a new KomputerConnector CR pointing to an MCP server that
         can be attached to agents.
+      operationId: createConnector
       parameters:
       - description: Connector creation request
         in: body
@@ -816,6 +844,7 @@ paths:
   /connectors/{name}:
     delete:
       description: Deletes the connector CR.
+      operationId: deleteConnector
       parameters:
       - description: Connector name
         in: path
@@ -846,6 +875,7 @@ paths:
       - connectors
     get:
       description: Returns the URL, service, type, and auth config for a single connector.
+      operationId: getConnector
       parameters:
       - description: Connector name
         in: path
@@ -882,6 +912,7 @@ paths:
     get:
       description: Calls the MCP server's tools/list endpoint and returns the available
         tools.
+      operationId: listConnectorTools
       parameters:
       - description: Connector name
         in: path
@@ -925,6 +956,7 @@ paths:
     get:
       description: Returns all memories with content and attached agent counts in
         the specified namespace.
+      operationId: listMemories
       parameters:
       - description: Kubernetes namespace
         in: query
@@ -952,6 +984,7 @@ paths:
       - application/json
       description: Creates a new KomputerMemory CR that can be attached to agents
         as persistent context.
+      operationId: createMemory
       parameters:
       - description: Memory creation request
         in: body
@@ -984,6 +1017,7 @@ paths:
   /memories/{name}:
     delete:
       description: Deletes the memory CR.
+      operationId: deleteMemory
       parameters:
       - description: Memory name
         in: path
@@ -1014,6 +1048,7 @@ paths:
       - memories
     get:
       description: Returns the content and attached agent count for a single memory.
+      operationId: getMemory
       parameters:
       - description: Memory name
         in: path
@@ -1050,6 +1085,7 @@ paths:
       consumes:
       - application/json
       description: Updates the content or description of an existing memory.
+      operationId: patchMemory
       parameters:
       - description: Memory name
         in: path
@@ -1112,6 +1148,7 @@ paths:
     get:
       description: Returns all offices with their current status in the specified
         namespace.
+      operationId: listOffices
       parameters:
       - description: Kubernetes namespace
         in: query
@@ -1137,6 +1174,7 @@ paths:
     delete:
       description: Deletes the office CR and cleans up Redis event streams for all
         member agents.
+      operationId: deleteOffice
       parameters:
       - description: Office name
         in: path
@@ -1173,6 +1211,7 @@ paths:
       - offices
     get:
       description: Returns the current status and member list for a single office.
+      operationId: getOffice
       parameters:
       - description: Office name
         in: path
@@ -1209,6 +1248,7 @@ paths:
     get:
       description: Returns merged events from all member agent Redis streams, sorted
         chronologically.
+      operationId: getOfficeEvents
       parameters:
       - description: Office name
         in: path
@@ -1257,6 +1297,7 @@ paths:
     get:
       description: Returns all schedules with their current status and run history
         in the specified namespace.
+      operationId: listSchedules
       parameters:
       - description: Kubernetes namespace
         in: query
@@ -1283,6 +1324,7 @@ paths:
       - application/json
       description: Creates a new KomputerSchedule CR that triggers agent tasks on
         a cron schedule.
+      operationId: createSchedule
       parameters:
       - description: Schedule creation request
         in: body
@@ -1316,6 +1358,7 @@ paths:
     delete:
       description: Deletes the schedule CR. Does not delete any agents that were created
         by the schedule.
+      operationId: deleteSchedule
       parameters:
       - description: Schedule name
         in: path
@@ -1352,6 +1395,7 @@ paths:
       - schedules
     get:
       description: Returns the current status and run history for a single schedule.
+      operationId: getSchedule
       parameters:
       - description: Schedule name
         in: path
@@ -1388,6 +1432,7 @@ paths:
       consumes:
       - application/json
       description: Updates the cron expression for an existing schedule.
+      operationId: patchSchedule
       parameters:
       - description: Schedule name
         in: path
@@ -1430,6 +1475,7 @@ paths:
     get:
       description: Returns all secrets with key names (not values) and attached agent
         counts in the specified namespace.
+      operationId: listSecrets
       parameters:
       - description: Kubernetes namespace
         in: query
@@ -1460,6 +1506,7 @@ paths:
       - application/json
       description: Creates a new Kubernetes secret managed by komputer.ai that can
         be attached to agents.
+      operationId: createSecret
       parameters:
       - description: Secret creation request
         in: body
@@ -1492,6 +1539,7 @@ paths:
   /secrets/{name}:
     delete:
       description: Deletes a managed Kubernetes secret.
+      operationId: deleteSecret
       parameters:
       - description: Secret name
         in: path
@@ -1524,6 +1572,7 @@ paths:
       consumes:
       - application/json
       description: Replaces the key-value pairs in a managed Kubernetes secret.
+      operationId: updateSecret
       parameters:
       - description: Secret name
         in: path
@@ -1568,6 +1617,7 @@ paths:
     get:
       description: Returns all skills with content and attached agent counts in the
         specified namespace.
+      operationId: listSkills
       parameters:
       - description: Kubernetes namespace
         in: query
@@ -1595,6 +1645,7 @@ paths:
       - application/json
       description: Creates a new KomputerSkill CR with script content that can be
         attached to agents.
+      operationId: createSkill
       parameters:
       - description: Skill creation request
         in: body
@@ -1627,6 +1678,7 @@ paths:
   /skills/{name}:
     delete:
       description: Deletes the skill CR.
+      operationId: deleteSkill
       parameters:
       - description: Skill name
         in: path
@@ -1658,6 +1710,7 @@ paths:
     get:
       description: Returns the content, description, and attached agent count for
         a single skill.
+      operationId: getSkill
       parameters:
       - description: Skill name
         in: path
@@ -1694,6 +1747,7 @@ paths:
       consumes:
       - application/json
       description: Updates the description or script content of an existing skill.
+      operationId: patchSkill
       parameters:
       - description: Skill name
         in: path
@@ -1736,6 +1790,7 @@ paths:
     get:
       description: Returns all agent templates (both namespace-scoped and cluster-scoped)
         available in the specified namespace.
+      operationId: listTemplates
       parameters:
       - description: Kubernetes namespace
         in: query

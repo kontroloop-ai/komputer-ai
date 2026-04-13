@@ -47,6 +47,7 @@
 - **Scheduling** — cron-based recurring tasks with timezone support and auto-cleanup
 - **Cost tracking and analysis** — real-time cost per task, context window monitoring, per-agent cost breakdown with task-level drill-down
 - **Session history resilience** — if Redis is wiped, full conversation history is recovered from the agent's session data with proper event conversion
+- **SDKs for Python, Go, and TypeScript** — create agents, send tasks, and stream results with a few lines of code
 - **CLI, UI, and API** — manage everything from the terminal, browser, or programmatically
 
 ---
@@ -60,6 +61,7 @@
 | [komputer-agent](komputer-agent/) | Python | The agent runtime — runs Claude with bash/web tools in a persistent workspace |
 | [komputer-cli](komputer-cli/) | Go | Beautiful CLI for interacting with the platform |
 | [komputer-ui](komputer-ui/) | TypeScript | Web dashboard for managing agents, offices, schedules, memories, skills, connectors, and costs |
+| [komputer-sdk](komputer-sdk/) | Python, Go, TypeScript | Typed SDKs for the REST API + WebSocket streaming |
 
 
 ## Documentation
@@ -76,6 +78,8 @@
    3. [komputer-agent](komputer-agent/README.md) — Agent runtime, Claude SDK integration, manager tools, event format
    4. [komputer-cli](komputer-cli/README.md) — CLI commands, flags, usage examples
    5. [komputer-ui](komputer-ui/README.md) — Web dashboard, pages, configuration, development
+   6. [komputer-sdk](komputer-sdk/README.md) — Python, Go, TypeScript SDKs, generation pipeline, testing
+   7. [Helm Chart](helm/komputer-ai/README.md) — Chart values, custom installation, external Redis
 
 ## Installation
 
@@ -142,23 +146,38 @@ komputer login http://localhost:8080
 komputer run my-agent "Write a haiku about Kubernetes"
 ```
 
-### Custom installation
+For custom installation options (external Redis, resource limits, etc.), see the [Helm Chart docs](helm/komputer-ai/README.md). For building from source, see [Local Development](docs/local-development.md).
 
-For external Redis, custom resource limits, or other configuration:
+## Python SDK
 
 ```bash
-# Use external Redis
-helm install komputer-ai oci://ghcr.io/kontroloop-ai/charts/komputer-ai \
-  --set anthropicApiKeySecret.name=anthropic-api-key \
-  --set redis.enabled=false \
-  --set externalRedis.address=redis.prod:6379 \
-  --namespace komputer-ai
-
-# See all options
-helm show values oci://ghcr.io/kontroloop-ai/charts/komputer-ai
+pip install komputer-ai-sdk
 ```
 
-For building from source, see the [Local Development](docs/local-development.md) guide.
+```python
+from komputer_ai.client import KomputerClient
+
+client = KomputerClient("http://localhost:8080")
+
+# Create an agent and give it a task
+client.create_agent(
+    name="my-agent",
+    instructions="Analyze our Kubernetes cluster and suggest cost optimizations",
+    model="claude-sonnet-4-6",
+)
+
+# Stream events as the agent works
+for event in client.watch_agent("my-agent"):
+    if event.type == "text":
+        print(event.payload.content)
+    elif event.type == "tool_use":
+        print(f"  -> using {event.payload.name}")
+    elif event.type == "task_completed":
+        print(f"\nDone — cost: ${event.payload.cost_usd}")
+        break
+```
+
+Full SDK reference in [komputer-sdk/](komputer-sdk/).
 
 ## Custom Resources
 

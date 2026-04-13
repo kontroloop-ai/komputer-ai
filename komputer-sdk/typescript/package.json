@@ -1,0 +1,27 @@
+{
+  "name": "@komputer-ai/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for the komputer.ai platform",
+  "author": "kontroloop-ai",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kontroloop-ai/komputer-ai.git",
+    "directory": "komputer-sdk/typescript"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "module": "./dist/esm/index.js",
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc && tsc -p tsconfig.esm.json",
+    "prepare": "npm run build"
+  },
+  "devDependencies": {
+    "typescript": "^4.0 || ^5.0",
+    "vitest": "^4.1.4"
+  }
+}

@@ -1,0 +1,91 @@
+name: SDK — Regenerate & Test
+
+on:
+  workflow_call:
+    inputs:
+      is_tag:
+        required: true
+        type: string
+
+jobs:
+  regenerate:
+    name: Regenerate SDKs
+    if: inputs.is_tag != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: komputer-api/go.sum
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install tools
+        run: |
+          go install github.com/swaggo/swag/cmd/swag@v1.16.6
+          pip install pyyaml -q
+
+      - name: Regenerate SDKs
+        run: cd komputer-sdk && make all
+
+      - name: Test Python SDK
+        run: |
+          cd komputer-sdk/python
+          pip install -e . pytest -q
+          pytest tests/ --ignore=tests/integration -v
+
+      - name: Test Go SDK
+        run: cd komputer-sdk/go && go test -v ./...
+
+      - name: Test TypeScript SDK
+        run: cd komputer-sdk/typescript && npm ci && npx vitest run
+
+  test:
+    name: Test SDKs
+    if: inputs.is_tag == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: komputer-sdk/go/go.sum
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Test Python SDK
+        run: |
+          cd komputer-sdk/python
+          pip install -e . pytest -q
+          pytest tests/ --ignore=tests/integration -v
+
+      - name: Test Go SDK
+        run: cd komputer-sdk/go && go test -v ./...
+
+      - name: Test TypeScript SDK
+        run: cd komputer-sdk/typescript && npm ci && npx vitest run
+
+

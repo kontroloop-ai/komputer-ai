@@ -38,8 +38,9 @@ class TestConnectors:
             url="https://example.com/mcp",
         )
 
-        connectors = client.list_connectors()
-        names = [c.name for c in connectors]
+        result = client.list_connectors()
+        connectors = result.get("connectors", [])
+        names = [c["name"] for c in connectors]
         assert CONNECTOR_NAME in names
 
     def test_get_connector(self, client):

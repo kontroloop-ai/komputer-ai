@@ -37,8 +37,9 @@ class TestSkills:
             content="echo list",
         )
 
-        skills = client.list_skills()
-        names = [s.name for s in skills]
+        result = client.list_skills()
+        skills = result.get("skills", [])
+        names = [s["name"] for s in skills]
         assert SKILL_NAME in names
 
     def test_get_skill(self, client):

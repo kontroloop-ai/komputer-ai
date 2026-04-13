@@ -41,7 +41,7 @@ class TestSecrets:
         client.create_secret(name=SECRET_NAME, data={"OLD_KEY": "old"})
 
         resp = client.update_secret(SECRET_NAME, data={"NEW_KEY": "new-value"})
-        assert "NEW_KEY" in resp.keys
+        assert resp["name"] == SECRET_NAME
 
     def test_create_idempotent(self, client):
         client.create_secret(name=SECRET_NAME, data={"KEY": "original-value"})

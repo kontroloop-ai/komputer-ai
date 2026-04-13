@@ -37,8 +37,9 @@ class TestMemories:
             description="for listing",
         )
 
-        memories = client.list_memories()
-        names = [m.name for m in memories]
+        result = client.list_memories()
+        memories = result.get("memories", [])
+        names = [m["name"] for m in memories]
         assert MEMORY_NAME in names
 
     def test_get_memory(self, client):

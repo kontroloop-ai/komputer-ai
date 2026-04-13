@@ -60,7 +60,7 @@ describe("Memories CRUD", () => {
 
   it("lists memories and finds the created one", async () => {
     const list = await client.listMemories();
-    const items: any[] = Array.isArray(list) ? list : (list as any).items ?? [];
+    const items: any[] = Array.isArray(list) ? list : (list as any).memories ?? (list as any).items ?? [];
     const found = items.some((m: any) => m.name === name);
     expect(found).toBe(true);
   });
@@ -155,7 +155,7 @@ describe("Skills CRUD", () => {
 
   it("lists skills and finds the created one", async () => {
     const list = await client.listSkills();
-    const items: any[] = Array.isArray(list) ? list : (list as any).items ?? [];
+    const items: any[] = Array.isArray(list) ? list : (list as any).skills ?? (list as any).items ?? [];
     const found = items.some((s: any) => s.name === name);
     expect(found).toBe(true);
   });
@@ -244,7 +244,7 @@ describe("Secrets CRUD", () => {
 
   it("lists secrets and finds the created one", async () => {
     const list = await client.listSecrets();
-    const items: any[] = Array.isArray(list) ? list : (list as any).items ?? [];
+    const items: any[] = Array.isArray(list) ? list : (list as any).secrets ?? (list as any).items ?? [];
     const found = items.some((s: any) => s.name === name);
     expect(found).toBe(true);
   });
@@ -291,7 +291,7 @@ describe("Secrets idempotent create", () => {
 
   it("lists secrets and still finds the entry", async () => {
     const list = await client.listSecrets();
-    const items: any[] = Array.isArray(list) ? list : (list as any).items ?? [];
+    const items: any[] = Array.isArray(list) ? list : (list as any).secrets ?? (list as any).items ?? [];
     const found = items.some((s: any) => s.name === name);
     expect(found).toBe(true);
   });

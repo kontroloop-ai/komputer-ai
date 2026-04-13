@@ -7,6 +7,16 @@ from typing import Iterator
 import websocket
 
 
+class Payload(dict):
+    """Dict subclass that supports attribute access (event.payload.content)."""
+
+    def __getattr__(self, key):
+        try:
+            return self[key]
+        except KeyError:
+            return None
+
+
 @dataclass
 class AgentEvent:
     """A single event from an agent's WebSocket stream."""
@@ -14,7 +24,7 @@ class AgentEvent:
     agent_name: str
     type: str
     timestamp: str = ""
-    payload: dict = field(default_factory=dict)
+    payload: Payload = field(default_factory=Payload)
 
 
 class AgentEventStream:
@@ -44,7 +54,7 @@ class AgentEventStream:
                 agent_name=data.get("agentName", self._agent_name),
                 type=data.get("type", ""),
                 timestamp=data.get("timestamp", ""),
-                payload=data.get("payload", {}),
+                payload=Payload(data.get("payload", {})),
             )
         except Exception:
             self.close()

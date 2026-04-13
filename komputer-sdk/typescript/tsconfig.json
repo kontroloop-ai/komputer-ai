@@ -2,6 +2,7 @@
   "compilerOptions": {
     "declaration": true,
     "target": "es6",
+    "lib": ["es2018", "dom"],
     "module": "commonjs",
     "moduleResolution": "node",
     "outDir": "dist",
@@ -11,6 +12,7 @@
   },
   "exclude": [
     "dist",
-    "node_modules"
+    "node_modules",
+    "src/**/*.test.ts"
   ]
 }

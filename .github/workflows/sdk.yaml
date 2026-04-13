@@ -148,28 +148,3 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-  publish-go:
-    name: Publish Go SDK
-    needs: test
-    if: inputs.is_tag == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.24'
-
-      - name: Create Go module tag
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag "komputer-sdk/go/v${VERSION}"
-          git push origin "komputer-sdk/go/v${VERSION}"
-
-      - name: Warm Go module proxy
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          GOPROXY=proxy.golang.org go get github.com/kontroloop-ai/komputer-ai/komputer-sdk/go@v${VERSION} || true

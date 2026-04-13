@@ -8,6 +8,13 @@ TypeScript/JavaScript client for the [komputer.ai](https://github.com/kontroloop
 npm install @komputer-ai/sdk
 ```
 
+Or install directly from the repository:
+
+```bash
+git clone https://github.com/kontroloop-ai/komputer-ai.git
+cd komputer-ai/komputer-sdk/typescript && npm install && npm run build
+```
+
 ## Quick Start
 
 ```typescript

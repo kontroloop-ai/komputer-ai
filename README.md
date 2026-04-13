@@ -169,11 +169,11 @@ client.create_agent(
 # Stream events as the agent works
 for event in client.watch_agent("my-agent"):
     if event.type == "text":
-        print(event.payload.get("content", ""))
+        print(event.payload.content)
     elif event.type == "tool_use":
-        print(f"  -> using {event.payload.get('name')}")
+        print(f"  -> using {event.payload.name}")
     elif event.type == "task_completed":
-        print(f"\nDone — cost: ${event.payload.get('cost_usd')}")
+        print(f"\nDone — cost: ${event.payload.cost_usd}")
         break
 ```
 

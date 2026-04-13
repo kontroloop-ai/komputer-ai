@@ -23,7 +23,7 @@ client.create_agent(
 # Stream events as the agent works
 for event in client.watch_agent("my-agent"):
     if event.type == "text":
-        print(event.payload.get("content", ""))
+        print(event.payload.content)
     elif event.type == "task_completed":
         break
 
@@ -35,7 +35,7 @@ client.patch_agent("my-agent", memories=["context"])
 ## TypeScript
 
 ```bash
-cd komputer-sdk/typescript && npm install && npm run build
+npm install @komputer-ai/sdk
 ```
 
 ```typescript

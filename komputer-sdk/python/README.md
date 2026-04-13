@@ -8,6 +8,12 @@ Python client for the [komputer.ai](https://github.com/kontroloop-ai/komputer-ai
 pip install komputer-ai-sdk
 ```
 
+Or install directly from the repository:
+
+```bash
+pip install git+https://github.com/kontroloop-ai/komputer-ai.git#subdirectory=komputer-sdk/python
+```
+
 ## Quick Start
 
 ```python
@@ -25,13 +31,12 @@ agent = client.create_agent(
 # Stream events as the agent works
 for event in client.watch_agent("my-agent"):
     if event.type == "text":
-        print(event.payload.get("content", ""))
+        print(event.payload.content)
     elif event.type == "task_completed":
-        print(f"Done — cost: ${event.payload.get('cost_usd')}")
+        print(f"Done — cost: ${event.payload.cost_usd}")
         break
 ```
 
-> WebSocket streaming requires `websocket-client`: `pip install websocket-client`
 
 ## Usage
 
@@ -132,14 +137,14 @@ for event in client.watch_agent("my-agent"):
         case "task_started":
             print("Agent started working...")
         case "text":
-            print(event.payload.get("content", ""))
-        case "tool_use":
-            print(f"Using tool: {event.payload.get('name')}")
+            print(event.payload.content)
+        case "tool_call":
+            print(f"Using tool: {event.payload.tool}")
         case "task_completed":
-            print(f"Done — cost: ${event.payload.get('cost_usd')}")
+            print(f"Done — cost: ${event.payload.cost_usd}")
             break
         case "error":
-            print(f"Error: {event.payload.get('error')}")
+            print(f"Error: {event.payload.error}")
             break
 ```
 

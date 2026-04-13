@@ -1,7 +1,7 @@
 /**
  * High-level convenience client for the komputer.ai API.
  *
- * Hand-written — do not overwrite with generated output.
+ * Hand-maintained — do not overwrite with generated output.
  *
  * @example
  * const client = new KomputerClient("http://localhost:8080");

@@ -27,6 +27,7 @@ jobs:
       ui: ${{ steps.filter.outputs.ui }}
       cli: ${{ steps.filter.outputs.cli }}
       helm: ${{ steps.filter.outputs.helm }}
+      sdk: ${{ steps.filter.outputs.sdk }}
       is_tag: ${{ startsWith(github.ref, 'refs/tags/v') }}
     steps:
       - uses: actions/checkout@v4
@@ -47,6 +48,8 @@ jobs:
               - 'komputer-cli/**'
             helm:
               - 'helm/**'
+            sdk:
+              - 'komputer-sdk/**'
 
   operator:
     name: Build Operator
@@ -317,7 +320,7 @@ jobs:
   sdk:
     name: SDK
     needs: [changes]
-    if: needs.changes.outputs.api == 'true' || needs.changes.outputs.is_tag == 'true'
+    if: needs.changes.outputs.api == 'true' || needs.changes.outputs.sdk == 'true' || needs.changes.outputs.is_tag == 'true'
     uses: ./.github/workflows/sdk.yaml
     with:
       is_tag: ${{ needs.changes.outputs.is_tag }}

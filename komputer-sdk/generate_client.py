@@ -342,7 +342,7 @@ def go_type(field, pointer=False):
 
 
 def generate_go(operations):
-    output_path = Path(__file__).parent / "go" / "client" / "client.go"
+    output_path = Path(__file__).parent / "go" / "client.go"
     methods_by_tag = {}
 
     for op in operations:
@@ -469,16 +469,16 @@ def generate_go(operations):
 //
 // Quick start:
 //
-//	client := komputerclient.New("http://localhost:8080")
+//	client := sdk.New("http://localhost:8080")
 //	agent, _, err := client.CreateAgent(ctx, "my-agent", "Say hello",
-//	    komputerclient.CreateAgentOpts{{Model: komputer.PtrString("claude-sonnet-4-6")}})
-package client
+//	    sdk.CreateAgentOpts{{Model: sdk.PtrString("claude-sonnet-4-6")}})
+package sdk
 
 import (
 \t"context"
 \t"net/http"
 
-\tkomputer "github.com/kontroloop-ai/komputer-ai/komputer-sdk/go/komputer"
+\tkomputer "github.com/kontroloop-ai/komputer-ai/komputer-sdk/go/internal"
 )
 
 // Client wraps the generated komputer API client with convenience methods.

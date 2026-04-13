@@ -45,17 +45,18 @@ python: spec
 
 # Step 4: Generate Go SDK
 go: spec
-	rm -rf go/komputer
+	rm -rf go/internal
 	$(GENERATOR) generate \
 		-i $(SPEC_OPENAPI) \
 		-g go \
-		-o go/komputer \
+		-o go/internal \
 		--package-name komputer \
 		--skip-validate-spec \
 		--git-user-id kontroloop-ai \
 		--git-repo-id komputer-ai \
 		--additional-properties=packageVersion=0.1.0,isGoSubmodule=true
-	sed -i.bak 's|komputer-ai/komputer$$|komputer-ai/komputer-sdk/go/komputer|' go/komputer/go.mod && rm -f go/komputer/go.mod.bak
+	rm -f go/internal/go.mod go/internal/go.sum go/internal/git_push.sh go/internal/.travis.yml
+	rm -rf go/internal/.openapi-generator
 	python generate_client.py go
 	@echo "Go SDK generated in go/"
 
@@ -82,7 +83,7 @@ test-python:
 	cd python && pip install -e . -q && pytest tests/ --ignore=tests/integration -v
 
 test-go:
-	cd go/client && go test -v ./...
+	cd go && go test -v ./...
 
 test-typescript:
 	cd typescript && npx vitest run

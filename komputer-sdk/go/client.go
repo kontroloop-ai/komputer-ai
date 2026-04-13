@@ -4,16 +4,16 @@
 //
 // Quick start:
 //
-//	client := komputerclient.New("http://localhost:8080")
+//	client := sdk.New("http://localhost:8080")
 //	agent, _, err := client.CreateAgent(ctx, "my-agent", "Say hello",
-//	    komputerclient.CreateAgentOpts{Model: komputer.PtrString("claude-sonnet-4-6")})
-package client
+//	    sdk.CreateAgentOpts{Model: sdk.PtrString("claude-sonnet-4-6")})
+package sdk
 
 import (
 	"context"
 	"net/http"
 
-	komputer "github.com/kontroloop-ai/komputer-ai/komputer-sdk/go/komputer"
+	komputer "github.com/kontroloop-ai/komputer-ai/komputer-sdk/go/internal"
 )
 
 // Client wraps the generated komputer API client with convenience methods.

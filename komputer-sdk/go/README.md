@@ -5,7 +5,7 @@ Go client for the [komputer.ai](https://github.com/kontroloop-ai/komputer-ai) pl
 ## Installation
 
 ```bash
-go get github.com/kontroloop-ai/komputer-ai/komputer-sdk/go/client
+go get github.com/kontroloop-ai/komputer-ai/komputer-sdk/go
 ```
 
 ## Quick Start
@@ -17,17 +17,16 @@ import (
     "context"
     "fmt"
 
-    client "github.com/kontroloop-ai/komputer-ai/komputer-sdk/go/client"
-    komputer "github.com/kontroloop-ai/komputer-ai/komputer-sdk/go/komputer"
+    sdk "github.com/kontroloop-ai/komputer-ai/komputer-sdk/go"
 )
 
 func main() {
-    c := client.New("http://localhost:8080")
+    c := sdk.New("http://localhost:8080")
     ctx := context.Background()
 
     // Create an agent
     agent, _, err := c.CreateAgent(ctx, "my-agent", "Summarize the latest Kubernetes release notes",
-        client.CreateAgentOpts{Model: komputer.PtrString("claude-sonnet-4-6")})
+        sdk.CreateAgentOpts{Model: sdk.PtrString("claude-sonnet-4-6")})
     if err != nil {
         panic(err)
     }
@@ -64,7 +63,7 @@ ctx := context.Background()
 
 // Create
 agent, _, _ := c.CreateAgent(ctx, "researcher", "Research AI trends",
-    client.CreateAgentOpts{Model: komputer.PtrString("claude-sonnet-4-6")})
+    sdk.CreateAgentOpts{Model: sdk.PtrString("claude-sonnet-4-6")})
 
 // List
 agents, _, _ := c.ListAgents(ctx)
@@ -74,9 +73,9 @@ agent, _, _ := c.GetAgent(ctx, "researcher")
 
 // Update
 c.PatchAgent(ctx, "researcher",
-    client.PatchAgentOpts{
-        Model:     komputer.PtrString("claude-haiku-4-5-20251001"),
-        Lifecycle: komputer.PtrString("Sleep"),
+    sdk.PatchAgentOpts{
+        Model:     sdk.PtrString("claude-haiku-4-5-20251001"),
+        Lifecycle: sdk.PtrString("Sleep"),
     })
 
 // Cancel a running task
@@ -90,11 +89,11 @@ c.DeleteAgent(ctx, "researcher")
 
 ```go
 c.CreateMemory(ctx, "company-context", "We are a B2B SaaS company.",
-    client.CreateMemoryOpts{Description: komputer.PtrString("Background info")})
-c.PatchAgent(ctx, "my-agent", client.PatchAgentOpts{Memories: []string{"company-context"}})
+    sdk.CreateMemoryOpts{Description: sdk.PtrString("Background info")})
+c.PatchAgent(ctx, "my-agent", sdk.PatchAgentOpts{Memories: []string{"company-context"}})
 
 c.PatchMemory(ctx, "company-context",
-    client.PatchMemoryOpts{Content: komputer.PtrString("Updated context.")})
+    sdk.PatchMemoryOpts{Content: sdk.PtrString("Updated context.")})
 c.DeleteMemory(ctx, "company-context")
 ```
 
@@ -102,7 +101,7 @@ c.DeleteMemory(ctx, "company-context")
 
 ```go
 c.CreateSkill(ctx, "healthcheck", "curl -s http://api/healthz", "Check service health")
-c.PatchAgent(ctx, "my-agent", client.PatchAgentOpts{Skills: []string{"healthcheck"}})
+c.PatchAgent(ctx, "my-agent", sdk.PatchAgentOpts{Skills: []string{"healthcheck"}})
 c.DeleteSkill(ctx, "healthcheck")
 ```
 
@@ -110,10 +109,10 @@ c.DeleteSkill(ctx, "healthcheck")
 
 ```go
 c.CreateSchedule(ctx, "daily-report", "Generate a daily status report", "0 9 * * *",
-    client.CreateScheduleOpts{Timezone: komputer.PtrString("America/New_York")})
+    sdk.CreateScheduleOpts{Timezone: sdk.PtrString("America/New_York")})
 
 c.PatchSchedule(ctx, "daily-report",
-    client.PatchScheduleOpts{Schedule: komputer.PtrString("0 10 * * *")})
+    sdk.PatchScheduleOpts{Schedule: sdk.PtrString("0 10 * * *")})
 c.DeleteSchedule(ctx, "daily-report")
 ```
 
@@ -121,7 +120,7 @@ c.DeleteSchedule(ctx, "daily-report")
 
 ```go
 c.CreateSecret(ctx, map[string]string{"GITHUB_TOKEN": "ghp_xxx"}, "api-keys")
-c.PatchAgent(ctx, "my-agent", client.PatchAgentOpts{SecretRefs: []string{"api-keys"}})
+c.PatchAgent(ctx, "my-agent", sdk.PatchAgentOpts{SecretRefs: []string{"api-keys"}})
 c.DeleteSecret(ctx, "api-keys")
 ```
 
@@ -129,8 +128,8 @@ c.DeleteSecret(ctx, "api-keys")
 
 ```go
 c.CreateConnector(ctx, "slack", "slack", "https://mcp.slack.com",
-    client.CreateConnectorOpts{AuthType: komputer.PtrString("token")})
-c.PatchAgent(ctx, "my-agent", client.PatchAgentOpts{Connectors: []string{"slack"}})
+    sdk.CreateConnectorOpts{AuthType: sdk.PtrString("token")})
+c.PatchAgent(ctx, "my-agent", sdk.PatchAgentOpts{Connectors: []string{"slack"}})
 c.DeleteConnector(ctx, "slack")
 ```
 

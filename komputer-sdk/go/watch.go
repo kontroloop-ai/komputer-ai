@@ -1,6 +1,6 @@
 // WebSocket streaming for agents — hand-written, preserved across regeneration.
 
-package client
+package sdk
 
 import (
 	"encoding/json"

@@ -64,7 +64,7 @@ await client.patchAgent({ name: "my-agent", memories: ["context"] });
 ## Go
 
 ```bash
-go get github.com/kontroloop-ai/komputer-ai/komputer-sdk/go/client
+go get github.com/kontroloop-ai/komputer-ai/komputer-sdk/go
 ```
 
 ```go
@@ -74,17 +74,16 @@ import (
     "context"
     "fmt"
 
-    client "github.com/kontroloop-ai/komputer-ai/komputer-sdk/go/client"
-    komputer "github.com/kontroloop-ai/komputer-ai/komputer-sdk/go/komputer"
+    sdk "github.com/kontroloop-ai/komputer-ai/komputer-sdk/go"
 )
 
 func main() {
-    c := client.New("http://localhost:8080")
+    c := sdk.New("http://localhost:8080")
     ctx := context.Background()
 
     // Create an agent
     agent, _, _ := c.CreateAgent(ctx, "my-agent", "Analyze our cluster",
-        client.CreateAgentOpts{Model: komputer.PtrString("claude-sonnet-4-6")})
+        sdk.CreateAgentOpts{Model: sdk.PtrString("claude-sonnet-4-6")})
     fmt.Println(agent.Name)
 
     // Stream events

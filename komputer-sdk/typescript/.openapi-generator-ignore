@@ -31,3 +31,4 @@ tsconfig.json
 tsconfig.esm.json
 package.json
 .npmignore
+README.md

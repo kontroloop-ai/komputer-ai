@@ -1,172 +1,143 @@
-# @komputer-ai/sdk@0.1.0
+# @komputer-ai/sdk
 
-A TypeScript SDK client for the localhost API.
+TypeScript SDK for the [komputer.ai](https://komputer.ai) platform. Create agents, send tasks, and stream real-time results.
 
-## Usage
-
-First, install the SDK from npm.
+## Installation
 
 ```bash
-npm install @komputer-ai/sdk --save
+npm install @komputer-ai/sdk
 ```
 
-Next, try it out.
-
+## Quick start
 
 ```ts
-import {
-  Configuration,
-  AgentsApi,
-} from '@komputer-ai/sdk';
-import type { AgentsNameWsGetRequest } from '@komputer-ai/sdk';
+import { KomputerClient } from "@komputer-ai/sdk";
 
-async function example() {
-  console.log("🚀 Testing @komputer-ai/sdk SDK...");
-  const api = new AgentsApi();
+const client = new KomputerClient("http://localhost:8080");
 
-  const body = {
-    // string | Agent name
-    name: name_example,
-  } satisfies AgentsNameWsGetRequest;
+// Create an agent
+const agent = await client.createAgent({
+  name: "my-agent",
+  instructions: "Analyze our Kubernetes cluster",
+  model: "claude-sonnet-4-6",
+});
 
-  try {
-    const data = await api.agentsNameWsGet(body);
-    console.log(data);
-  } catch (error) {
-    console.error(error);
+// Stream events
+for await (const event of await client.watchAgent("my-agent")) {
+  if (event.type === "text") console.log(event.payload.content);
+  if (event.type === "task_completed") break;
+}
+```
+
+## Features
+
+- Full REST API coverage: agents, memories, skills, schedules, secrets, connectors, offices, templates
+- WebSocket event streaming with automatic history prefetch
+- Idempotent create methods (safe to call twice without errors)
+- TypeScript types for all request/response models
+
+## API
+
+### Client
+
+```ts
+const client = new KomputerClient(baseUrl?: string);
+```
+
+### Agents
+
+```ts
+await client.createAgent({ name, instructions, model?, ... })
+await client.getAgent(name)
+await client.listAgents()
+await client.patchAgent({ name, instructions?, model?, ... })
+await client.deleteAgent(name)
+await client.cancelAgentTask(name)
+await client.getAgentEvents(name)
+const stream = await client.watchAgent(name)  // WebSocket + history
+```
+
+### Memories
+
+```ts
+await client.createMemory({ name, content, description? })
+await client.getMemory(name)
+await client.listMemories()
+await client.patchMemory({ name, content?, description? })
+await client.deleteMemory(name)
+```
+
+### Skills
+
+```ts
+await client.createSkill({ name, content, description })
+await client.getSkill(name)
+await client.listSkills()
+await client.patchSkill({ name, content?, description? })
+await client.deleteSkill(name)
+```
+
+### Schedules
+
+```ts
+await client.createSchedule({ name, instructions, schedule, ... })
+await client.getSchedule(name)
+await client.listSchedules()
+await client.patchSchedule({ name, schedule? })
+await client.deleteSchedule(name)
+```
+
+### Secrets
+
+```ts
+await client.createSecret({ name, data })
+await client.listSecrets()
+await client.updateSecret({ name, data })
+await client.deleteSecret(name)
+```
+
+### Connectors
+
+```ts
+await client.createConnector({ name, service, url, ... })
+await client.getConnector(name)
+await client.listConnectors()
+await client.deleteConnector(name)
+await client.listConnectorTools(name)
+```
+
+### Event streaming
+
+```ts
+import { KomputerClient } from "@komputer-ai/sdk";
+import type { AgentEvent } from "@komputer-ai/sdk";
+
+const stream = await client.watchAgent("my-agent");
+
+for await (const event of stream) {
+  switch (event.type) {
+    case "task_started":   // Agent began working
+    case "thinking":       // Model is reasoning
+    case "text":           // Text output (event.payload.content)
+    case "tool_call":      // Tool invocation
+    case "tool_result":    // Tool response
+    case "task_completed": // Done (event.payload.cost_usd)
+    case "error":          // Error occurred
   }
 }
-
-// Run the test
-example().catch(console.error);
 ```
 
+### Direct API access
 
-## Documentation
+For advanced use cases, the underlying generated API clients are available:
 
-### API Endpoints
+```ts
+import { AgentsApi, Configuration } from "@komputer-ai/sdk";
 
-All URIs are relative to *http://localhost:8080/api/v1*
-
-| Class | Method | HTTP request | Description
-| ----- | ------ | ------------ | -------------
-*AgentsApi* | [**agentsNameWsGet**](docs/AgentsApi.md#agentsnamewsget) | **GET** /agents/{name}/ws | Stream agent events (WebSocket)
-*AgentsApi* | [**cancelAgentTask**](docs/AgentsApi.md#cancelagenttask) | **POST** /agents/{name}/cancel | Cancel agent task
-*AgentsApi* | [**createAgent**](docs/AgentsApi.md#createagentoperation) | **POST** /agents | Create agent or send task
-*AgentsApi* | [**deleteAgent**](docs/AgentsApi.md#deleteagent) | **DELETE** /agents/{name} | Delete agent
-*AgentsApi* | [**getAgent**](docs/AgentsApi.md#getagent) | **GET** /agents/{name} | Get agent details
-*AgentsApi* | [**getAgentEvents**](docs/AgentsApi.md#getagentevents) | **GET** /agents/{name}/events | Get agent events
-*AgentsApi* | [**listAgents**](docs/AgentsApi.md#listagents) | **GET** /agents | List agents
-*AgentsApi* | [**patchAgent**](docs/AgentsApi.md#patchagentoperation) | **PATCH** /agents/{name} | Patch agent
-*ConnectorsApi* | [**createConnector**](docs/ConnectorsApi.md#createconnectoroperation) | **POST** /connectors | Create connector
-*ConnectorsApi* | [**deleteConnector**](docs/ConnectorsApi.md#deleteconnector) | **DELETE** /connectors/{name} | Delete connector
-*ConnectorsApi* | [**getConnector**](docs/ConnectorsApi.md#getconnector) | **GET** /connectors/{name} | Get connector details
-*ConnectorsApi* | [**listConnectorTools**](docs/ConnectorsApi.md#listconnectortools) | **GET** /connectors/{name}/tools | List connector tools
-*ConnectorsApi* | [**listConnectors**](docs/ConnectorsApi.md#listconnectors) | **GET** /connectors | List connectors
-*MemoriesApi* | [**createMemory**](docs/MemoriesApi.md#creatememoryoperation) | **POST** /memories | Create memory
-*MemoriesApi* | [**deleteMemory**](docs/MemoriesApi.md#deletememory) | **DELETE** /memories/{name} | Delete memory
-*MemoriesApi* | [**getMemory**](docs/MemoriesApi.md#getmemory) | **GET** /memories/{name} | Get memory details
-*MemoriesApi* | [**listMemories**](docs/MemoriesApi.md#listmemories) | **GET** /memories | List memories
-*MemoriesApi* | [**patchMemory**](docs/MemoriesApi.md#patchmemoryoperation) | **PATCH** /memories/{name} | Patch memory
-*OfficesApi* | [**deleteOffice**](docs/OfficesApi.md#deleteoffice) | **DELETE** /offices/{name} | Delete office
-*OfficesApi* | [**getOffice**](docs/OfficesApi.md#getoffice) | **GET** /offices/{name} | Get office details
-*OfficesApi* | [**getOfficeEvents**](docs/OfficesApi.md#getofficeevents) | **GET** /offices/{name}/events | Get office events
-*OfficesApi* | [**listOffices**](docs/OfficesApi.md#listoffices) | **GET** /offices | List offices
-*SchedulesApi* | [**createSchedule**](docs/SchedulesApi.md#createscheduleoperation) | **POST** /schedules | Create schedule
-*SchedulesApi* | [**deleteSchedule**](docs/SchedulesApi.md#deleteschedule) | **DELETE** /schedules/{name} | Delete schedule
-*SchedulesApi* | [**getSchedule**](docs/SchedulesApi.md#getschedule) | **GET** /schedules/{name} | Get schedule details
-*SchedulesApi* | [**listSchedules**](docs/SchedulesApi.md#listschedules) | **GET** /schedules | List schedules
-*SchedulesApi* | [**patchSchedule**](docs/SchedulesApi.md#patchscheduleoperation) | **PATCH** /schedules/{name} | Patch schedule
-*SecretsApi* | [**createSecret**](docs/SecretsApi.md#createsecretoperation) | **POST** /secrets | Create managed secret
-*SecretsApi* | [**deleteSecret**](docs/SecretsApi.md#deletesecret) | **DELETE** /secrets/{name} | Delete managed secret
-*SecretsApi* | [**listSecrets**](docs/SecretsApi.md#listsecrets) | **GET** /secrets | List secrets
-*SecretsApi* | [**updateSecret**](docs/SecretsApi.md#updatesecretoperation) | **PATCH** /secrets/{name} | Update managed secret
-*SkillsApi* | [**createSkill**](docs/SkillsApi.md#createskilloperation) | **POST** /skills | Create skill
-*SkillsApi* | [**deleteSkill**](docs/SkillsApi.md#deleteskill) | **DELETE** /skills/{name} | Delete skill
-*SkillsApi* | [**getSkill**](docs/SkillsApi.md#getskill) | **GET** /skills/{name} | Get skill details
-*SkillsApi* | [**listSkills**](docs/SkillsApi.md#listskills) | **GET** /skills | List skills
-*SkillsApi* | [**patchSkill**](docs/SkillsApi.md#patchskilloperation) | **PATCH** /skills/{name} | Patch skill
-*TemplatesApi* | [**listTemplates**](docs/TemplatesApi.md#listtemplates) | **GET** /templates | List agent templates
-*TemplatesApi* | [**namespacesGet**](docs/TemplatesApi.md#namespacesget) | **GET** /namespaces | List namespaces
-
-
-### Models
-
-- [AgentListResponse](docs/AgentListResponse.md)
-- [AgentResponse](docs/AgentResponse.md)
-- [ConnectorResponse](docs/ConnectorResponse.md)
-- [CreateAgentRequest](docs/CreateAgentRequest.md)
-- [CreateConnectorRequest](docs/CreateConnectorRequest.md)
-- [CreateMemoryRequest](docs/CreateMemoryRequest.md)
-- [CreateScheduleAgentSpec](docs/CreateScheduleAgentSpec.md)
-- [CreateScheduleRequest](docs/CreateScheduleRequest.md)
-- [CreateSecretRequest](docs/CreateSecretRequest.md)
-- [CreateSkillRequest](docs/CreateSkillRequest.md)
-- [MemoryResponse](docs/MemoryResponse.md)
-- [OfficeListResponse](docs/OfficeListResponse.md)
-- [OfficeMemberResponse](docs/OfficeMemberResponse.md)
-- [OfficeResponse](docs/OfficeResponse.md)
-- [PatchAgentRequest](docs/PatchAgentRequest.md)
-- [PatchMemoryRequest](docs/PatchMemoryRequest.md)
-- [PatchScheduleRequest](docs/PatchScheduleRequest.md)
-- [PatchSkillRequest](docs/PatchSkillRequest.md)
-- [ScheduleListResponse](docs/ScheduleListResponse.md)
-- [ScheduleResponse](docs/ScheduleResponse.md)
-- [SecretListResponse](docs/SecretListResponse.md)
-- [SecretResponse](docs/SecretResponse.md)
-- [SkillResponse](docs/SkillResponse.md)
-- [UpdateSecretRequest](docs/UpdateSecretRequest.md)
-
-### Authorization
-
-Endpoints do not require authorization.
-
-
-## About
-
-This TypeScript SDK client supports the [Fetch API](https://fetch.spec.whatwg.org/)
-and is automatically generated by the
-[OpenAPI Generator](https://openapi-generator.tech) project:
-
-- API version: `1.0`
-- Package version: `0.1.0`
-- Generator version: `7.21.0`
-- Build package: `org.openapitools.codegen.languages.TypeScriptFetchClientCodegen`
-
-The generated npm module supports the following:
-
-- Environments
-  * Node.js
-  * Webpack
-  * Browserify
-- Language levels
-  * ES5 - you must have a Promises/A+ library installed
-  * ES6
-- Module systems
-  * CommonJS
-  * ES6 module system
-
-
-## Development
-
-### Building
-
-To build the TypeScript source code, you need to have Node.js and npm installed.
-After cloning the repository, navigate to the project directory and run:
-
-```bash
-npm install
-npm run build
-```
-
-### Publishing
-
-Once you've built the package, you can publish it to npm:
-
-```bash
-npm publish
+const config = new Configuration({ basePath: "http://localhost:8080/api/v1" });
+const agents = new AgentsApi(config);
 ```
 
 ## License
 
-[]()
+MIT

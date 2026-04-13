@@ -11,7 +11,7 @@ Name | Type
 ## Example
 
 ```typescript
-import type { ScheduleListResponse } from 'komputer-ai'
+import type { ScheduleListResponse } from '@komputer-ai/sdk'
 
 // TODO: Update the object below with actual values
 const example = {

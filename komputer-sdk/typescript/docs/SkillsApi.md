@@ -26,11 +26,11 @@ Creates a new KomputerSkill CR with script content that can be attached to agent
 import {
   Configuration,
   SkillsApi,
-} from 'komputer-ai';
-import type { CreateSkillOperationRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { CreateSkillOperationRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new SkillsApi();
 
   const body = {
@@ -95,11 +95,11 @@ Deletes the skill CR.
 import {
   Configuration,
   SkillsApi,
-} from 'komputer-ai';
-import type { DeleteSkillRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { DeleteSkillRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new SkillsApi();
 
   const body = {
@@ -166,11 +166,11 @@ Returns the content, description, and attached agent count for a single skill.
 import {
   Configuration,
   SkillsApi,
-} from 'komputer-ai';
-import type { GetSkillRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { GetSkillRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new SkillsApi();
 
   const body = {
@@ -238,11 +238,11 @@ Returns all skills with content and attached agent counts in the specified names
 import {
   Configuration,
   SkillsApi,
-} from 'komputer-ai';
-import type { ListSkillsRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { ListSkillsRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new SkillsApi();
 
   const body = {
@@ -306,11 +306,11 @@ Updates the description or script content of an existing skill.
 import {
   Configuration,
   SkillsApi,
-} from 'komputer-ai';
-import type { PatchSkillOperationRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { PatchSkillOperationRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new SkillsApi();
 
   const body = {

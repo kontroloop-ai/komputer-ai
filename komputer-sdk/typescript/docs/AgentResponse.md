@@ -28,7 +28,7 @@ Name | Type
 ## Example
 
 ```typescript
-import type { AgentResponse } from 'komputer-ai'
+import type { AgentResponse } from '@komputer-ai/sdk'
 
 // TODO: Update the object below with actual values
 const example = {

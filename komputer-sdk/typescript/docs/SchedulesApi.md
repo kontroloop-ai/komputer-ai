@@ -26,11 +26,11 @@ Creates a new KomputerSchedule CR that triggers agent tasks on a cron schedule.
 import {
   Configuration,
   SchedulesApi,
-} from 'komputer-ai';
-import type { CreateScheduleOperationRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { CreateScheduleOperationRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new SchedulesApi();
 
   const body = {
@@ -95,11 +95,11 @@ Deletes the schedule CR. Does not delete any agents that were created by the sch
 import {
   Configuration,
   SchedulesApi,
-} from 'komputer-ai';
-import type { DeleteScheduleRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { DeleteScheduleRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new SchedulesApi();
 
   const body = {
@@ -167,11 +167,11 @@ Returns the current status and run history for a single schedule.
 import {
   Configuration,
   SchedulesApi,
-} from 'komputer-ai';
-import type { GetScheduleRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { GetScheduleRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new SchedulesApi();
 
   const body = {
@@ -239,11 +239,11 @@ Returns all schedules with their current status and run history in the specified
 import {
   Configuration,
   SchedulesApi,
-} from 'komputer-ai';
-import type { ListSchedulesRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { ListSchedulesRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new SchedulesApi();
 
   const body = {
@@ -307,11 +307,11 @@ Updates the cron expression for an existing schedule.
 import {
   Configuration,
   SchedulesApi,
-} from 'komputer-ai';
-import type { PatchScheduleOperationRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { PatchScheduleOperationRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new SchedulesApi();
 
   const body = {

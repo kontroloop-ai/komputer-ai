@@ -12,7 +12,7 @@ Name | Type
 ## Example
 
 ```typescript
-import type { PatchSkillRequest } from 'komputer-ai'
+import type { PatchSkillRequest } from '@komputer-ai/sdk'
 
 // TODO: Update the object below with actual values
 const example = {

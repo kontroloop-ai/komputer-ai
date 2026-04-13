@@ -25,11 +25,11 @@ Creates a new Kubernetes secret managed by komputer.ai that can be attached to a
 import {
   Configuration,
   SecretsApi,
-} from 'komputer-ai';
-import type { CreateSecretOperationRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { CreateSecretOperationRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new SecretsApi();
 
   const body = {
@@ -94,11 +94,11 @@ Deletes a managed Kubernetes secret.
 import {
   Configuration,
   SecretsApi,
-} from 'komputer-ai';
-import type { DeleteSecretRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { DeleteSecretRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new SecretsApi();
 
   const body = {
@@ -165,11 +165,11 @@ Returns all secrets with key names (not values) and attached agent counts in the
 import {
   Configuration,
   SecretsApi,
-} from 'komputer-ai';
-import type { ListSecretsRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { ListSecretsRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new SecretsApi();
 
   const body = {
@@ -236,11 +236,11 @@ Replaces the key-value pairs in a managed Kubernetes secret.
 import {
   Configuration,
   SecretsApi,
-} from 'komputer-ai';
-import type { UpdateSecretOperationRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { UpdateSecretOperationRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new SecretsApi();
 
   const body = {

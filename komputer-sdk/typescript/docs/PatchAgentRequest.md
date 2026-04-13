@@ -19,7 +19,7 @@ Name | Type
 ## Example
 
 ```typescript
-import type { PatchAgentRequest } from 'komputer-ai'
+import type { PatchAgentRequest } from '@komputer-ai/sdk'
 
 // TODO: Update the object below with actual values
 const example = {

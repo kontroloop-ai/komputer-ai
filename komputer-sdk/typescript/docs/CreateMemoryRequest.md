@@ -14,7 +14,7 @@ Name | Type
 ## Example
 
 ```typescript
-import type { CreateMemoryRequest } from 'komputer-ai'
+import type { CreateMemoryRequest } from '@komputer-ai/sdk'
 
 // TODO: Update the object below with actual values
 const example = {

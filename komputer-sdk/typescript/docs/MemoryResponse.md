@@ -17,7 +17,7 @@ Name | Type
 ## Example
 
 ```typescript
-import type { MemoryResponse } from 'komputer-ai'
+import type { MemoryResponse } from '@komputer-ai/sdk'
 
 // TODO: Update the object below with actual values
 const example = {

@@ -26,11 +26,11 @@ Creates a new KomputerConnector CR pointing to an MCP server that can be attache
 import {
   Configuration,
   ConnectorsApi,
-} from 'komputer-ai';
-import type { CreateConnectorOperationRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { CreateConnectorOperationRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new ConnectorsApi();
 
   const body = {
@@ -95,11 +95,11 @@ Deletes the connector CR.
 import {
   Configuration,
   ConnectorsApi,
-} from 'komputer-ai';
-import type { DeleteConnectorRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { DeleteConnectorRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new ConnectorsApi();
 
   const body = {
@@ -166,11 +166,11 @@ Returns the URL, service, type, and auth config for a single connector.
 import {
   Configuration,
   ConnectorsApi,
-} from 'komputer-ai';
-import type { GetConnectorRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { GetConnectorRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new ConnectorsApi();
 
   const body = {
@@ -238,11 +238,11 @@ Calls the MCP server\&#39;s tools/list endpoint and returns the available tools.
 import {
   Configuration,
   ConnectorsApi,
-} from 'komputer-ai';
-import type { ListConnectorToolsRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { ListConnectorToolsRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new ConnectorsApi();
 
   const body = {
@@ -311,11 +311,11 @@ Returns all connectors with attached agent counts in the specified namespace.
 import {
   Configuration,
   ConnectorsApi,
-} from 'komputer-ai';
-import type { ListConnectorsRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { ListConnectorsRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new ConnectorsApi();
 
   const body = {

@@ -23,11 +23,11 @@ Returns all agent templates (both namespace-scoped and cluster-scoped) available
 import {
   Configuration,
   TemplatesApi,
-} from 'komputer-ai';
-import type { ListTemplatesRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { ListTemplatesRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new TemplatesApi();
 
   const body = {
@@ -91,11 +91,11 @@ Returns all Kubernetes namespaces the API has access to.
 import {
   Configuration,
   TemplatesApi,
-} from 'komputer-ai';
-import type { NamespacesGetRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { NamespacesGetRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new TemplatesApi();
 
   try {

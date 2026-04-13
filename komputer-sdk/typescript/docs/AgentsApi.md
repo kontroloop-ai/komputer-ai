@@ -29,11 +29,11 @@ Upgrades to a WebSocket connection to stream real-time agent events. Events incl
 import {
   Configuration,
   AgentsApi,
-} from 'komputer-ai';
-import type { AgentsNameWsGetRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { AgentsNameWsGetRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new AgentsApi();
 
   const body = {
@@ -91,11 +91,11 @@ Gracefully cancels the currently running task. The agent pod stays alive for fut
 import {
   Configuration,
   AgentsApi,
-} from 'komputer-ai';
-import type { CancelAgentTaskRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { CancelAgentTaskRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new AgentsApi();
 
   const body = {
@@ -164,11 +164,11 @@ Creates a new agent or sends a task to an existing idle agent (upsert by name). 
 import {
   Configuration,
   AgentsApi,
-} from 'komputer-ai';
-import type { CreateAgentOperationRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { CreateAgentOperationRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new AgentsApi();
 
   const body = {
@@ -212,8 +212,7 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-| **200** | Task forwarded to existing agent |  -  |
-| **201** | Agent created |  -  |
+| **200** | Agent created or task forwarded |  -  |
 | **400** | Bad request |  -  |
 | **409** | Agent is busy or has no running pod |  -  |
 | **500** | Internal error |  -  |
@@ -235,11 +234,11 @@ Deletes the agent CR, pod, PVC, secrets, and Redis event stream.
 import {
   Configuration,
   AgentsApi,
-} from 'komputer-ai';
-import type { DeleteAgentRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { DeleteAgentRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new AgentsApi();
 
   const body = {
@@ -307,11 +306,11 @@ Returns the current status and metadata for a single agent.
 import {
   Configuration,
   AgentsApi,
-} from 'komputer-ai';
-import type { GetAgentRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { GetAgentRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new AgentsApi();
 
   const body = {
@@ -379,11 +378,11 @@ Returns recent events from the agent\&#39;s Redis stream in chronological order.
 import {
   Configuration,
   AgentsApi,
-} from 'komputer-ai';
-import type { GetAgentEventsRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { GetAgentEventsRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new AgentsApi();
 
   const body = {
@@ -454,11 +453,11 @@ Returns all agents with their current status in the specified namespace.
 import {
   Configuration,
   AgentsApi,
-} from 'komputer-ai';
-import type { ListAgentsRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { ListAgentsRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new AgentsApi();
 
   const body = {
@@ -522,11 +521,11 @@ Updates model, lifecycle, instructions, secretRefs, memories, skills, or connect
 import {
   Configuration,
   AgentsApi,
-} from 'komputer-ai';
-import type { PatchAgentOperationRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { PatchAgentOperationRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new AgentsApi();
 
   const body = {

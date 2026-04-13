@@ -17,7 +17,6 @@ Direct API access (model-based):
 from typing import Dict, List, Optional
 
 from komputer_ai import Configuration, ApiClient
-from komputer_ai.exceptions import ApiException
 from komputer_ai.api.agents_api import AgentsApi
 from komputer_ai.api.connectors_api import ConnectorsApi
 from komputer_ai.api.memories_api import MemoriesApi
@@ -60,12 +59,7 @@ class KomputerClient:
         return self.agents.list_agents()
 
     def create_agent(self, name: str, instructions: str, *, connectors: Optional[List[str]] = None, lifecycle: Optional[str] = None, memories: Optional[List[str]] = None, model: Optional[str] = None, namespace: Optional[str] = None, office_manager: Optional[str] = None, role: Optional[str] = None, secret_refs: Optional[List[str]] = None, skills: Optional[List[str]] = None, system_prompt: Optional[str] = None, template_ref: Optional[str] = None):
-        try:
-            return self.agents.create_agent(CreateAgentRequest(connectors=connectors, instructions=instructions, lifecycle=lifecycle, memories=memories, model=model, name=name, namespace=namespace, office_manager=office_manager, role=role, secret_refs=secret_refs, skills=skills, system_prompt=system_prompt, template_ref=template_ref))
-        except ApiException as e:
-            if e.status == 409:
-                return self.patch_agent(name, connectors=connectors, instructions=instructions, lifecycle=lifecycle, memories=memories, model=model, secret_refs=secret_refs, skills=skills, system_prompt=system_prompt, template_ref=template_ref)
-            raise
+        return self.agents.create_agent(CreateAgentRequest(connectors=connectors, instructions=instructions, lifecycle=lifecycle, memories=memories, model=model, name=name, namespace=namespace, office_manager=office_manager, role=role, secret_refs=secret_refs, skills=skills, system_prompt=system_prompt, template_ref=template_ref))
 
     def get_agent(self, name: str):
         return self.agents.get_agent(name)
@@ -88,12 +82,7 @@ class KomputerClient:
         return self.memories.list_memories()
 
     def create_memory(self, name: str, content: str, *, description: Optional[str] = None, namespace: Optional[str] = None):
-        try:
-            return self.memories.create_memory(CreateMemoryRequest(content=content, description=description, name=name, namespace=namespace))
-        except ApiException as e:
-            if e.status == 409:
-                return self.patch_memory(name, content=content, description=description)
-            raise
+        return self.memories.create_memory(CreateMemoryRequest(content=content, description=description, name=name, namespace=namespace))
 
     def get_memory(self, name: str):
         return self.memories.get_memory(name)
@@ -110,12 +99,7 @@ class KomputerClient:
         return self.skills.list_skills()
 
     def create_skill(self, name: str, content: str, description: str, *, namespace: Optional[str] = None):
-        try:
-            return self.skills.create_skill(CreateSkillRequest(content=content, description=description, name=name, namespace=namespace))
-        except ApiException as e:
-            if e.status == 409:
-                return self.patch_skill(name, content=content, description=description)
-            raise
+        return self.skills.create_skill(CreateSkillRequest(content=content, description=description, name=name, namespace=namespace))
 
     def get_skill(self, name: str):
         return self.skills.get_skill(name)
@@ -132,12 +116,7 @@ class KomputerClient:
         return self.schedules.list_schedules()
 
     def create_schedule(self, name: str, instructions: str, schedule: str, *, agent: Optional[CreateScheduleAgentSpec] = None, agent_name: Optional[str] = None, auto_delete: Optional[bool] = None, keep_agents: Optional[bool] = None, namespace: Optional[str] = None, timezone: Optional[str] = None):
-        try:
-            return self.schedules.create_schedule(CreateScheduleRequest(agent=agent, agent_name=agent_name, auto_delete=auto_delete, instructions=instructions, keep_agents=keep_agents, name=name, namespace=namespace, schedule=schedule, timezone=timezone))
-        except ApiException as e:
-            if e.status == 409:
-                return self.patch_schedule(name, schedule=schedule)
-            raise
+        return self.schedules.create_schedule(CreateScheduleRequest(agent=agent, agent_name=agent_name, auto_delete=auto_delete, instructions=instructions, keep_agents=keep_agents, name=name, namespace=namespace, schedule=schedule, timezone=timezone))
 
     def get_schedule(self, name: str):
         return self.schedules.get_schedule(name)
@@ -154,12 +133,7 @@ class KomputerClient:
         return self.secrets.list_secrets()
 
     def create_secret(self, name: str, data: Dict[str, str], *, namespace: Optional[str] = None):
-        try:
-            return self.secrets.create_secret(CreateSecretRequest(data=data, name=name, namespace=namespace))
-        except ApiException as e:
-            if e.status == 409:
-                return self.update_secret(name, data=data)
-            raise
+        return self.secrets.create_secret(CreateSecretRequest(data=data, name=name, namespace=namespace))
 
     def update_secret(self, name: str, data: Dict[str, str], *, namespace: Optional[str] = None):
         return self.secrets.update_secret(name, UpdateSecretRequest(data=data, namespace=namespace))
@@ -209,29 +183,12 @@ class KomputerClient:
     def watch_agent(self, name: str) -> AgentEventStream:
         """Stream real-time events from an agent via WebSocket.
 
-        Prefetches history via REST and deduplicates against live WS events.
-
         Requires: pip install websocket-client
         """
         ws_url = self._base_url.replace("http://", "ws://").replace(
             "https://", "wss://"
         )
-        history = []
-        try:
-            resp = self.agents.get_agent_events(name, limit=200)
-            if resp and isinstance(resp, dict):
-                raw_events = resp.get("events") or []
-                for e in raw_events:
-                    if isinstance(e, dict):
-                        history.append(AgentEvent(
-                            agent_name=e.get("agentName", name),
-                            type=e.get("type", ""),
-                            timestamp=e.get("timestamp", ""),
-                            payload=Payload(e.get("payload", {})),
-                        ))
-        except Exception:
-            pass
-        return AgentEventStream(ws_url, name, history)
+        return AgentEventStream(ws_url, name)
 
     # --- Lifecycle ---
 

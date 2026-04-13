@@ -25,11 +25,11 @@ Deletes the office CR and cleans up Redis event streams for all member agents.
 import {
   Configuration,
   OfficesApi,
-} from 'komputer-ai';
-import type { DeleteOfficeRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { DeleteOfficeRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new OfficesApi();
 
   const body = {
@@ -97,11 +97,11 @@ Returns the current status and member list for a single office.
 import {
   Configuration,
   OfficesApi,
-} from 'komputer-ai';
-import type { GetOfficeRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { GetOfficeRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new OfficesApi();
 
   const body = {
@@ -169,11 +169,11 @@ Returns merged events from all member agent Redis streams, sorted chronologicall
 import {
   Configuration,
   OfficesApi,
-} from 'komputer-ai';
-import type { GetOfficeEventsRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { GetOfficeEventsRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new OfficesApi();
 
   const body = {
@@ -245,11 +245,11 @@ Returns all offices with their current status in the specified namespace.
 import {
   Configuration,
   OfficesApi,
-} from 'komputer-ai';
-import type { ListOfficesRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { ListOfficesRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new OfficesApi();
 
   const body = {

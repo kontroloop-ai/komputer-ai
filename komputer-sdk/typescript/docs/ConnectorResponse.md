@@ -23,7 +23,7 @@ Name | Type
 ## Example
 
 ```typescript
-import type { ConnectorResponse } from 'komputer-ai'
+import type { ConnectorResponse } from '@komputer-ai/sdk'
 
 // TODO: Update the object below with actual values
 const example = {

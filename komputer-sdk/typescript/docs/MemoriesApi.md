@@ -26,11 +26,11 @@ Creates a new KomputerMemory CR that can be attached to agents as persistent con
 import {
   Configuration,
   MemoriesApi,
-} from 'komputer-ai';
-import type { CreateMemoryOperationRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { CreateMemoryOperationRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new MemoriesApi();
 
   const body = {
@@ -95,11 +95,11 @@ Deletes the memory CR.
 import {
   Configuration,
   MemoriesApi,
-} from 'komputer-ai';
-import type { DeleteMemoryRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { DeleteMemoryRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new MemoriesApi();
 
   const body = {
@@ -166,11 +166,11 @@ Returns the content and attached agent count for a single memory.
 import {
   Configuration,
   MemoriesApi,
-} from 'komputer-ai';
-import type { GetMemoryRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { GetMemoryRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new MemoriesApi();
 
   const body = {
@@ -238,11 +238,11 @@ Returns all memories with content and attached agent counts in the specified nam
 import {
   Configuration,
   MemoriesApi,
-} from 'komputer-ai';
-import type { ListMemoriesRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { ListMemoriesRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new MemoriesApi();
 
   const body = {
@@ -306,11 +306,11 @@ Updates the content or description of an existing memory.
 import {
   Configuration,
   MemoriesApi,
-} from 'komputer-ai';
-import type { PatchMemoryOperationRequest } from 'komputer-ai';
+} from '@komputer-ai/sdk';
+import type { PatchMemoryOperationRequest } from '@komputer-ai/sdk';
 
 async function example() {
-  console.log("🚀 Testing komputer-ai SDK...");
+  console.log("🚀 Testing @komputer-ai/sdk SDK...");
   const api = new MemoriesApi();
 
   const body = {

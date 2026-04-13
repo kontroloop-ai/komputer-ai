@@ -1,5 +1,4 @@
 .gitignore
-.npmignore
 README.md
 docs/AgentListResponse.md
 docs/AgentResponse.md
@@ -42,7 +41,6 @@ src/apis/SecretsApi.ts
 src/apis/SkillsApi.ts
 src/apis/TemplatesApi.ts
 src/apis/index.ts
-src/index.ts
 src/models/AgentListResponse.ts
 src/models/AgentResponse.ts
 src/models/ConnectorResponse.ts

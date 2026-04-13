@@ -469,10 +469,10 @@ def generate_go(operations):
 //
 // Quick start:
 //
-//	client := sdk.New("http://localhost:8080")
+//	client := client.New("http://localhost:8080")
 //	agent, _, err := client.CreateAgent(ctx, "my-agent", "Say hello",
-//	    sdk.CreateAgentOpts{{Model: sdk.PtrString("claude-sonnet-4-6")}})
-package sdk
+//	    client.CreateAgentOpts{{Model: client.PtrString("claude-sonnet-4-6")}})
+package client
 
 import (
 \t"context"

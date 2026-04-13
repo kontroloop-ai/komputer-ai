@@ -7,7 +7,7 @@
 //	client := sdk.New("http://localhost:8080")
 //	agent, _, err := client.CreateAgent(ctx, "my-agent", "Say hello",
 //	    sdk.CreateAgentOpts{Model: sdk.PtrString("claude-sonnet-4-6")})
-package sdk
+package client
 
 import (
 	"context"

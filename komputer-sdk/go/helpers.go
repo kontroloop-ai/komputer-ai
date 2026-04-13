@@ -1,4 +1,4 @@
-package sdk
+package client
 
 // PtrString returns a pointer to the given string value.
 func PtrString(v string) *string { return &v }

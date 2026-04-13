@@ -74,16 +74,16 @@ import (
     "context"
     "fmt"
 
-    sdk "github.com/kontroloop-ai/komputer-ai/komputer-sdk/go"
+    client "github.com/kontroloop-ai/komputer-ai/komputer-sdk/go"
 )
 
 func main() {
-    c := sdk.New("http://localhost:8080")
+    c := client.New("http://localhost:8080")
     ctx := context.Background()
 
     // Create an agent
     agent, _, _ := c.CreateAgent(ctx, "my-agent", "Analyze our cluster",
-        sdk.CreateAgentOpts{Model: sdk.PtrString("claude-sonnet-4-6")})
+        client.CreateAgentOpts{Model: client.PtrString("claude-sonnet-4-6")})
     fmt.Println(agent.Name)
 
     // Stream events

@@ -322,6 +322,7 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.api == 'true' || needs.changes.outputs.sdk == 'true' || needs.changes.outputs.is_tag == 'true'
     uses: ./.github/workflows/sdk.yaml
+    secrets: inherit
     with:
       is_tag: ${{ needs.changes.outputs.is_tag }}
 

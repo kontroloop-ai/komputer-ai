@@ -65,11 +65,12 @@ jobs:
         run: |
           git diff --quiet komputer-sdk/ && exit 0
           VERSION=${GITHUB_REF#refs/tags/}
+          cp -r komputer-sdk /tmp/komputer-sdk-regenerated
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git stash --include-untracked
           git checkout main
-          git stash pop
+          rm -rf komputer-sdk
+          cp -r /tmp/komputer-sdk-regenerated komputer-sdk
           git add komputer-sdk/
           git commit -m "chore(sdk): regenerate SDKs for ${VERSION}"
           git push origin main

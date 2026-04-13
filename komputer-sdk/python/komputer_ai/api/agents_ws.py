@@ -19,7 +19,20 @@ class Payload(dict):
 
 @dataclass
 class AgentEvent:
-    """A single event from an agent's WebSocket stream."""
+    """A single event from an agent's WebSocket stream.
+
+    Access payload fields with dot notation: event.payload.content
+
+    Payload fields by event type:
+        task_started:   instructions
+        thinking:       content
+        text:           content
+        tool_use:       name, input
+        tool_result:    name, input, output
+        task_completed: result, cost_usd, duration_ms, turns
+        task_cancelled: reason
+        error:          error
+    """
 
     agent_name: str
     type: str

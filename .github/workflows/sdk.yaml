@@ -1,4 +1,4 @@
-name: SDK — Regenerate, Test & Publish
+name: SDK — Regenerate & Test
 
 on:
   workflow_call:
@@ -6,13 +6,6 @@ on:
       is_tag:
         required: true
         type: string
-    secrets:
-      NPM_TOKEN:
-        required: false
-
-permissions:
-  contents: write
-  id-token: write
 
 jobs:
   regenerate:
@@ -95,58 +88,4 @@ jobs:
       - name: Test TypeScript SDK
         run: cd komputer-sdk/typescript && npm ci && npx vitest run
 
-  publish-python:
-    name: Publish Python SDK
-    needs: test
-    if: inputs.is_tag == 'true'
-    runs-on: ubuntu-latest
-    environment: pypi
-    permissions:
-      id-token: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Build package
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          # Convert to PEP 440: v0.1.0-beta → 0.1.0b0, v0.1.0-test → 0.1.0.dev0
-          VERSION=$(echo "$VERSION" | sed 's/-alpha/.a0/;s/-beta/.b0/;s/-rc/.rc0/;s/-.*/.dev0/')
-          cd komputer-sdk/python
-          sed -i "s/^version = .*/version = \"${VERSION}\"/" pyproject.toml
-          pip install build -q
-          python -m build
-
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          packages-dir: komputer-sdk/python/dist/
-
-  publish-npm:
-    name: Publish TypeScript SDK
-    needs: test
-    if: inputs.is_tag == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
-
-      - name: Build and publish
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          cd komputer-sdk/typescript
-          npm version ${VERSION} --no-git-tag-version
-          npm ci
-          npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 

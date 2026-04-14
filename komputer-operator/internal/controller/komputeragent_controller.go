@@ -824,9 +824,9 @@ func (r *KomputerAgentReconciler) reconcileStatus(ctx context.Context, agent *ko
 		})
 	}
 
-	// AutoDelete mode: delete the entire agent CR when task is done (complete or error)
+	// AutoDelete mode: delete the entire agent CR when task completes successfully
 	if agent.Spec.Lifecycle == komputerv1alpha1.AgentLifecycleAutoDelete &&
-		(agent.Status.TaskStatus == komputerv1alpha1.AgentTaskComplete || agent.Status.TaskStatus == komputerv1alpha1.AgentTaskError) {
+		agent.Status.TaskStatus == komputerv1alpha1.AgentTaskComplete {
 		log.Info("AutoDelete mode: deleting agent after task completion", "agent", agent.Name)
 		return r.Delete(ctx, agent)
 	}

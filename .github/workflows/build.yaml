@@ -382,6 +382,23 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+  publish-sdk-go:
+    name: Tag Go SDK
+    needs: [changes, sdk]
+    if: needs.changes.outputs.is_tag == 'true' && needs.sdk.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create Go submodule tag
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          TAG="komputer-sdk/go/${VERSION}"
+          git tag "$TAG"
+          git push origin "$TAG"
+
   helm:
     name: Publish Helm Chart
     needs: [changes, test]

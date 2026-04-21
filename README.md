@@ -102,8 +102,9 @@ Full SDK reference in [komputer-sdk/](komputer-sdk/).
 3. [Integration Guide](docs/integration-guide.md) — How to connect external systems via HTTP API and WebSocket events
 4. [Custom Agent Images](docs/custom-agent-image.md) — Build custom agent images with your own packages and tools
 5. [Local Development](docs/local-development.md) — Build and run from source on a local cluster
-6. [Architecture](#architecture) — System diagram and component interactions
-7. Komputer Components
+6. [Examples](examples/) — 10 end-to-end examples: hello world, secrets, managers, schedules, CI/CD, Slack, and more
+7. [Architecture](#architecture) — System diagram and component interactions
+8. Komputer Components
    1. [komputer-api](komputer-api/README.md) — REST & WebSocket API reference, Swagger UI, configuration
    2. [komputer-operator](komputer-operator/README.md) — CRD definitions, reconciliation logic, operator development guide
    3. [komputer-agent](komputer-agent/README.md) — Agent runtime, Claude SDK integration, manager tools, event format

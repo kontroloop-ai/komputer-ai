@@ -1,0 +1,7 @@
+apiVersion: komputer.komputer.ai/v1alpha1
+kind: KomputerAgent
+metadata:
+  name: dev-agent
+spec:
+  instructions: "Clone https://github.com/example/my-app into /workspace/my-app and install dependencies."
+  model: claude-sonnet-4-6

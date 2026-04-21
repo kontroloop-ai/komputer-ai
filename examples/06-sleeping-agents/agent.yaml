@@ -1,0 +1,10 @@
+apiVersion: komputer.komputer.ai/v1alpha1
+kind: KomputerAgent
+metadata:
+  name: data-processor
+spec:
+  instructions: >
+    Process the CSV files in /workspace/input/, compute summary statistics
+    for each file, and write results to /workspace/output/summary.json.
+  model: claude-sonnet-4-6
+  lifecycle: Sleep

@@ -1,0 +1,29 @@
+apiVersion: komputer.komputer.ai/v1alpha1
+kind: KomputerAgentClusterTemplate
+metadata:
+  name: data-science
+spec:
+  podSpec:
+    containers:
+      - name: agent
+        image: my-registry/data-science-agent:latest
+        env:
+          - name: ANTHROPIC_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: anthropic-api-key
+                key: api-key
+  storage:
+    size: "20Gi"
+---
+apiVersion: komputer.komputer.ai/v1alpha1
+kind: KomputerAgent
+metadata:
+  name: data-analyst
+spec:
+  templateRef: data-science
+  instructions: >
+    Load /workspace/data/sales.csv using pandas. Compute monthly revenue trends,
+    identify the top 5 performing products, and generate a matplotlib chart saved
+    to /workspace/output/sales_chart.png. Print a summary of your findings.
+  model: claude-sonnet-4-6

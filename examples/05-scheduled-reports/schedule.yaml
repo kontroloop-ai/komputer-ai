@@ -1,0 +1,17 @@
+apiVersion: komputer.komputer.ai/v1alpha1
+kind: KomputerSchedule
+metadata:
+  name: daily-standup-report
+spec:
+  schedule: "0 9 * * 1-5"
+  timezone: "America/New_York"
+  instructions: >
+    Generate a daily standup summary. Check the /workspace/tasks.md file for
+    current tasks and update it with today's progress. Write a brief standup
+    report to /workspace/standups/$(date +%Y-%m-%d).md covering:
+    - What was completed yesterday
+    - What is planned for today
+    - Any blockers
+  agent:
+    model: claude-sonnet-4-6
+    lifecycle: AutoDelete

@@ -1,0 +1,7 @@
+apiVersion: komputer.komputer.ai/v1alpha1
+kind: KomputerAgent
+metadata:
+  name: hello-world
+spec:
+  instructions: "Write a haiku about Kubernetes and print it to the terminal."
+  model: claude-sonnet-4-6

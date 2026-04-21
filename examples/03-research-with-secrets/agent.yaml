@@ -1,0 +1,13 @@
+apiVersion: komputer.komputer.ai/v1alpha1
+kind: KomputerAgent
+metadata:
+  name: github-researcher
+spec:
+  instructions: >
+    Use the GitHub API token from the SECRET_GITHUB environment variable to fetch
+    the latest releases from the kubernetes/kubernetes repository.
+    Summarize what changed in the last 3 releases.
+  model: claude-sonnet-4-6
+  secrets:
+    - github-credentials
+  lifecycle: AutoDelete

@@ -2,28 +2,29 @@
 
 A Slack slash command that runs a komputer.ai agent and posts the result back to the channel.
 
+Uses [Slack Bolt for Python](https://slack.dev/bolt-python/) for the Slack integration and the komputer-ai SDK for agent creation and event streaming.
+
 ## What it does
 
-A Flask server that:
-1. Receives a `/agent <instructions>` slash command from Slack
-2. Returns an immediate acknowledgement (Slack requires a response in 3 seconds)
-3. Creates a komputer.ai agent in the background
-4. Streams the agent's events via WebSocket
+1. Receives a `/agent <instructions>` slash command
+2. Immediately acknowledges (Bolt handles the 3-second Slack timeout automatically)
+3. Creates a komputer.ai agent in a background thread via the SDK
+4. Streams events via `watch_agent()` until `task_completed`
 5. Posts the final text response back to the Slack channel
 
 ## Install dependencies
 
 ```bash
-pip install flask slack-sdk httpx websockets
+pip install slack-bolt komputer-ai-sdk
 ```
 
 ## Setup
 
 ### 1. Create a Slack app
 
-1. Go to [api.slack.com/apps](https://api.slack.com/apps) → Create New App
-2. Add a **Slash Command**: `/agent` → `https://your-server.example.com/slack/command`
-3. Add **OAuth Scope**: `chat:write`
+1. Go to [api.slack.com/apps](https://api.slack.com/apps) → Create New App → From scratch
+2. Under **Slash Commands**, create `/agent` with request URL `https://your-server.example.com/slack/events`
+3. Under **OAuth & Permissions**, add the `chat:write` bot scope
 4. Install the app to your workspace
 5. Copy the **Bot User OAuth Token** and **Signing Secret**
 
@@ -32,17 +33,17 @@ pip install flask slack-sdk httpx websockets
 ```bash
 export SLACK_BOT_TOKEN=xoxb-your-token
 export SLACK_SIGNING_SECRET=your-signing-secret
-export KOMPUTER_API=http://komputer-api:8080   # or localhost:8080 for local dev
+export KOMPUTER_API=http://komputer-api:8080   # or http://localhost:8080 for local dev
 
 python app.py
 ```
 
-### 3. Expose locally (for development)
+### 3. Expose locally for development
 
 ```bash
-# Use ngrok or similar to expose localhost:3001
+# Use ngrok to tunnel localhost:3001
 ngrok http 3001
-# Update the slash command URL in your Slack app settings
+# Paste the ngrok URL + /slack/events into your slash command settings
 ```
 
 ## Usage
@@ -55,14 +56,23 @@ In any Slack channel where the bot is present:
 /agent What are the best practices for Kubernetes RBAC?
 ```
 
-The bot replies: *"Running: <instructions>. I'll post results here when done."*
+Bolt immediately responds: *"Running: <instructions>. I'll post the result here when done."*
 
-A few seconds later (depending on task complexity), the agent's response appears in the channel.
+Once the agent finishes, the response appears in the channel.
+
+## Why Slack Bolt?
+
+Bolt handles the parts you'd otherwise have to wire up manually:
+
+- **Signature verification** — every request is verified against `SLACK_SIGNING_SECRET` automatically
+- **3-second ack** — Bolt separates `ack()` (immediate) from the rest of the handler, so you never time out Slack while the agent runs
+- **Routing** — `@bolt.command("/agent")` cleanly maps commands to handlers without manual URL routing
+- **Flask adapter** — `SlackRequestHandler` bridges Bolt into a standard Flask app with one line
 
 ## Key concepts
 
-- **3-second Slack timeout** — Slack slash commands must respond in 3 seconds or they show an error. The bot returns immediately, then does the real work in a background thread.
-- **`lifecycle: AutoDelete`** — each Slack request creates a fresh agent that deletes itself when done
-- **Agent naming** — `slack-{user}-{timestamp}` ensures unique names per request
-- **Signature verification** — always verify Slack's HMAC signature before processing commands
+- **`ack()`** — must be called within 3 seconds; Bolt makes this explicit and hard to forget
+- **`client.create_agent(lifecycle="AutoDelete")`** — each slash command creates a fresh agent that deletes itself when done
+- **Agent naming** — `slack-{user}` reuses the same agent across commands from the same user; each new command re-tasks it (the SDK handles the 409 automatically)
+- **`watch_agent()`** — prefetches event history before opening the WebSocket, so no events are missed even if the agent runs fast
 - The komputer.ai API URL should be your in-cluster service address in production

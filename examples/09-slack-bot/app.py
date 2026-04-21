@@ -1,104 +1,90 @@
 """
 Slack slash command → komputer.ai agent → stream response back to Slack.
 
+Uses Slack Bolt for Python (handles signature verification, ack, and async out of the box)
+and the komputer-ai SDK for agent creation and event streaming.
+
 Setup:
   1. Create a Slack app with a slash command (e.g. /agent) pointing at this server.
-  2. Set SLACK_BOT_TOKEN and SLACK_SIGNING_SECRET env vars.
-  3. pip install flask slack-sdk httpx websockets
-  4. Run: python app.py
+  2. Enable Socket Mode or set the request URL to https://your-server/slack/events.
+  3. Set SLACK_BOT_TOKEN and SLACK_SIGNING_SECRET env vars.
+  4. pip install slack-bolt komputer-ai-sdk
+  5. Run: python app.py
 
 Usage in Slack:
   /agent Write a poem about distributed systems
 """
 
-import asyncio
-import hashlib
-import hmac
-import json
 import os
+import re
 import threading
-import time
 
-import httpx
-import websockets
-from flask import Flask, Response, abort, request
-from slack_sdk import WebClient
+from slack_bolt import App
+from slack_bolt.adapter.flask import SlackRequestHandler
+from flask import Flask, request
 
-app = Flask(__name__)
+from komputer_ai.client import KomputerClient
 
-SLACK_BOT_TOKEN     = os.environ["SLACK_BOT_TOKEN"]
+SLACK_BOT_TOKEN      = os.environ["SLACK_BOT_TOKEN"]
 SLACK_SIGNING_SECRET = os.environ["SLACK_SIGNING_SECRET"]
-KOMPUTER_API        = os.environ.get("KOMPUTER_API", "http://komputer-api:8080")
+KOMPUTER_API         = os.environ.get("KOMPUTER_API", "http://komputer-api:8080")
 
-slack = WebClient(token=SLACK_BOT_TOKEN)
-
-
-def verify_slack_signature(req: request) -> bool:
-    ts = req.headers.get("X-Slack-Request-Timestamp", "")
-    if abs(time.time() - int(ts)) > 60 * 5:
-        return False
-    body = req.get_data(as_text=True)
-    sig_base = f"v0:{ts}:{body}"
-    expected = "v0=" + hmac.new(
-        SLACK_SIGNING_SECRET.encode(), sig_base.encode(), hashlib.sha256
-    ).hexdigest()
-    return hmac.compare_digest(expected, req.headers.get("X-Slack-Signature", ""))
+bolt = App(token=SLACK_BOT_TOKEN, signing_secret=SLACK_SIGNING_SECRET)
+flask_app = Flask(__name__)
+handler = SlackRequestHandler(bolt)
 
 
-async def run_agent_and_reply(agent_name: str, instructions: str, channel: str):
-    api_url = KOMPUTER_API
-    ws_url  = KOMPUTER_API.replace("http", "ws")
+def agent_name_for(user: str) -> str:
+    slug = re.sub(r"[^a-z0-9-]", "-", user.lower())[:20].strip("-")
+    return f"slack-{slug}"
 
-    async with httpx.AsyncClient() as http:
-        resp = await http.post(f"{api_url}/api/v1/agents", json={
-            "name": agent_name,
-            "instructions": instructions,
-            "lifecycle": "AutoDelete",
-        })
-        if resp.status_code not in (200, 201):
-            slack.chat_postMessage(channel=channel, text=f"Failed to create agent: {resp.text}")
-            return
 
-    text_chunks = []
-    uri = f"{ws_url}/api/v1/agents/{agent_name}/ws"
+def run_agent_and_reply(agent_name: str, instructions: str, channel: str, say):
+    with KomputerClient(KOMPUTER_API) as client:
+        client.create_agent(
+            name=agent_name,
+            instructions=instructions,
+            lifecycle="AutoDelete",
+        )
 
-    async with websockets.connect(uri) as ws:
-        async for raw in ws:
-            event = json.loads(raw)
-            etype = event.get("type")
-            payload = event.get("payload", {})
-
-            if etype == "text":
-                text_chunks.append(payload.get("content", ""))
-            elif etype in ("task_completed", "error"):
+        text_chunks = []
+        for event in client.watch_agent(agent_name):
+            if event.type == "text":
+                text_chunks.append(event.payload.get("content", ""))
+            elif event.type == "task_completed":
                 break
+            elif event.type == "error":
+                say(channel=channel, text=f"Agent error: {event.payload.get('error')}")
+                return
 
     reply = "\n".join(text_chunks) or "Task completed with no text output."
-    slack.chat_postMessage(channel=channel, text=reply)
+    say(channel=channel, text=reply)
 
 
-@app.route("/slack/command", methods=["POST"])
-def slash_command():
-    if not verify_slack_signature(request):
-        abort(403)
+@bolt.command("/agent")
+def handle_agent_command(ack, command, say):
+    ack(f"Running: _{command['text']}_\nI'll post the result here when done.")
 
-    instructions = request.form.get("text", "").strip()
-    channel      = request.form.get("channel_id")
-    user         = request.form.get("user_name", "user").replace(".", "-")
-
+    instructions = command["text"].strip()
     if not instructions:
-        return Response("Usage: /agent <your task>", content_type="text/plain")
+        ack("Usage: /agent <your task>")
+        return
 
-    agent_name = f"slack-{user}-{int(time.time())}"
+    channel    = command["channel_id"]
+    user       = command.get("user_name", "user")
+    agent_name = agent_name_for(user)
 
-    def run():
-        asyncio.run(run_agent_and_reply(agent_name, instructions, channel))
+    threading.Thread(
+        target=run_agent_and_reply,
+        args=(agent_name, instructions, channel, say),
+        daemon=True,
+    ).start()
 
-    threading.Thread(target=run, daemon=True).start()
 
-    return Response(f"Running: _{instructions}_\nI'll post results here when done.",
-                    content_type="text/plain")
+@flask_app.route("/slack/events", methods=["POST"])
+def slack_events():
+    return handler.handle(request)
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=3001)
+    flask_app.run(host="0.0.0.0", port=3001)

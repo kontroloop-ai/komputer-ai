@@ -259,7 +259,7 @@ func (k *K8sClient) UpdateManagedSecret(ctx context.Context, ns, name string, da
 	return secret, nil
 }
 
-func (k *K8sClient) CreateAgent(ctx context.Context, ns, name, instructions, internalSystemPrompt, systemPrompt, model, templateRef, role string, secretNames []string, memories []string, skills []string, connectors []string, lifecycle, officeManager string) (*komputerv1alpha1.KomputerAgent, error) {
+func (k *K8sClient) CreateAgent(ctx context.Context, ns, name, instructions, internalSystemPrompt, systemPrompt, model, templateRef, role string, secretNames []string, memories []string, skills []string, connectors []string, lifecycle, officeManager string, podSpec *corev1.PodSpec, storage *komputerv1alpha1.StorageSpec) (*komputerv1alpha1.KomputerAgent, error) {
 	if model == "" {
 		model = "claude-sonnet-4-6"
 	}
@@ -288,6 +288,8 @@ func (k *K8sClient) CreateAgent(ctx context.Context, ns, name, instructions, int
 			Connectors:           connectors,
 			Lifecycle:            komputerv1alpha1.AgentLifecycle(lifecycle),
 			OfficeManager:        officeManager,
+			PodSpec:              podSpec,
+			Storage:              storage,
 		},
 	}
 
@@ -299,6 +301,23 @@ func (k *K8sClient) CreateAgent(ctx context.Context, ns, name, instructions, int
 		return nil, err
 	}
 	return agent, nil
+}
+
+// PatchAgentOverrides patches the podSpec and/or storage overrides on a KomputerAgent CR.
+func (k *K8sClient) PatchAgentOverrides(ctx context.Context, ns, agentName string, podSpec *corev1.PodSpec, storage *komputerv1alpha1.StorageSpec) error {
+	agent := &komputerv1alpha1.KomputerAgent{}
+	key := types.NamespacedName{Name: agentName, Namespace: ns}
+	if err := k.client.Get(ctx, key, agent); err != nil {
+		return fmt.Errorf("failed to get agent %s: %w", agentName, err)
+	}
+	original := agent.DeepCopy()
+	if podSpec != nil {
+		agent.Spec.PodSpec = podSpec
+	}
+	if storage != nil {
+		agent.Spec.Storage = storage
+	}
+	return k.client.Patch(ctx, agent, client.MergeFrom(original))
 }
 
 func (k *K8sClient) ListNamespaces(ctx context.Context) ([]string, error) {

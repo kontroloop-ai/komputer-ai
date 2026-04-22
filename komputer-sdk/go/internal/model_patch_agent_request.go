@@ -27,6 +27,8 @@ type PatchAgentRequest struct {
 	Memories []string `json:"memories,omitempty"`
 	Model *string `json:"model,omitempty"`
 	PodSpec *V1PodSpec `json:"podSpec,omitempty"`
+	// pointer so 0 vs unset is distinguishable
+	Priority *int32 `json:"priority,omitempty"`
 	// full replacement list of K8s secret names
 	SecretRefs []string `json:"secretRefs,omitempty"`
 	// skill names to attach
@@ -246,6 +248,38 @@ func (o *PatchAgentRequest) SetPodSpec(v V1PodSpec) {
 	o.PodSpec = &v
 }
 
+// GetPriority returns the Priority field value if set, zero value otherwise.
+func (o *PatchAgentRequest) GetPriority() int32 {
+	if o == nil || IsNil(o.Priority) {
+		var ret int32
+		return ret
+	}
+	return *o.Priority
+}
+
+// GetPriorityOk returns a tuple with the Priority field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *PatchAgentRequest) GetPriorityOk() (*int32, bool) {
+	if o == nil || IsNil(o.Priority) {
+		return nil, false
+	}
+	return o.Priority, true
+}
+
+// HasPriority returns a boolean if a field has been set.
+func (o *PatchAgentRequest) HasPriority() bool {
+	if o != nil && !IsNil(o.Priority) {
+		return true
+	}
+
+	return false
+}
+
+// SetPriority gets a reference to the given int32 and assigns it to the Priority field.
+func (o *PatchAgentRequest) SetPriority(v int32) {
+	o.Priority = &v
+}
+
 // GetSecretRefs returns the SecretRefs field value if set, zero value otherwise.
 func (o *PatchAgentRequest) GetSecretRefs() []string {
 	if o == nil || IsNil(o.SecretRefs) {
@@ -433,6 +467,9 @@ func (o PatchAgentRequest) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.PodSpec) {
 		toSerialize["podSpec"] = o.PodSpec
+	}
+	if !IsNil(o.Priority) {
+		toSerialize["priority"] = o.Priority
 	}
 	if !IsNil(o.SecretRefs) {
 		toSerialize["secretRefs"] = o.SecretRefs

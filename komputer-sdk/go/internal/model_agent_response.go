@@ -34,6 +34,9 @@ type AgentResponse struct {
 	Name *string `json:"name,omitempty"`
 	Namespace *string `json:"namespace,omitempty"`
 	PodSpec *V1PodSpec `json:"podSpec,omitempty"`
+	Priority *int32 `json:"priority,omitempty"`
+	QueuePosition *int32 `json:"queuePosition,omitempty"`
+	QueueReason *string `json:"queueReason,omitempty"`
 	// Key names from K8s Secrets (not values)
 	Secrets []string `json:"secrets,omitempty"`
 	// KomputerSkill names attached to this agent
@@ -448,6 +451,102 @@ func (o *AgentResponse) SetPodSpec(v V1PodSpec) {
 	o.PodSpec = &v
 }
 
+// GetPriority returns the Priority field value if set, zero value otherwise.
+func (o *AgentResponse) GetPriority() int32 {
+	if o == nil || IsNil(o.Priority) {
+		var ret int32
+		return ret
+	}
+	return *o.Priority
+}
+
+// GetPriorityOk returns a tuple with the Priority field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *AgentResponse) GetPriorityOk() (*int32, bool) {
+	if o == nil || IsNil(o.Priority) {
+		return nil, false
+	}
+	return o.Priority, true
+}
+
+// HasPriority returns a boolean if a field has been set.
+func (o *AgentResponse) HasPriority() bool {
+	if o != nil && !IsNil(o.Priority) {
+		return true
+	}
+
+	return false
+}
+
+// SetPriority gets a reference to the given int32 and assigns it to the Priority field.
+func (o *AgentResponse) SetPriority(v int32) {
+	o.Priority = &v
+}
+
+// GetQueuePosition returns the QueuePosition field value if set, zero value otherwise.
+func (o *AgentResponse) GetQueuePosition() int32 {
+	if o == nil || IsNil(o.QueuePosition) {
+		var ret int32
+		return ret
+	}
+	return *o.QueuePosition
+}
+
+// GetQueuePositionOk returns a tuple with the QueuePosition field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *AgentResponse) GetQueuePositionOk() (*int32, bool) {
+	if o == nil || IsNil(o.QueuePosition) {
+		return nil, false
+	}
+	return o.QueuePosition, true
+}
+
+// HasQueuePosition returns a boolean if a field has been set.
+func (o *AgentResponse) HasQueuePosition() bool {
+	if o != nil && !IsNil(o.QueuePosition) {
+		return true
+	}
+
+	return false
+}
+
+// SetQueuePosition gets a reference to the given int32 and assigns it to the QueuePosition field.
+func (o *AgentResponse) SetQueuePosition(v int32) {
+	o.QueuePosition = &v
+}
+
+// GetQueueReason returns the QueueReason field value if set, zero value otherwise.
+func (o *AgentResponse) GetQueueReason() string {
+	if o == nil || IsNil(o.QueueReason) {
+		var ret string
+		return ret
+	}
+	return *o.QueueReason
+}
+
+// GetQueueReasonOk returns a tuple with the QueueReason field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *AgentResponse) GetQueueReasonOk() (*string, bool) {
+	if o == nil || IsNil(o.QueueReason) {
+		return nil, false
+	}
+	return o.QueueReason, true
+}
+
+// HasQueueReason returns a boolean if a field has been set.
+func (o *AgentResponse) HasQueueReason() bool {
+	if o != nil && !IsNil(o.QueueReason) {
+		return true
+	}
+
+	return false
+}
+
+// SetQueueReason gets a reference to the given string and assigns it to the QueueReason field.
+func (o *AgentResponse) SetQueueReason(v string) {
+	o.QueueReason = &v
+}
+
 // GetSecrets returns the Secrets field value if set, zero value otherwise.
 func (o *AgentResponse) GetSecrets() []string {
 	if o == nil || IsNil(o.Secrets) {
@@ -749,6 +848,15 @@ func (o AgentResponse) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.PodSpec) {
 		toSerialize["podSpec"] = o.PodSpec
+	}
+	if !IsNil(o.Priority) {
+		toSerialize["priority"] = o.Priority
+	}
+	if !IsNil(o.QueuePosition) {
+		toSerialize["queuePosition"] = o.QueuePosition
+	}
+	if !IsNil(o.QueueReason) {
+		toSerialize["queueReason"] = o.QueueReason
 	}
 	if !IsNil(o.Secrets) {
 		toSerialize["secrets"] = o.Secrets

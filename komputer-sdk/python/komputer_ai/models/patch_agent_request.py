@@ -17,7 +17,7 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
 from komputer_ai.models.v1_pod_spec import V1PodSpec
 from komputer_ai.models.v1alpha1_storage_spec import V1alpha1StorageSpec
@@ -35,12 +35,13 @@ class PatchAgentRequest(BaseModel):
     memories: Optional[List[StrictStr]] = Field(default=None, description="memory names to attach")
     model: Optional[StrictStr] = None
     pod_spec: Optional[V1PodSpec] = Field(default=None, alias="podSpec")
+    priority: Optional[StrictInt] = Field(default=None, description="pointer so 0 vs unset is distinguishable")
     secret_refs: Optional[List[StrictStr]] = Field(default=None, description="full replacement list of K8s secret names", alias="secretRefs")
     skills: Optional[List[StrictStr]] = Field(default=None, description="skill names to attach")
     storage: Optional[V1alpha1StorageSpec] = None
     system_prompt: Optional[StrictStr] = Field(default=None, description="custom system prompt", alias="systemPrompt")
     template_ref: Optional[StrictStr] = Field(default=None, alias="templateRef")
-    __properties: ClassVar[List[str]] = ["connectors", "instructions", "lifecycle", "memories", "model", "podSpec", "secretRefs", "skills", "storage", "systemPrompt", "templateRef"]
+    __properties: ClassVar[List[str]] = ["connectors", "instructions", "lifecycle", "memories", "model", "podSpec", "priority", "secretRefs", "skills", "storage", "systemPrompt", "templateRef"]
 
     model_config = ConfigDict(
         validate_by_name=True,
@@ -105,6 +106,7 @@ class PatchAgentRequest(BaseModel):
             "memories": obj.get("memories"),
             "model": obj.get("model"),
             "podSpec": V1PodSpec.from_dict(obj["podSpec"]) if obj.get("podSpec") is not None else None,
+            "priority": obj.get("priority"),
             "secretRefs": obj.get("secretRefs"),
             "skills": obj.get("skills"),
             "storage": V1alpha1StorageSpec.from_dict(obj["storage"]) if obj.get("storage") is not None else None,

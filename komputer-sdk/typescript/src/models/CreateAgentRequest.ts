@@ -89,6 +89,12 @@ export interface CreateAgentRequest {
      */
     podSpec?: V1PodSpec;
     /**
+     * queue priority; higher = admitted first
+     * @type {number}
+     * @memberof CreateAgentRequest
+     */
+    priority?: number;
+    /**
      * "manager" or "" (default manager)
      * @type {string}
      * @memberof CreateAgentRequest
@@ -154,6 +160,7 @@ export function CreateAgentRequestFromJSONTyped(json: any, ignoreDiscriminator: 
         'namespace': json['namespace'] == null ? undefined : json['namespace'],
         'officeManager': json['officeManager'] == null ? undefined : json['officeManager'],
         'podSpec': json['podSpec'] == null ? undefined : V1PodSpecFromJSON(json['podSpec']),
+        'priority': json['priority'] == null ? undefined : json['priority'],
         'role': json['role'] == null ? undefined : json['role'],
         'secretRefs': json['secretRefs'] == null ? undefined : json['secretRefs'],
         'skills': json['skills'] == null ? undefined : json['skills'],
@@ -183,6 +190,7 @@ export function CreateAgentRequestToJSONTyped(value?: CreateAgentRequest | null,
         'namespace': value['namespace'],
         'officeManager': value['officeManager'],
         'podSpec': V1PodSpecToJSON(value['podSpec']),
+        'priority': value['priority'],
         'role': value['role'],
         'secretRefs': value['secretRefs'],
         'skills': value['skills'],

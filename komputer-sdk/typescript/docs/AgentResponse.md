@@ -18,6 +18,9 @@ Name | Type
 `name` | string
 `namespace` | string
 `podSpec` | [V1PodSpec](V1PodSpec.md)
+`priority` | number
+`queuePosition` | number
+`queueReason` | string
 `secrets` | Array&lt;string&gt;
 `skills` | Array&lt;string&gt;
 `status` | string
@@ -46,6 +49,9 @@ const example = {
   "name": null,
   "namespace": null,
   "podSpec": null,
+  "priority": null,
+  "queuePosition": null,
+  "queueReason": null,
   "secrets": null,
   "skills": null,
   "status": null,

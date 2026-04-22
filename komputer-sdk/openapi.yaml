@@ -1559,6 +1559,7 @@ components:
           connectors:
           - connectors
           - connectors
+          queuePosition: 4
           totalCostUSD: totalCostUSD
           storage:
             size: size
@@ -2183,10 +2184,11 @@ components:
               stdinOnce: true
             affinity: "{}"
             hostPID: true
+          priority: 2
           secrets:
           - secrets
           - secrets
-          totalTokens: 2
+          totalTokens: 7
           lifecycle: lifecycle
           skills:
           - skills
@@ -2199,6 +2201,7 @@ components:
           name: name
           namespace: namespace
           modelContextWindow: 0
+          queueReason: queueReason
           model: model
           lastTaskCostUSD: lastTaskCostUSD
           lastTaskMessage: lastTaskMessage
@@ -2208,6 +2211,7 @@ components:
           connectors:
           - connectors
           - connectors
+          queuePosition: 4
           totalCostUSD: totalCostUSD
           storage:
             size: size
@@ -2832,10 +2836,11 @@ components:
               stdinOnce: true
             affinity: "{}"
             hostPID: true
+          priority: 2
           secrets:
           - secrets
           - secrets
-          totalTokens: 2
+          totalTokens: 7
           lifecycle: lifecycle
           skills:
           - skills
@@ -2848,6 +2853,7 @@ components:
           name: name
           namespace: namespace
           modelContextWindow: 0
+          queueReason: queueReason
           model: model
           lastTaskCostUSD: lastTaskCostUSD
           lastTaskMessage: lastTaskMessage
@@ -2865,6 +2871,7 @@ components:
         connectors:
         - connectors
         - connectors
+        queuePosition: 4
         totalCostUSD: totalCostUSD
         storage:
           size: size
@@ -3489,10 +3496,11 @@ components:
             stdinOnce: true
           affinity: "{}"
           hostPID: true
+        priority: 2
         secrets:
         - secrets
         - secrets
-        totalTokens: 2
+        totalTokens: 7
         lifecycle: lifecycle
         skills:
         - skills
@@ -3505,6 +3513,7 @@ components:
         name: name
         namespace: namespace
         modelContextWindow: 0
+        queueReason: queueReason
         model: model
         lastTaskCostUSD: lastTaskCostUSD
         lastTaskMessage: lastTaskMessage
@@ -3542,6 +3551,12 @@ components:
           type: string
         podSpec:
           $ref: "#/components/schemas/v1.PodSpec"
+        priority:
+          type: integer
+        queuePosition:
+          type: integer
+        queueReason:
+          type: string
         secrets:
           description: Key names from K8s Secrets (not values)
           items:
@@ -3643,6 +3658,9 @@ components:
           type: string
         podSpec:
           $ref: "#/components/schemas/v1.PodSpec"
+        priority:
+          description: queue priority; higher = admitted first
+          type: integer
         role:
           description: '"manager" or "" (default manager)'
           type: string
@@ -3941,6 +3959,9 @@ components:
           type: string
         podSpec:
           $ref: "#/components/schemas/v1.PodSpec"
+        priority:
+          description: pointer so 0 vs unset is distinguishable
+          type: integer
         secretRefs:
           description: full replacement list of K8s secret names
           items:

@@ -15,6 +15,7 @@ Name | Type
 `namespace` | string
 `officeManager` | string
 `podSpec` | [V1PodSpec](V1PodSpec.md)
+`priority` | number
 `role` | string
 `secretRefs` | Array&lt;string&gt;
 `skills` | Array&lt;string&gt;
@@ -38,6 +39,7 @@ const example = {
   "namespace": null,
   "officeManager": null,
   "podSpec": null,
+  "priority": null,
   "role": null,
   "secretRefs": null,
   "skills": null,

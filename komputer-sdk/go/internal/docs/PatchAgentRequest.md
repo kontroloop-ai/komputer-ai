@@ -10,6 +10,7 @@ Name | Type | Description | Notes
 **Memories** | Pointer to **[]string** | memory names to attach | [optional] 
 **Model** | Pointer to **string** |  | [optional] 
 **PodSpec** | Pointer to [**V1PodSpec**](V1PodSpec.md) |  | [optional] 
+**Priority** | Pointer to **int32** | pointer so 0 vs unset is distinguishable | [optional] 
 **SecretRefs** | Pointer to **[]string** | full replacement list of K8s secret names | [optional] 
 **Skills** | Pointer to **[]string** | skill names to attach | [optional] 
 **Storage** | Pointer to [**V1alpha1StorageSpec**](V1alpha1StorageSpec.md) |  | [optional] 
@@ -184,6 +185,31 @@ SetPodSpec sets PodSpec field to given value.
 `func (o *PatchAgentRequest) HasPodSpec() bool`
 
 HasPodSpec returns a boolean if a field has been set.
+
+### GetPriority
+
+`func (o *PatchAgentRequest) GetPriority() int32`
+
+GetPriority returns the Priority field if non-nil, zero value otherwise.
+
+### GetPriorityOk
+
+`func (o *PatchAgentRequest) GetPriorityOk() (*int32, bool)`
+
+GetPriorityOk returns a tuple with the Priority field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetPriority
+
+`func (o *PatchAgentRequest) SetPriority(v int32)`
+
+SetPriority sets Priority field to given value.
+
+### HasPriority
+
+`func (o *PatchAgentRequest) HasPriority() bool`
+
+HasPriority returns a boolean if a field has been set.
 
 ### GetSecretRefs
 

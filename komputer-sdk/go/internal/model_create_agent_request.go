@@ -35,6 +35,8 @@ type CreateAgentRequest struct {
 	// set by manager MCP tool
 	OfficeManager *string `json:"officeManager,omitempty"`
 	PodSpec *V1PodSpec `json:"podSpec,omitempty"`
+	// queue priority; higher = admitted first
+	Priority *int32 `json:"priority,omitempty"`
 	// \"manager\" or \"\" (default manager)
 	Role *string `json:"role,omitempty"`
 	// names of existing K8s Secrets to attach
@@ -340,6 +342,38 @@ func (o *CreateAgentRequest) SetPodSpec(v V1PodSpec) {
 	o.PodSpec = &v
 }
 
+// GetPriority returns the Priority field value if set, zero value otherwise.
+func (o *CreateAgentRequest) GetPriority() int32 {
+	if o == nil || IsNil(o.Priority) {
+		var ret int32
+		return ret
+	}
+	return *o.Priority
+}
+
+// GetPriorityOk returns a tuple with the Priority field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CreateAgentRequest) GetPriorityOk() (*int32, bool) {
+	if o == nil || IsNil(o.Priority) {
+		return nil, false
+	}
+	return o.Priority, true
+}
+
+// HasPriority returns a boolean if a field has been set.
+func (o *CreateAgentRequest) HasPriority() bool {
+	if o != nil && !IsNil(o.Priority) {
+		return true
+	}
+
+	return false
+}
+
+// SetPriority gets a reference to the given int32 and assigns it to the Priority field.
+func (o *CreateAgentRequest) SetPriority(v int32) {
+	o.Priority = &v
+}
+
 // GetRole returns the Role field value if set, zero value otherwise.
 func (o *CreateAgentRequest) GetRole() string {
 	if o == nil || IsNil(o.Role) {
@@ -564,6 +598,9 @@ func (o CreateAgentRequest) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.PodSpec) {
 		toSerialize["podSpec"] = o.PodSpec
+	}
+	if !IsNil(o.Priority) {
+		toSerialize["priority"] = o.Priority
 	}
 	if !IsNil(o.Role) {
 		toSerialize["role"] = o.Role

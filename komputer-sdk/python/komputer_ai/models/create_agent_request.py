@@ -17,7 +17,7 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
 from komputer_ai.models.v1_pod_spec import V1PodSpec
 from komputer_ai.models.v1alpha1_storage_spec import V1alpha1StorageSpec
@@ -38,13 +38,14 @@ class CreateAgentRequest(BaseModel):
     namespace: Optional[StrictStr] = Field(default=None, description="optional, defaults to server default")
     office_manager: Optional[StrictStr] = Field(default=None, description="set by manager MCP tool", alias="officeManager")
     pod_spec: Optional[V1PodSpec] = Field(default=None, alias="podSpec")
+    priority: Optional[StrictInt] = Field(default=None, description="queue priority; higher = admitted first")
     role: Optional[StrictStr] = Field(default=None, description="\"manager\" or \"\" (default manager)")
     secret_refs: Optional[List[StrictStr]] = Field(default=None, description="names of existing K8s Secrets to attach", alias="secretRefs")
     skills: Optional[List[StrictStr]] = Field(default=None, description="optional KomputerSkill names to attach")
     storage: Optional[V1alpha1StorageSpec] = None
     system_prompt: Optional[StrictStr] = Field(default=None, description="optional custom system prompt", alias="systemPrompt")
     template_ref: Optional[StrictStr] = Field(default=None, alias="templateRef")
-    __properties: ClassVar[List[str]] = ["connectors", "instructions", "lifecycle", "memories", "model", "name", "namespace", "officeManager", "podSpec", "role", "secretRefs", "skills", "storage", "systemPrompt", "templateRef"]
+    __properties: ClassVar[List[str]] = ["connectors", "instructions", "lifecycle", "memories", "model", "name", "namespace", "officeManager", "podSpec", "priority", "role", "secretRefs", "skills", "storage", "systemPrompt", "templateRef"]
 
     model_config = ConfigDict(
         validate_by_name=True,
@@ -112,6 +113,7 @@ class CreateAgentRequest(BaseModel):
             "namespace": obj.get("namespace"),
             "officeManager": obj.get("officeManager"),
             "podSpec": V1PodSpec.from_dict(obj["podSpec"]) if obj.get("podSpec") is not None else None,
+            "priority": obj.get("priority"),
             "role": obj.get("role"),
             "secretRefs": obj.get("secretRefs"),
             "skills": obj.get("skills"),

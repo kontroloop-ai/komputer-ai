@@ -16,6 +16,9 @@ Name | Type | Description | Notes
 **Name** | Pointer to **string** |  | [optional] 
 **Namespace** | Pointer to **string** |  | [optional] 
 **PodSpec** | Pointer to [**V1PodSpec**](V1PodSpec.md) |  | [optional] 
+**Priority** | Pointer to **int32** |  | [optional] 
+**QueuePosition** | Pointer to **int32** |  | [optional] 
+**QueueReason** | Pointer to **string** |  | [optional] 
 **Secrets** | Pointer to **[]string** | Key names from K8s Secrets (not values) | [optional] 
 **Skills** | Pointer to **[]string** | KomputerSkill names attached to this agent | [optional] 
 **Status** | Pointer to **string** |  | [optional] 
@@ -343,6 +346,81 @@ SetPodSpec sets PodSpec field to given value.
 `func (o *AgentResponse) HasPodSpec() bool`
 
 HasPodSpec returns a boolean if a field has been set.
+
+### GetPriority
+
+`func (o *AgentResponse) GetPriority() int32`
+
+GetPriority returns the Priority field if non-nil, zero value otherwise.
+
+### GetPriorityOk
+
+`func (o *AgentResponse) GetPriorityOk() (*int32, bool)`
+
+GetPriorityOk returns a tuple with the Priority field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetPriority
+
+`func (o *AgentResponse) SetPriority(v int32)`
+
+SetPriority sets Priority field to given value.
+
+### HasPriority
+
+`func (o *AgentResponse) HasPriority() bool`
+
+HasPriority returns a boolean if a field has been set.
+
+### GetQueuePosition
+
+`func (o *AgentResponse) GetQueuePosition() int32`
+
+GetQueuePosition returns the QueuePosition field if non-nil, zero value otherwise.
+
+### GetQueuePositionOk
+
+`func (o *AgentResponse) GetQueuePositionOk() (*int32, bool)`
+
+GetQueuePositionOk returns a tuple with the QueuePosition field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetQueuePosition
+
+`func (o *AgentResponse) SetQueuePosition(v int32)`
+
+SetQueuePosition sets QueuePosition field to given value.
+
+### HasQueuePosition
+
+`func (o *AgentResponse) HasQueuePosition() bool`
+
+HasQueuePosition returns a boolean if a field has been set.
+
+### GetQueueReason
+
+`func (o *AgentResponse) GetQueueReason() string`
+
+GetQueueReason returns the QueueReason field if non-nil, zero value otherwise.
+
+### GetQueueReasonOk
+
+`func (o *AgentResponse) GetQueueReasonOk() (*string, bool)`
+
+GetQueueReasonOk returns a tuple with the QueueReason field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetQueueReason
+
+`func (o *AgentResponse) SetQueueReason(v string)`
+
+SetQueueReason sets QueueReason field to given value.
+
+### HasQueueReason
+
+`func (o *AgentResponse) HasQueueReason() bool`
+
+HasQueueReason returns a boolean if a field has been set.
 
 ### GetSecrets
 

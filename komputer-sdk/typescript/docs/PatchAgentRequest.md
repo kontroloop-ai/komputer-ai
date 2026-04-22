@@ -12,6 +12,7 @@ Name | Type
 `memories` | Array&lt;string&gt;
 `model` | string
 `podSpec` | [V1PodSpec](V1PodSpec.md)
+`priority` | number
 `secretRefs` | Array&lt;string&gt;
 `skills` | Array&lt;string&gt;
 `storage` | [V1alpha1StorageSpec](V1alpha1StorageSpec.md)
@@ -31,6 +32,7 @@ const example = {
   "memories": null,
   "model": null,
   "podSpec": null,
+  "priority": null,
   "secretRefs": null,
   "skills": null,
   "storage": null,

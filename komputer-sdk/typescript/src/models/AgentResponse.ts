@@ -107,6 +107,24 @@ export interface AgentResponse {
      */
     podSpec?: V1PodSpec;
     /**
+     * 
+     * @type {number}
+     * @memberof AgentResponse
+     */
+    priority?: number;
+    /**
+     * 
+     * @type {number}
+     * @memberof AgentResponse
+     */
+    queuePosition?: number;
+    /**
+     * 
+     * @type {string}
+     * @memberof AgentResponse
+     */
+    queueReason?: string;
+    /**
      * Key names from K8s Secrets (not values)
      * @type {Array<string>}
      * @memberof AgentResponse
@@ -185,6 +203,9 @@ export function AgentResponseFromJSONTyped(json: any, ignoreDiscriminator: boole
         'name': json['name'] == null ? undefined : json['name'],
         'namespace': json['namespace'] == null ? undefined : json['namespace'],
         'podSpec': json['podSpec'] == null ? undefined : V1PodSpecFromJSON(json['podSpec']),
+        'priority': json['priority'] == null ? undefined : json['priority'],
+        'queuePosition': json['queuePosition'] == null ? undefined : json['queuePosition'],
+        'queueReason': json['queueReason'] == null ? undefined : json['queueReason'],
         'secrets': json['secrets'] == null ? undefined : json['secrets'],
         'skills': json['skills'] == null ? undefined : json['skills'],
         'status': json['status'] == null ? undefined : json['status'],
@@ -219,6 +240,9 @@ export function AgentResponseToJSONTyped(value?: AgentResponse | null, ignoreDis
         'name': value['name'],
         'namespace': value['namespace'],
         'podSpec': V1PodSpecToJSON(value['podSpec']),
+        'priority': value['priority'],
+        'queuePosition': value['queuePosition'],
+        'queueReason': value['queueReason'],
         'secrets': value['secrets'],
         'skills': value['skills'],
         'status': value['status'],

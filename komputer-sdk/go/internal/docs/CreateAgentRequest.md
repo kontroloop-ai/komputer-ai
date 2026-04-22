@@ -13,6 +13,7 @@ Name | Type | Description | Notes
 **Namespace** | Pointer to **string** | optional, defaults to server default | [optional] 
 **OfficeManager** | Pointer to **string** | set by manager MCP tool | [optional] 
 **PodSpec** | Pointer to [**V1PodSpec**](V1PodSpec.md) |  | [optional] 
+**Priority** | Pointer to **int32** | queue priority; higher &#x3D; admitted first | [optional] 
 **Role** | Pointer to **string** | \&quot;manager\&quot; or \&quot;\&quot; (default manager) | [optional] 
 **SecretRefs** | Pointer to **[]string** | names of existing K8s Secrets to attach | [optional] 
 **Skills** | Pointer to **[]string** | optional KomputerSkill names to attach | [optional] 
@@ -253,6 +254,31 @@ SetPodSpec sets PodSpec field to given value.
 `func (o *CreateAgentRequest) HasPodSpec() bool`
 
 HasPodSpec returns a boolean if a field has been set.
+
+### GetPriority
+
+`func (o *CreateAgentRequest) GetPriority() int32`
+
+GetPriority returns the Priority field if non-nil, zero value otherwise.
+
+### GetPriorityOk
+
+`func (o *CreateAgentRequest) GetPriorityOk() (*int32, bool)`
+
+GetPriorityOk returns a tuple with the Priority field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetPriority
+
+`func (o *CreateAgentRequest) SetPriority(v int32)`
+
+SetPriority sets Priority field to given value.
+
+### HasPriority
+
+`func (o *CreateAgentRequest) HasPriority() bool`
+
+HasPriority returns a boolean if a field has been set.
 
 ### GetRole
 

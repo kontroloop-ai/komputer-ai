@@ -14,6 +14,7 @@ Name | Type | Description | Notes
 **namespace** | **str** | optional, defaults to server default | [optional] 
 **office_manager** | **str** | set by manager MCP tool | [optional] 
 **pod_spec** | [**V1PodSpec**](V1PodSpec.md) |  | [optional] 
+**priority** | **int** | queue priority; higher &#x3D; admitted first | [optional] 
 **role** | **str** | \&quot;manager\&quot; or \&quot;\&quot; (default manager) | [optional] 
 **secret_refs** | **List[str]** | names of existing K8s Secrets to attach | [optional] 
 **skills** | **List[str]** | optional KomputerSkill names to attach | [optional] 

@@ -71,6 +71,12 @@ export interface PatchAgentRequest {
      */
     podSpec?: V1PodSpec;
     /**
+     * pointer so 0 vs unset is distinguishable
+     * @type {number}
+     * @memberof PatchAgentRequest
+     */
+    priority?: number;
+    /**
      * full replacement list of K8s secret names
      * @type {Array<string>}
      * @memberof PatchAgentRequest
@@ -125,6 +131,7 @@ export function PatchAgentRequestFromJSONTyped(json: any, ignoreDiscriminator: b
         'memories': json['memories'] == null ? undefined : json['memories'],
         'model': json['model'] == null ? undefined : json['model'],
         'podSpec': json['podSpec'] == null ? undefined : V1PodSpecFromJSON(json['podSpec']),
+        'priority': json['priority'] == null ? undefined : json['priority'],
         'secretRefs': json['secretRefs'] == null ? undefined : json['secretRefs'],
         'skills': json['skills'] == null ? undefined : json['skills'],
         'storage': json['storage'] == null ? undefined : V1alpha1StorageSpecFromJSON(json['storage']),
@@ -150,6 +157,7 @@ export function PatchAgentRequestToJSONTyped(value?: PatchAgentRequest | null, i
         'memories': value['memories'],
         'model': value['model'],
         'podSpec': V1PodSpecToJSON(value['podSpec']),
+        'priority': value['priority'],
         'secretRefs': value['secretRefs'],
         'skills': value['skills'],
         'storage': V1alpha1StorageSpecToJSON(value['storage']),

@@ -1,3 +1,8 @@
+export interface StorageOverride {
+  size?: string;
+  storageClassName?: string;
+}
+
 export interface AgentResponse {
   name: string;
   namespace: string;
@@ -17,6 +22,8 @@ export interface AgentResponse {
   instructions?: string;
   systemPrompt?: string;
   createdAt: string;
+  podSpec?: Record<string, unknown>;
+  storage?: StorageOverride;
 }
 
 export interface AgentListResponse {
@@ -95,6 +102,8 @@ export interface CreateAgentRequest {
   secretRefs?: string[];
   lifecycle?: '' | 'Sleep' | 'AutoDelete';
   systemPrompt?: string;
+  podSpec?: Record<string, unknown>;
+  storage?: StorageOverride;
 }
 
 export interface CreateScheduleRequest {
@@ -123,6 +132,8 @@ export interface PatchAgentRequest {
   skills?: string[];
   connectors?: string[];
   systemPrompt?: string;
+  podSpec?: Record<string, unknown>;
+  storage?: StorageOverride;
 }
 
 export interface ConnectorResponse {

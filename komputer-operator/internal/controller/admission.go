@@ -30,7 +30,7 @@ import (
 
 type admissionDecision struct {
 	Admit    bool
-	Position int32  // 1-based when not admitted; 0 when admitted
+	Position int32 // 1-based when not admitted; 0 when admitted
 	Reason   string
 }
 
@@ -56,10 +56,11 @@ func evaluateAdmission(agent *komputerv1alpha1.KomputerAgent, siblings []kompute
 			running++
 		}
 	}
-	if running < cap {
-		return admissionDecision{Admit: true}
-	}
 
+	// Build the contender list (this agent + all queued/pending siblings) and
+	// sort by priority then creationTimestamp. The agent is admitted only if it
+	// ranks within the available open slots — otherwise a higher-priority
+	// sibling could be queued behind it after a slot just opened up.
 	contenders := []komputerv1alpha1.KomputerAgent{*agent}
 	for _, s := range siblings {
 		if s.Name == agent.Name {
@@ -77,7 +78,12 @@ func evaluateAdmission(agent *komputerv1alpha1.KomputerAgent, siblings []kompute
 		if contenders[i].Spec.Priority != contenders[j].Spec.Priority {
 			return contenders[i].Spec.Priority > contenders[j].Spec.Priority
 		}
-		return contenders[i].CreationTimestamp.Before(&contenders[j].CreationTimestamp)
+		if !contenders[i].CreationTimestamp.Equal(&contenders[j].CreationTimestamp) {
+			return contenders[i].CreationTimestamp.Before(&contenders[j].CreationTimestamp)
+		}
+		// Sub-second tie-breaker so identical creationTimestamps don't yield
+		// non-deterministic ordering.
+		return contenders[i].Name < contenders[j].Name
 	})
 
 	pos := int32(1)
@@ -86,6 +92,13 @@ func evaluateAdmission(agent *komputerv1alpha1.KomputerAgent, siblings []kompute
 			break
 		}
 		pos++
+	}
+
+	// Open slots = cap - running. Admit this agent only if its rank is within
+	// the open slots.
+	openSlots := cap - running
+	if openSlots > 0 && pos <= openSlots {
+		return admissionDecision{Admit: true}
 	}
 	return admissionDecision{
 		Admit:    false,

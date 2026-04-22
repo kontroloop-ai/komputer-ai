@@ -48,4 +48,4 @@ Each message is a new task on the same agent. The agent remembers its workspace 
 - **No `lifecycle` field** — the pod stays running between tasks, ready for the next one
 - **Workspace persistence** — `/workspace` is a PVC that survives pod restarts and task completions
 - **Session continuity** — Claude remembers the conversation history across tasks on the same agent
-- **409 Conflict** — sending a task while the agent is busy returns a conflict error; wait for completion first
+- **Session steering** — sending a task while the agent is busy allows to agent to pivot during a task

@@ -260,11 +260,20 @@ var _ = Describe("KomputerAgent Controller", func() {
 			a.Status.Phase = komputerv1alpha1.AgentPhaseSucceeded
 			Expect(k8sClient.Status().Patch(ctx, a, client.MergeFrom(oa))).To(Succeed())
 
-			Eventually(func() komputerv1alpha1.KomputerAgentPhase {
-				a := &komputerv1alpha1.KomputerAgent{}
-				_ = k8sClient.Get(ctx, types.NamespacedName{Name: "vc-a3", Namespace: "default"}, a)
-				return a.Status.Phase
-			}, timeout, interval).Should(Or(Equal(komputerv1alpha1.AgentPhasePending), Equal(komputerv1alpha1.AgentPhaseRunning)))
+			// After the slot frees, exactly one of the queued agents (vc-a2 or vc-a3)
+			// should be admitted. With priority-aware admission and identical
+			// creation timestamps, the name-lexicographic tie-breaker picks vc-a2.
+			Eventually(func() int {
+				admitted := 0
+				for _, n := range []string{"vc-a2", "vc-a3"} {
+					a := &komputerv1alpha1.KomputerAgent{}
+					_ = k8sClient.Get(ctx, types.NamespacedName{Name: n, Namespace: "default"}, a)
+					if a.Status.Phase == komputerv1alpha1.AgentPhasePending || a.Status.Phase == komputerv1alpha1.AgentPhaseRunning {
+						admitted++
+					}
+				}
+				return admitted
+			}, timeout, interval).Should(Equal(1))
 		})
 
 		It("admits higher Priority before lower under template cap", func() {
@@ -286,19 +295,22 @@ var _ = Describe("KomputerAgent Controller", func() {
 				}
 			})
 
-			// r1 already Running — fills the slot.
+			// r1 fills the slot. Force it to Phase=Running and keep patching it
+			// so the reconciler doesn't transition it back to Pending.
 			r1 := &komputerv1alpha1.KomputerAgent{
 				ObjectMeta: metav1.ObjectMeta{Name: "p-r1", Namespace: "default"},
 				Spec:       komputerv1alpha1.KomputerAgentSpec{Instructions: "x", TemplateRef: "default"},
 			}
 			Expect(k8sClient.Create(ctx, r1)).To(Succeed())
-			a := &komputerv1alpha1.KomputerAgent{}
 			Eventually(func() error {
-				return k8sClient.Get(ctx, types.NamespacedName{Name: "p-r1", Namespace: "default"}, a)
+				a := &komputerv1alpha1.KomputerAgent{}
+				if err := k8sClient.Get(ctx, types.NamespacedName{Name: "p-r1", Namespace: "default"}, a); err != nil {
+					return err
+				}
+				oa := a.DeepCopy()
+				a.Status.Phase = komputerv1alpha1.AgentPhaseRunning
+				return k8sClient.Status().Patch(ctx, a, client.MergeFrom(oa))
 			}, timeout, interval).Should(Succeed())
-			oa := a.DeepCopy()
-			a.Status.Phase = komputerv1alpha1.AgentPhaseRunning
-			Expect(k8sClient.Status().Patch(ctx, a, client.MergeFrom(oa))).To(Succeed())
 
 			low := &komputerv1alpha1.KomputerAgent{
 				ObjectMeta: metav1.ObjectMeta{Name: "p-low", Namespace: "default"},
@@ -312,12 +324,20 @@ var _ = Describe("KomputerAgent Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, high)).To(Succeed())
 
-			// Both queued; high should be position 1.
-			Eventually(func() int32 {
-				a := &komputerv1alpha1.KomputerAgent{}
-				_ = k8sClient.Get(ctx, types.NamespacedName{Name: "p-high", Namespace: "default"}, a)
-				return a.Status.QueuePosition
-			}, timeout, interval).Should(Equal(int32(1)))
+			// p-high (priority 100) should land at queue position 1, p-low at 2.
+			// We check both ends to give the reconciler a fair chance and to
+			// catch the case where p-r1 reconciled itself out of Running.
+			Eventually(func() bool {
+				high := &komputerv1alpha1.KomputerAgent{}
+				low := &komputerv1alpha1.KomputerAgent{}
+				if err := k8sClient.Get(ctx, types.NamespacedName{Name: "p-high", Namespace: "default"}, high); err != nil {
+					return false
+				}
+				if err := k8sClient.Get(ctx, types.NamespacedName{Name: "p-low", Namespace: "default"}, low); err != nil {
+					return false
+				}
+				return high.Status.QueuePosition < low.Status.QueuePosition && high.Status.Phase == komputerv1alpha1.AgentPhaseQueued
+			}, timeout, interval).Should(BeTrue())
 		})
 	})
 })

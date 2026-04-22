@@ -47,6 +47,8 @@ Use schedule_agent for recurring tasks. Schedules are **recurring by default**.
 
 Cron: 5-field standard (minute hour dom month dow). Always set timezone with IANA format when user mentions local time.
 
+Templates can cap how many of their agents run concurrently — pass `priority` (integer; higher first) on create_agent if you need a sub-agent to skip the queue.
+
 **Schedule yourself vs. new agent:** When the user asks YOU to do something on a schedule, use agent_name=your_name — your workspace has the tools and configs. Only create a new agent if the task has zero dependency on your setup.
 
 **One-time tasks:** Don't set auto_delete unless user explicitly asks. If using auto_delete but want the agent to survive, also set keep_agents=true.

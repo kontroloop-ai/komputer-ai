@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	komputerv1alpha1 "github.com/komputer-ai/komputer-operator/api/v1alpha1"
@@ -58,6 +59,31 @@ func TestApplyAgentOverrides_PodSpecOverride(t *testing.T) {
 	out := applyAgentOverrides(tpl, agent)
 	if out.Spec.PodSpec.Containers[0].Image != "custom:latest" {
 		t.Fatalf("podSpec not overridden: %s", out.Spec.PodSpec.Containers[0].Image)
+	}
+}
+
+func TestApplyAgentOverrides_PartialContainerMerge_PreservesImage(t *testing.T) {
+	tpl := tplFixture()
+	agent := &komputerv1alpha1.KomputerAgent{
+		Spec: komputerv1alpha1.KomputerAgentSpec{
+			PodSpec: &corev1.PodSpec{
+				Containers: []corev1.Container{{
+					Name: "agent",
+					Resources: corev1.ResourceRequirements{
+						Limits:   corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("4Gi")},
+						Requests: corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("4Gi")},
+					},
+				}},
+			},
+		},
+	}
+	out := applyAgentOverrides(tpl, agent)
+	c := out.Spec.PodSpec.Containers[0]
+	if c.Image != "img:v1" {
+		t.Fatalf("image should be preserved from template, got %q", c.Image)
+	}
+	if got := c.Resources.Limits[corev1.ResourceMemory]; got.String() != "4Gi" {
+		t.Fatalf("memory limit not merged, got %s", got.String())
 	}
 }
 

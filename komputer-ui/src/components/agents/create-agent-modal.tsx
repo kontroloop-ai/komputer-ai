@@ -63,6 +63,10 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
   const [showAllSecrets, setShowAllSecrets] = useState(false);
   const [createSecretOpen, setCreateSecretOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [cpu, setCpu] = useState("");
+  const [memoryLimit, setMemoryLimit] = useState("");
+  const [storageSize, setStorageSize] = useState("");
+  const [image, setImage] = useState("");
   const advancedRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -83,6 +87,10 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
     setSelectedSkills([]);
     setSelectedConnectors([]);
     setAdvancedOpen(false);
+    setCpu("");
+    setMemoryLimit("");
+    setStorageSize("");
+    setImage("");
     setError(null);
   }
 
@@ -150,6 +158,20 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
     setError(null);
 
     try {
+      // Build podSpec override from cpu/memory/image inputs.
+      let podSpecOverride: Record<string, unknown> | undefined;
+      if (cpu.trim() || memoryLimit.trim() || image.trim()) {
+        const container: Record<string, unknown> = { name: "agent" };
+        if (image.trim()) container.image = image.trim();
+        if (cpu.trim() || memoryLimit.trim()) {
+          const rl: Record<string, string> = {};
+          if (cpu.trim()) rl.cpu = cpu.trim();
+          if (memoryLimit.trim()) rl.memory = memoryLimit.trim();
+          container.resources = { requests: rl, limits: rl };
+        }
+        podSpecOverride = { containers: [container] };
+      }
+
       const req: CreateAgentRequest = {
         name: name.trim(),
         instructions: instructions.trim(),
@@ -163,6 +185,8 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
         skills: selectedSkills.length > 0 ? selectedSkills : undefined,
         connectors: selectedConnectors.length > 0 ? selectedConnectors : undefined,
         systemPrompt: systemPrompt.trim() || undefined,
+        podSpec: podSpecOverride,
+        storage: storageSize.trim() ? { size: storageSize.trim() } : undefined,
       };
       await createAgent(req);
       const agentName = name.trim();
@@ -371,6 +395,50 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
                     }}
                   >
                     <div className="border-t border-[var(--color-border)] px-3 py-3 flex flex-col gap-4">
+                      {/* Resource overrides */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1.5">
+                          <Label htmlFor="agent-cpu">CPU</Label>
+                          <Input
+                            id="agent-cpu"
+                            placeholder="e.g. 2 or 500m"
+                            value={cpu}
+                            onChange={(e) => setCpu(e.target.value)}
+                            autoComplete="off"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <Label htmlFor="agent-memory">Memory</Label>
+                          <Input
+                            id="agent-memory"
+                            placeholder="e.g. 4Gi"
+                            value={memoryLimit}
+                            onChange={(e) => setMemoryLimit(e.target.value)}
+                            autoComplete="off"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <Label htmlFor="agent-storage">Storage</Label>
+                          <Input
+                            id="agent-storage"
+                            placeholder="e.g. 20Gi"
+                            value={storageSize}
+                            onChange={(e) => setStorageSize(e.target.value)}
+                            autoComplete="off"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <Label htmlFor="agent-image">Container Image</Label>
+                          <Input
+                            id="agent-image"
+                            placeholder="e.g. custom:latest"
+                            value={image}
+                            onChange={(e) => setImage(e.target.value)}
+                            autoComplete="off"
+                          />
+                        </div>
+                      </div>
+
                       <div className="flex flex-col gap-1.5">
                         <Label>Template</Label>
                         <Select value={templateRef} onValueChange={(v) => v && setTemplateRef(v)}>

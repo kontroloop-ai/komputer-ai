@@ -10,7 +10,10 @@ on:
 jobs:
   regenerate:
     name: Regenerate SDKs
-    if: inputs.is_tag != 'true' && github.actor != 'sdk-bot-komputer-ai[bot]'
+    # Skip on pull_request — the regen step needs to git push the result, which
+    # fails on PR-event checkouts (detached HEAD). PRs are validated by the
+    # other build jobs; SDK regeneration runs on push to main.
+    if: inputs.is_tag != 'true' && github.event_name != 'pull_request' && github.actor != 'sdk-bot-komputer-ai[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Create GitHub App token

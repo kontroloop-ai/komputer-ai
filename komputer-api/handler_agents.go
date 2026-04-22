@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	komputerv1alpha1 "github.com/komputer-ai/komputer-operator/api/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -27,6 +28,8 @@ type CreateAgentRequest struct {
 	Lifecycle     string   `json:"lifecycle"`     // "", "Sleep", or "AutoDelete"
 	OfficeManager string   `json:"officeManager"` // set by manager MCP tool
 	SystemPrompt  string   `json:"systemPrompt"`  // optional custom system prompt
+	PodSpec      *corev1.PodSpec               `json:"podSpec,omitempty"`
+	Storage      *komputerv1alpha1.StorageSpec `json:"storage,omitempty"`
 }
 
 type AgentResponse struct {
@@ -48,6 +51,8 @@ type AgentResponse struct {
 	Instructions    string   `json:"instructions,omitempty"` // User task (spec.instructions)
 	SystemPrompt    string   `json:"systemPrompt,omitempty"` // Custom system prompt (spec.systemPrompt)
 	CreatedAt       string   `json:"createdAt"`
+	PodSpec         *corev1.PodSpec               `json:"podSpec,omitempty"`
+	Storage         *komputerv1alpha1.StorageSpec `json:"storage,omitempty"`
 }
 
 // mergeDefaultSkills adds default skill names to the explicit list, deduplicating.
@@ -79,6 +84,8 @@ type PatchAgentRequest struct {
 	Skills       *[]string `json:"skills,omitempty"`      // skill names to attach
 	Connectors   *[]string `json:"connectors,omitempty"`  // connector names to attach
 	SystemPrompt *string   `json:"systemPrompt,omitempty"` // custom system prompt
+	PodSpec      *corev1.PodSpec               `json:"podSpec,omitempty"`
+	Storage      *komputerv1alpha1.StorageSpec `json:"storage,omitempty"`
 }
 
 // createOrTriggerAgent creates a new agent or sends a task to an existing one.
@@ -180,6 +187,8 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 					Instructions:    existing.Spec.Instructions,
 					SystemPrompt:    existing.Spec.SystemPrompt,
 					CreatedAt:       existing.CreationTimestamp.UTC().Format(time.RFC3339),
+					PodSpec:         existing.Spec.PodSpec,
+					Storage:         existing.Spec.Storage,
 				})
 				return
 			}
@@ -245,6 +254,8 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 				Instructions:    existing.Spec.Instructions,
 				SystemPrompt:    existing.Spec.SystemPrompt,
 				CreatedAt:       existing.CreationTimestamp.UTC().Format(time.RFC3339),
+				PodSpec:         existing.Spec.PodSpec,
+				Storage:         existing.Spec.Storage,
 			})
 			return
 		}
@@ -271,7 +282,7 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 			}
 		}
 
-		agent, err := k8s.CreateAgent(c.Request.Context(), ns, req.Name, instructions, buildInternalSystemPrompt(req.Memories), req.SystemPrompt, req.Model, req.TemplateRef, role, req.SecretRefs, req.Memories, req.Skills, connectors, req.Lifecycle, req.OfficeManager)
+		agent, err := k8s.CreateAgent(c.Request.Context(), ns, req.Name, instructions, buildInternalSystemPrompt(req.Memories), req.SystemPrompt, req.Model, req.TemplateRef, role, req.SecretRefs, req.Memories, req.Skills, connectors, req.Lifecycle, req.OfficeManager, req.PodSpec, req.Storage)
 		if err != nil {
 			if errors.IsAlreadyExists(err) {
 				c.JSON(http.StatusConflict, gin.H{"error": "agent already exists: " + req.Name})
@@ -297,6 +308,8 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 			CreatedAt:    agent.CreationTimestamp.UTC().Format(time.RFC3339),
 			TotalTokens:        agent.Status.TotalTokens,
 			ModelContextWindow: agent.Status.ModelContextWindow,
+			PodSpec:      agent.Spec.PodSpec,
+			Storage:      agent.Spec.Storage,
 		})
 	}
 }
@@ -428,6 +441,8 @@ func getAgent(k8s *K8sClient) gin.HandlerFunc {
 			Instructions:       agent.Spec.Instructions,
 			SystemPrompt:       agent.Spec.SystemPrompt,
 			CreatedAt:          agent.CreationTimestamp.UTC().Format(time.RFC3339),
+			PodSpec:            agent.Spec.PodSpec,
+			Storage:            agent.Spec.Storage,
 		})
 	}
 }
@@ -550,6 +565,8 @@ func listAgents(k8s *K8sClient) gin.HandlerFunc {
 				Instructions:       a.Spec.Instructions,
 				SystemPrompt:       a.Spec.SystemPrompt,
 				CreatedAt:          a.CreationTimestamp.UTC().Format(time.RFC3339),
+				PodSpec:            a.Spec.PodSpec,
+				Storage:            a.Spec.Storage,
 			})
 		}
 
@@ -582,7 +599,7 @@ func patchAgent(k8s *K8sClient) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: " + err.Error()})
 			return
 		}
-		if req.Model == nil && req.Lifecycle == nil && req.Instructions == nil && req.TemplateRef == nil && req.SecretRefs == nil && req.Memories == nil && req.Skills == nil && req.Connectors == nil && req.SystemPrompt == nil {
+		if req.Model == nil && req.Lifecycle == nil && req.Instructions == nil && req.TemplateRef == nil && req.SecretRefs == nil && req.Memories == nil && req.Skills == nil && req.Connectors == nil && req.SystemPrompt == nil && req.PodSpec == nil && req.Storage == nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "no fields to update"})
 			return
 		}
@@ -591,6 +608,14 @@ func patchAgent(k8s *K8sClient) gin.HandlerFunc {
 		if err := k8s.PatchAgentSpec(c.Request.Context(), ns, name, req.Model, req.Lifecycle, req.Instructions, req.TemplateRef, req.SystemPrompt); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to patch agent: " + err.Error()})
 			return
+		}
+
+		// 1a-override. Patch podSpec / storage overrides if provided.
+		if req.PodSpec != nil || req.Storage != nil {
+			if err := k8s.PatchAgentOverrides(c.Request.Context(), ns, name, req.PodSpec, req.Storage); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to patch agent overrides: " + err.Error()})
+				return
+			}
 		}
 
 		// 1a. If model changed and pod is running, fetch context window via the agent (it has the API key).
@@ -707,6 +732,8 @@ func patchAgent(k8s *K8sClient) gin.HandlerFunc {
 			SystemPrompt:       updated.Spec.SystemPrompt,
 			Connectors:         updated.Spec.Connectors,
 			CreatedAt:          updated.CreationTimestamp.UTC().Format(time.RFC3339),
+			PodSpec:            updated.Spec.PodSpec,
+			Storage:            updated.Spec.Storage,
 		})
 	}
 }

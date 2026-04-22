@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -102,6 +103,15 @@ type KomputerAgentSpec struct {
 	// When set, the operator creates/joins a KomputerOffice for the group.
 	// +optional
 	OfficeManager string `json:"officeManager,omitempty"`
+	// PodSpec, when set, overrides the template's PodSpec for this agent.
+	// The full corev1.PodSpec is replaced — there is no field-level merge.
+	// Takes effect on next pod start (existing pods are not mutated).
+	// +optional
+	PodSpec *corev1.PodSpec `json:"podSpec,omitempty"`
+	// Storage, when set, overrides the template's storage settings for this agent.
+	// Used at PVC creation time; existing PVCs are not resized.
+	// +optional
+	Storage *StorageSpec `json:"storage,omitempty"`
 }
 
 // KomputerAgentStatus defines the observed state of KomputerAgent.

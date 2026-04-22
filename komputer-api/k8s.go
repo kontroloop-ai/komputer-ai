@@ -312,12 +312,38 @@ func (k *K8sClient) PatchAgentOverrides(ctx context.Context, ns, agentName strin
 	}
 	original := agent.DeepCopy()
 	if podSpec != nil {
-		agent.Spec.PodSpec = podSpec
+		if isEmptyPodSpec(podSpec) {
+			agent.Spec.PodSpec = nil
+		} else {
+			agent.Spec.PodSpec = podSpec
+		}
 	}
 	if storage != nil {
-		agent.Spec.Storage = storage
+		if storage.Size == "" && storage.StorageClassName == nil {
+			agent.Spec.Storage = nil
+		} else {
+			agent.Spec.Storage = storage
+		}
 	}
 	return k.client.Patch(ctx, agent, client.MergeFrom(original))
+}
+
+// isEmptyPodSpec reports whether a PodSpec contains no override fields. Used to
+// interpret an empty `{}` from a client as "clear the override".
+func isEmptyPodSpec(p *corev1.PodSpec) bool {
+	if p == nil {
+		return true
+	}
+	if len(p.Containers) > 0 || len(p.InitContainers) > 0 || len(p.Volumes) > 0 {
+		return false
+	}
+	if p.NodeSelector != nil || p.Tolerations != nil || p.Affinity != nil {
+		return false
+	}
+	if p.PriorityClassName != "" || p.RuntimeClassName != nil || p.ServiceAccountName != "" {
+		return false
+	}
+	return true
 }
 
 func (k *K8sClient) ListNamespaces(ctx context.Context) ([]string, error) {

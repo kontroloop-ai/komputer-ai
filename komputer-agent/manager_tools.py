@@ -389,17 +389,17 @@ async def attach_skill(args):
 
 @tool(
     name="update_agent",
-    description="Update a sub-agent's spec (model, instructions, cpu, memory, storage, image). Changes apply to the next pod start — running pods are not mutated. Use Sleep+wake if you want changes to take effect now.",
+    description="Update a sub-agent's spec (model, instructions, cpu, memory, storage, image). Changes apply to the next pod start — running pods are not mutated. Use Sleep+wake if you want changes to take effect now. To remove an override and revert to the template default, pass the field as an empty string (e.g. cpu='' or storage='').",
     input_schema={
         "type": "object",
         "properties": {
             "name": {"type": "string", "description": "Sub-agent name (as passed to create_agent)."},
             "instructions": {"type": "string", "description": "New task instructions (optional)."},
             "model": {"type": "string", "description": "Override Claude model (optional)."},
-            "cpu": {"type": "string", "description": "CPU (e.g. '2' or '500m'). Sets both requests and limits."},
-            "memory": {"type": "string", "description": "Memory (e.g. '4Gi'). Sets both requests and limits."},
-            "storage": {"type": "string", "description": "PVC size (e.g. '20Gi'). New PVCs only — existing PVCs are not resized."},
-            "image": {"type": "string", "description": "Override agent container image."},
+            "cpu": {"type": "string", "description": "CPU (e.g. '2' or '500m'). Sets both requests and limits. Empty string clears the resources override."},
+            "memory": {"type": "string", "description": "Memory (e.g. '4Gi'). Sets both requests and limits. Empty string clears the resources override."},
+            "storage": {"type": "string", "description": "PVC size (e.g. '20Gi'). Empty string clears the storage override."},
+            "image": {"type": "string", "description": "Override agent container image. Empty string clears the resources override."},
         },
         "required": ["name"],
     },
@@ -411,21 +411,31 @@ async def update_agent(args):
         payload["instructions"] = args["instructions"]
     if args.get("model"):
         payload["model"] = args["model"]
-    if args.get("storage"):
-        payload["storage"] = {"size": args["storage"]}
-    if args.get("cpu") or args.get("memory") or args.get("image"):
-        container = {"name": "agent"}
-        if args.get("image"):
-            container["image"] = args["image"]
-        if args.get("cpu") or args.get("memory"):
-            rl = {}
-            if args.get("cpu"):
-                rl["cpu"] = args["cpu"]
-            if args.get("memory"):
-                rl["memory"] = args["memory"]
-            # Same value for both requests and limits.
-            container["resources"] = {"requests": dict(rl), "limits": dict(rl)}
-        payload["podSpec"] = {"containers": [container]}
+
+    # Storage: empty string ("") = clear; non-empty = set; missing key = no change.
+    if "storage" in args:
+        payload["storage"] = {} if args["storage"] == "" else {"size": args["storage"]}
+
+    # Resources/image: any of cpu/memory/image present with empty value = clear;
+    # any present with a value = build override. Mixing is treated as clear (safer default).
+    keys = [k for k in ("cpu", "memory", "image") if k in args]
+    if keys:
+        if any(args[k] == "" for k in keys):
+            payload["podSpec"] = {}
+        else:
+            container = {"name": "agent"}
+            if args.get("image"):
+                container["image"] = args["image"]
+            if args.get("cpu") or args.get("memory"):
+                rl = {}
+                if args.get("cpu"):
+                    rl["cpu"] = args["cpu"]
+                if args.get("memory"):
+                    rl["memory"] = args["memory"]
+                # Same value for both requests and limits.
+                container["resources"] = {"requests": dict(rl), "limits": dict(rl)}
+            payload["podSpec"] = {"containers": [container]}
+
     if not payload:
         return _err("update_agent requires at least one field to update")
     return await _request("PATCH", f"/api/v1/agents/{full_name}", timeout=30, json=payload)

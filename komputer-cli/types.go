@@ -13,6 +13,9 @@ type AgentResponse struct {
 	LastTaskCostUSD string `json:"lastTaskCostUSD"`
 	TotalCostUSD    string `json:"totalCostUSD"`
 	CreatedAt       string `json:"createdAt"`
+	Priority        int32  `json:"priority"`
+	QueuePosition   int32  `json:"queuePosition"`
+	QueueReason     string `json:"queueReason"`
 }
 
 type AgentListResponse struct {

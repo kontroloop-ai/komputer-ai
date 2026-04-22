@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -104,11 +105,21 @@ type KomputerAgentSpec struct {
 	// +optional
 	OfficeManager string `json:"officeManager,omitempty"`
 	// Priority controls admission order when the template's maxConcurrentAgents
-	// cap is reached. Higher number = admitted first (matches K8s PodPriority).
+	// limit is reached. Higher number = admitted first (matches K8s PodPriority).
 	// Ties broken by creationTimestamp (older first). Defaults to 0.
 	// +kubebuilder:default=0
 	// +optional
 	Priority int32 `json:"priority,omitempty"`
+	// PodSpec, when set, overrides the template's PodSpec for this agent.
+	// Container fields are merged by name; non-zero fields from this PodSpec
+	// override the template's container fields. Takes effect on next pod start
+	// (existing pods are not mutated).
+	// +optional
+	PodSpec *corev1.PodSpec `json:"podSpec,omitempty"`
+	// Storage, when set, overrides the template's storage settings for this agent.
+	// Existing PVCs are expanded in place when the storage class supports it.
+	// +optional
+	Storage *StorageSpec `json:"storage,omitempty"`
 }
 
 // KomputerAgentStatus defines the observed state of KomputerAgent.

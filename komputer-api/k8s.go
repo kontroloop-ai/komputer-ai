@@ -259,7 +259,7 @@ func (k *K8sClient) UpdateManagedSecret(ctx context.Context, ns, name string, da
 	return secret, nil
 }
 
-func (k *K8sClient) CreateAgent(ctx context.Context, ns, name, instructions, internalSystemPrompt, systemPrompt, model, templateRef, role string, secretNames []string, memories []string, skills []string, connectors []string, lifecycle, officeManager string, priority int32) (*komputerv1alpha1.KomputerAgent, error) {
+func (k *K8sClient) CreateAgent(ctx context.Context, ns, name, instructions, internalSystemPrompt, systemPrompt, model, templateRef, role string, secretNames []string, memories []string, skills []string, connectors []string, lifecycle, officeManager string, priority int32, podSpec *corev1.PodSpec, storage *komputerv1alpha1.StorageSpec) (*komputerv1alpha1.KomputerAgent, error) {
 	if model == "" {
 		model = "claude-sonnet-4-6"
 	}
@@ -289,6 +289,8 @@ func (k *K8sClient) CreateAgent(ctx context.Context, ns, name, instructions, int
 			Lifecycle:            komputerv1alpha1.AgentLifecycle(lifecycle),
 			OfficeManager:        officeManager,
 			Priority:             priority,
+			PodSpec:              podSpec,
+			Storage:              storage,
 		},
 	}
 
@@ -300,6 +302,49 @@ func (k *K8sClient) CreateAgent(ctx context.Context, ns, name, instructions, int
 		return nil, err
 	}
 	return agent, nil
+}
+
+// PatchAgentOverrides patches the podSpec and/or storage overrides on a KomputerAgent CR.
+func (k *K8sClient) PatchAgentOverrides(ctx context.Context, ns, agentName string, podSpec *corev1.PodSpec, storage *komputerv1alpha1.StorageSpec) error {
+	agent := &komputerv1alpha1.KomputerAgent{}
+	key := types.NamespacedName{Name: agentName, Namespace: ns}
+	if err := k.client.Get(ctx, key, agent); err != nil {
+		return fmt.Errorf("failed to get agent %s: %w", agentName, err)
+	}
+	original := agent.DeepCopy()
+	if podSpec != nil {
+		if isEmptyPodSpec(podSpec) {
+			agent.Spec.PodSpec = nil
+		} else {
+			agent.Spec.PodSpec = podSpec
+		}
+	}
+	if storage != nil {
+		if storage.Size == "" && storage.StorageClassName == nil {
+			agent.Spec.Storage = nil
+		} else {
+			agent.Spec.Storage = storage
+		}
+	}
+	return k.client.Patch(ctx, agent, client.MergeFrom(original))
+}
+
+// isEmptyPodSpec reports whether a PodSpec contains no override fields. Used to
+// interpret an empty `{}` from a client as "clear the override".
+func isEmptyPodSpec(p *corev1.PodSpec) bool {
+	if p == nil {
+		return true
+	}
+	if len(p.Containers) > 0 || len(p.InitContainers) > 0 || len(p.Volumes) > 0 {
+		return false
+	}
+	if p.NodeSelector != nil || p.Tolerations != nil || p.Affinity != nil {
+		return false
+	}
+	if p.PriorityClassName != "" || p.RuntimeClassName != nil || p.ServiceAccountName != "" {
+		return false
+	}
+	return true
 }
 
 func (k *K8sClient) ListNamespaces(ctx context.Context) ([]string, error) {

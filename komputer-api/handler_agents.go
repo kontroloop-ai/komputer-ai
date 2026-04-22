@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	komputerv1alpha1 "github.com/komputer-ai/komputer-operator/api/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -28,7 +29,9 @@ type CreateAgentRequest struct {
 	Lifecycle     string   `json:"lifecycle"`     // "", "Sleep", or "AutoDelete"
 	OfficeManager string   `json:"officeManager"` // set by manager MCP tool
 	SystemPrompt  string   `json:"systemPrompt"`  // optional custom system prompt
-	Priority     int32    `json:"priority,omitempty"` // queue priority; higher = admitted first
+	Priority      int32    `json:"priority,omitempty"` // queue priority; higher = admitted first
+	PodSpec       *corev1.PodSpec               `json:"podSpec,omitempty"`
+	Storage       *komputerv1alpha1.StorageSpec `json:"storage,omitempty"`
 }
 
 type AgentResponse struct {
@@ -53,6 +56,8 @@ type AgentResponse struct {
 	Priority        int32    `json:"priority"`
 	QueuePosition   int32    `json:"queuePosition,omitempty"`
 	QueueReason     string   `json:"queueReason,omitempty"`
+	PodSpec         *corev1.PodSpec               `json:"podSpec,omitempty"`
+	Storage         *komputerv1alpha1.StorageSpec `json:"storage,omitempty"`
 }
 
 // mergeDefaultSkills adds default skill names to the explicit list, deduplicating.
@@ -85,6 +90,8 @@ type PatchAgentRequest struct {
 	Connectors   *[]string `json:"connectors,omitempty"`  // connector names to attach
 	SystemPrompt *string   `json:"systemPrompt,omitempty"` // custom system prompt
 	Priority     *int32    `json:"priority,omitempty"`    // pointer so 0 vs unset is distinguishable
+	PodSpec      *corev1.PodSpec               `json:"podSpec,omitempty"`
+	Storage      *komputerv1alpha1.StorageSpec `json:"storage,omitempty"`
 }
 
 // createOrTriggerAgent creates a new agent or sends a task to an existing one.
@@ -189,6 +196,8 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 					Priority:        existing.Spec.Priority,
 					QueuePosition:   existing.Status.QueuePosition,
 					QueueReason:     existing.Status.QueueReason,
+					PodSpec:         existing.Spec.PodSpec,
+					Storage:         existing.Spec.Storage,
 				})
 				return
 			}
@@ -257,6 +266,8 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 				Priority:        existing.Spec.Priority,
 				QueuePosition:   existing.Status.QueuePosition,
 				QueueReason:     existing.Status.QueueReason,
+				PodSpec:         existing.Spec.PodSpec,
+				Storage:         existing.Spec.Storage,
 			})
 			return
 		}
@@ -283,7 +294,7 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 			}
 		}
 
-		agent, err := k8s.CreateAgent(c.Request.Context(), ns, req.Name, instructions, buildInternalSystemPrompt(req.Memories), req.SystemPrompt, req.Model, req.TemplateRef, role, req.SecretRefs, req.Memories, req.Skills, connectors, req.Lifecycle, req.OfficeManager, req.Priority)
+		agent, err := k8s.CreateAgent(c.Request.Context(), ns, req.Name, instructions, buildInternalSystemPrompt(req.Memories), req.SystemPrompt, req.Model, req.TemplateRef, role, req.SecretRefs, req.Memories, req.Skills, connectors, req.Lifecycle, req.OfficeManager, req.Priority, req.PodSpec, req.Storage)
 		if err != nil {
 			if errors.IsAlreadyExists(err) {
 				c.JSON(http.StatusConflict, gin.H{"error": "agent already exists: " + req.Name})
@@ -310,6 +321,8 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 			TotalTokens:        agent.Status.TotalTokens,
 			ModelContextWindow: agent.Status.ModelContextWindow,
 			Priority:     agent.Spec.Priority,
+			PodSpec:      agent.Spec.PodSpec,
+			Storage:      agent.Spec.Storage,
 		})
 	}
 }
@@ -444,6 +457,8 @@ func getAgent(k8s *K8sClient) gin.HandlerFunc {
 			Priority:           agent.Spec.Priority,
 			QueuePosition:      agent.Status.QueuePosition,
 			QueueReason:        agent.Status.QueueReason,
+			PodSpec:            agent.Spec.PodSpec,
+			Storage:            agent.Spec.Storage,
 		})
 	}
 }
@@ -573,6 +588,8 @@ func listAgents(k8s *K8sClient) gin.HandlerFunc {
 				Priority:           a.Spec.Priority,
 				QueuePosition:      a.Status.QueuePosition,
 				QueueReason:        a.Status.QueueReason,
+				PodSpec:            a.Spec.PodSpec,
+				Storage:            a.Spec.Storage,
 			})
 		}
 
@@ -605,7 +622,7 @@ func patchAgent(k8s *K8sClient) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: " + err.Error()})
 			return
 		}
-		if req.Model == nil && req.Lifecycle == nil && req.Instructions == nil && req.TemplateRef == nil && req.SecretRefs == nil && req.Memories == nil && req.Skills == nil && req.Connectors == nil && req.SystemPrompt == nil && req.Priority == nil {
+		if req.Model == nil && req.Lifecycle == nil && req.Instructions == nil && req.TemplateRef == nil && req.SecretRefs == nil && req.Memories == nil && req.Skills == nil && req.Connectors == nil && req.SystemPrompt == nil && req.Priority == nil && req.PodSpec == nil && req.Storage == nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "no fields to update"})
 			return
 		}
@@ -614,6 +631,14 @@ func patchAgent(k8s *K8sClient) gin.HandlerFunc {
 		if err := k8s.PatchAgentSpec(c.Request.Context(), ns, name, req.Model, req.Lifecycle, req.Instructions, req.TemplateRef, req.SystemPrompt, req.Priority); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to patch agent: " + err.Error()})
 			return
+		}
+
+		// 1a-override. Patch podSpec / storage overrides if provided.
+		if req.PodSpec != nil || req.Storage != nil {
+			if err := k8s.PatchAgentOverrides(c.Request.Context(), ns, name, req.PodSpec, req.Storage); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to patch agent overrides: " + err.Error()})
+				return
+			}
 		}
 
 		// 1a. If model changed and pod is running, fetch context window via the agent (it has the API key).
@@ -733,6 +758,8 @@ func patchAgent(k8s *K8sClient) gin.HandlerFunc {
 			Priority:           updated.Spec.Priority,
 			QueuePosition:      updated.Status.QueuePosition,
 			QueueReason:        updated.Status.QueueReason,
+			PodSpec:            updated.Spec.PodSpec,
+			Storage:            updated.Spec.Storage,
 		})
 	}
 }

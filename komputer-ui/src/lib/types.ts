@@ -1,5 +1,10 @@
 export type AgentStatus = 'Pending' | 'Running' | 'Queued' | 'Sleeping' | 'Succeeded' | 'Failed';
 
+export interface StorageOverride {
+  size?: string;
+  storageClassName?: string;
+}
+
 export interface AgentResponse {
   name: string;
   namespace: string;
@@ -22,6 +27,8 @@ export interface AgentResponse {
   priority?: number;
   queuePosition?: number;
   queueReason?: string;
+  podSpec?: Record<string, unknown>;
+  storage?: StorageOverride;
 }
 
 export interface AgentListResponse {
@@ -101,6 +108,8 @@ export interface CreateAgentRequest {
   lifecycle?: '' | 'Sleep' | 'AutoDelete';
   systemPrompt?: string;
   priority?: number;
+  podSpec?: Record<string, unknown>;
+  storage?: StorageOverride;
 }
 
 export interface CreateScheduleRequest {
@@ -130,6 +139,8 @@ export interface PatchAgentRequest {
   connectors?: string[];
   systemPrompt?: string;
   priority?: number;
+  podSpec?: Record<string, unknown>;
+  storage?: StorageOverride;
 }
 
 export interface ConnectorResponse {

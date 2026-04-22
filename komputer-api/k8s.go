@@ -259,7 +259,7 @@ func (k *K8sClient) UpdateManagedSecret(ctx context.Context, ns, name string, da
 	return secret, nil
 }
 
-func (k *K8sClient) CreateAgent(ctx context.Context, ns, name, instructions, internalSystemPrompt, systemPrompt, model, templateRef, role string, secretNames []string, memories []string, skills []string, connectors []string, lifecycle, officeManager string) (*komputerv1alpha1.KomputerAgent, error) {
+func (k *K8sClient) CreateAgent(ctx context.Context, ns, name, instructions, internalSystemPrompt, systemPrompt, model, templateRef, role string, secretNames []string, memories []string, skills []string, connectors []string, lifecycle, officeManager string, priority int32) (*komputerv1alpha1.KomputerAgent, error) {
 	if model == "" {
 		model = "claude-sonnet-4-6"
 	}
@@ -288,6 +288,7 @@ func (k *K8sClient) CreateAgent(ctx context.Context, ns, name, instructions, int
 			Connectors:           connectors,
 			Lifecycle:            komputerv1alpha1.AgentLifecycle(lifecycle),
 			OfficeManager:        officeManager,
+			Priority:             priority,
 		},
 	}
 
@@ -629,7 +630,7 @@ func (k *K8sClient) DeleteSchedule(ctx context.Context, ns, name string) error {
 }
 
 // PatchAgentSpec patches mutable spec fields on a KomputerAgent CR.
-func (k *K8sClient) PatchAgentSpec(ctx context.Context, ns, agentName string, model, lifecycle, instructions, templateRef, systemPrompt *string) error {
+func (k *K8sClient) PatchAgentSpec(ctx context.Context, ns, agentName string, model, lifecycle, instructions, templateRef, systemPrompt *string, priority *int32) error {
 	agent := &komputerv1alpha1.KomputerAgent{}
 	key := types.NamespacedName{Name: agentName, Namespace: ns}
 	if err := k.client.Get(ctx, key, agent); err != nil {
@@ -655,6 +656,10 @@ func (k *K8sClient) PatchAgentSpec(ctx context.Context, ns, agentName string, mo
 	}
 	if systemPrompt != nil && *systemPrompt != agent.Spec.SystemPrompt {
 		agent.Spec.SystemPrompt = *systemPrompt
+		changed = true
+	}
+	if priority != nil && *priority != agent.Spec.Priority {
+		agent.Spec.Priority = *priority
 		changed = true
 	}
 	if !changed {

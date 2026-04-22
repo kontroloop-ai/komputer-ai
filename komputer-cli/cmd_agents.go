@@ -43,14 +43,22 @@ func registerAgentCommands(root *cobra.Command) {
 	})
 
 	// ── list ─────────────────────────────────────────────────────────────
-	root.AddCommand(&cobra.Command{
+	listCmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List all agents",
 		Run: func(cmd *cobra.Command, args []string) {
 			jsonMode, _ := cmd.Flags().GetBool("json")
 			ep := resolveEndpoint(cmd)
-			data, status, err := apiRequest("GET", ep+"/api/v1/agents"+nsQuery(cmd), nil)
+			listURL := ep + "/api/v1/agents" + nsQuery(cmd)
+			if statusFilter, _ := cmd.Flags().GetString("status"); statusFilter != "" {
+				if strings.Contains(listURL, "?") {
+					listURL += "&status=" + url.QueryEscape(statusFilter)
+				} else {
+					listURL += "?status=" + url.QueryEscape(statusFilter)
+				}
+			}
+			data, status, err := apiRequest("GET", listURL, nil)
 			if err != nil {
 				if jsonMode {
 					dieJSON("Request failed: "+err.Error(), 0)
@@ -118,6 +126,8 @@ func registerAgentCommands(root *cobra.Command) {
 					phase = errorStyle.Render(fmt.Sprintf("%-10s", phase))
 				case "Sleeping":
 					phase = dimStyle.Render(fmt.Sprintf("%-10s", "💤 Sleep"))
+				case "Queued":
+					phase = warnStyle.Render(fmt.Sprintf("%-10s", fmt.Sprintf("Queued #%d", a.QueuePosition)))
 				default:
 					phase = dimStyle.Render(fmt.Sprintf("%-10s", phase))
 				}
@@ -144,7 +154,9 @@ func registerAgentCommands(root *cobra.Command) {
 			}
 			fmt.Println()
 		},
-	})
+	}
+	listCmd.Flags().String("status", "", "Filter by status (e.g. queued, running, pending)")
+	root.AddCommand(listCmd)
 
 	// ── create ───────────────────────────────────────────────────────────
 	createCmd := &cobra.Command{
@@ -194,6 +206,10 @@ func registerAgentCommands(root *cobra.Command) {
 			}
 			if sp, _ := cmd.Flags().GetString("system-prompt"); sp != "" {
 				body["systemPrompt"] = sp
+			}
+			if cmd.Flags().Changed("priority") {
+				prio, _ := cmd.Flags().GetInt32("priority")
+				body["priority"] = prio
 			}
 			cpu, _ := cmd.Flags().GetString("cpu")
 			memLimit, _ := cmd.Flags().GetString("memory-limit")
@@ -258,6 +274,7 @@ func registerAgentCommands(root *cobra.Command) {
 	createCmd.Flags().StringSlice("memory", nil, "Memory names to attach (repeatable, e.g. --memory k8s-debug)")
 	createCmd.Flags().StringSlice("skill", nil, "Skill names to attach (repeatable, e.g. --skill python-expert)")
 	createCmd.Flags().String("system-prompt", "", "Custom system prompt for the agent")
+	createCmd.Flags().Int32("priority", 0, "Queue priority (higher = admitted first when template cap is reached; default 0)")
 	createCmd.Flags().String("cpu", "", "Override CPU (e.g. 2 or 500m). Sets both requests and limits.")
 	createCmd.Flags().String("memory-limit", "", "Override memory (e.g. 4Gi). Sets both requests and limits.")
 	createCmd.Flags().String("storage", "", "Override PVC storage size (e.g. 20Gi).")
@@ -575,12 +592,16 @@ func registerAgentCommands(root *cobra.Command) {
 			if sp, _ := cmd.Flags().GetString("system-prompt"); cmd.Flags().Changed("system-prompt") {
 				body["systemPrompt"] = sp
 			}
+			if cmd.Flags().Changed("priority") {
+				prio, _ := cmd.Flags().GetInt32("priority")
+				body["priority"] = prio
+			}
 
 			if len(body) == 0 {
 				if jsonMode {
-					dieJSON("No settings provided. Use --model, --lifecycle, --secret, --memory, --skill, or --system-prompt flags.", 400)
+					dieJSON("No settings provided. Use --model, --lifecycle, --secret, --memory, --skill, --system-prompt, or --priority flags.", 400)
 				}
-				fmt.Println(errorStyle.Render("No settings provided. Use --model, --lifecycle, --secret, --memory, --skill, or --system-prompt flags."))
+				fmt.Println(errorStyle.Render("No settings provided. Use --model, --lifecycle, --secret, --memory, --skill, --system-prompt, or --priority flags."))
 				os.Exit(1)
 			}
 
@@ -623,6 +644,7 @@ func registerAgentCommands(root *cobra.Command) {
 	configCmd.Flags().StringSlice("memory", nil, "Memory names to attach (repeatable, e.g. --memory k8s-debug)")
 	configCmd.Flags().StringSlice("skill", nil, "Skill names to attach (repeatable, e.g. --skill python-expert)")
 	configCmd.Flags().String("system-prompt", "", "Custom system prompt (use empty string to clear)")
+	configCmd.Flags().Int32("priority", 0, "Queue priority (higher = admitted first; use --priority 0 to reset)")
 	root.AddCommand(configCmd)
 
 	// ── watch ────────────────────────────────────────────────────────────

@@ -118,8 +118,45 @@ func (r *KomputerAgentReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 	}
 
-	// Apply per-agent podSpec / storage overrides. Affects new pods only.
+	// 2b. Apply per-agent podSpec / storage overrides. Affects new pods only.
+	// Must run before admission so the merged template is used for capacity decisions.
 	template = applyAgentOverrides(template, agent)
+
+	// 2c. Velocity admission gate — enforce MaxConcurrentAgents cap.
+	admissionCap := template.Spec.MaxConcurrentAgents
+	if admissionCap > 0 &&
+		agent.Status.Phase != komputerv1alpha1.AgentPhaseRunning &&
+		agent.Status.Phase != komputerv1alpha1.AgentPhaseSucceeded &&
+		agent.Status.Phase != komputerv1alpha1.AgentPhaseFailed &&
+		agent.Status.Phase != komputerv1alpha1.AgentPhaseSleeping {
+
+		siblings, sibErr := r.loadNamespaceSiblings(ctx, agent.Namespace)
+		if sibErr != nil {
+			return ctrl.Result{}, sibErr
+		}
+		decision := evaluateAdmission(agent, siblings, admissionCap)
+		if !decision.Admit {
+			if err := r.updateStatus(ctx, agent, func(s *komputerv1alpha1.KomputerAgentStatus) {
+				s.Phase = komputerv1alpha1.AgentPhaseQueued
+				s.QueuePosition = decision.Position
+				s.QueueReason = decision.Reason
+				s.Message = decision.Reason
+			}); err != nil {
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{}, nil
+		}
+		// If we were queued and are now admitted, transition to Pending.
+		if agent.Status.Phase == komputerv1alpha1.AgentPhaseQueued {
+			if err := r.updateStatus(ctx, agent, func(s *komputerv1alpha1.KomputerAgentStatus) {
+				s.Phase = komputerv1alpha1.AgentPhasePending
+				s.QueuePosition = 0
+				s.QueueReason = ""
+			}); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+	}
 
 	// 3. Auto-discover the singleton cluster-scoped KomputerConfig
 	komputerConfig, err := r.getConfig(ctx)
@@ -519,6 +556,13 @@ func (r *KomputerAgentReconciler) ensurePod(ctx context.Context, agent *komputer
 	}
 
 	if err := r.Create(ctx, pod); err != nil {
+		if errors.IsAlreadyExists(err) {
+			// Another reconcile already created the pod — fetch and return it.
+			if getErr := r.Get(ctx, types.NamespacedName{Name: podName, Namespace: agent.Namespace}, pod); getErr != nil {
+				return nil, getErr
+			}
+			return pod, nil
+		}
 		return nil, err
 	}
 
@@ -932,6 +976,9 @@ func (r *KomputerAgentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				return reqs
 			}),
 		).
+		Watches(&komputerv1alpha1.KomputerAgent{}, handler.EnqueueRequestsFromMapFunc(r.enqueueQueuedSiblings)).
+		Watches(&komputerv1alpha1.KomputerAgentTemplate{}, handler.EnqueueRequestsFromMapFunc(r.enqueueAgentsForTemplate)).
+		Watches(&komputerv1alpha1.KomputerAgentClusterTemplate{}, handler.EnqueueRequestsFromMapFunc(r.enqueueAgentsForTemplate)).
 		Named("komputeragent").
 		Complete(r)
 }

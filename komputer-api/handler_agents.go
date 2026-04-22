@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -28,8 +29,9 @@ type CreateAgentRequest struct {
 	Lifecycle     string   `json:"lifecycle"`     // "", "Sleep", or "AutoDelete"
 	OfficeManager string   `json:"officeManager"` // set by manager MCP tool
 	SystemPrompt  string   `json:"systemPrompt"`  // optional custom system prompt
-	PodSpec      *corev1.PodSpec               `json:"podSpec,omitempty"`
-	Storage      *komputerv1alpha1.StorageSpec `json:"storage,omitempty"`
+	Priority      int32    `json:"priority,omitempty"` // queue priority; higher = admitted first
+	PodSpec       *corev1.PodSpec               `json:"podSpec,omitempty"`
+	Storage       *komputerv1alpha1.StorageSpec `json:"storage,omitempty"`
 }
 
 type AgentResponse struct {
@@ -51,6 +53,9 @@ type AgentResponse struct {
 	Instructions    string   `json:"instructions,omitempty"` // User task (spec.instructions)
 	SystemPrompt    string   `json:"systemPrompt,omitempty"` // Custom system prompt (spec.systemPrompt)
 	CreatedAt       string   `json:"createdAt"`
+	Priority        int32    `json:"priority"`
+	QueuePosition   int32    `json:"queuePosition,omitempty"`
+	QueueReason     string   `json:"queueReason,omitempty"`
 	PodSpec         *corev1.PodSpec               `json:"podSpec,omitempty"`
 	Storage         *komputerv1alpha1.StorageSpec `json:"storage,omitempty"`
 }
@@ -84,6 +89,7 @@ type PatchAgentRequest struct {
 	Skills       *[]string `json:"skills,omitempty"`      // skill names to attach
 	Connectors   *[]string `json:"connectors,omitempty"`  // connector names to attach
 	SystemPrompt *string   `json:"systemPrompt,omitempty"` // custom system prompt
+	Priority     *int32    `json:"priority,omitempty"`    // pointer so 0 vs unset is distinguishable
 	PodSpec      *corev1.PodSpec               `json:"podSpec,omitempty"`
 	Storage      *komputerv1alpha1.StorageSpec `json:"storage,omitempty"`
 }
@@ -187,6 +193,9 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 					Instructions:    existing.Spec.Instructions,
 					SystemPrompt:    existing.Spec.SystemPrompt,
 					CreatedAt:       existing.CreationTimestamp.UTC().Format(time.RFC3339),
+					Priority:        existing.Spec.Priority,
+					QueuePosition:   existing.Status.QueuePosition,
+					QueueReason:     existing.Status.QueueReason,
 					PodSpec:         existing.Spec.PodSpec,
 					Storage:         existing.Spec.Storage,
 				})
@@ -254,6 +263,9 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 				Instructions:    existing.Spec.Instructions,
 				SystemPrompt:    existing.Spec.SystemPrompt,
 				CreatedAt:       existing.CreationTimestamp.UTC().Format(time.RFC3339),
+				Priority:        existing.Spec.Priority,
+				QueuePosition:   existing.Status.QueuePosition,
+				QueueReason:     existing.Status.QueueReason,
 				PodSpec:         existing.Spec.PodSpec,
 				Storage:         existing.Spec.Storage,
 			})
@@ -282,7 +294,7 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 			}
 		}
 
-		agent, err := k8s.CreateAgent(c.Request.Context(), ns, req.Name, instructions, buildInternalSystemPrompt(req.Memories), req.SystemPrompt, req.Model, req.TemplateRef, role, req.SecretRefs, req.Memories, req.Skills, connectors, req.Lifecycle, req.OfficeManager, req.PodSpec, req.Storage)
+		agent, err := k8s.CreateAgent(c.Request.Context(), ns, req.Name, instructions, buildInternalSystemPrompt(req.Memories), req.SystemPrompt, req.Model, req.TemplateRef, role, req.SecretRefs, req.Memories, req.Skills, connectors, req.Lifecycle, req.OfficeManager, req.Priority, req.PodSpec, req.Storage)
 		if err != nil {
 			if errors.IsAlreadyExists(err) {
 				c.JSON(http.StatusConflict, gin.H{"error": "agent already exists: " + req.Name})
@@ -308,6 +320,7 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 			CreatedAt:    agent.CreationTimestamp.UTC().Format(time.RFC3339),
 			TotalTokens:        agent.Status.TotalTokens,
 			ModelContextWindow: agent.Status.ModelContextWindow,
+			Priority:     agent.Spec.Priority,
 			PodSpec:      agent.Spec.PodSpec,
 			Storage:      agent.Spec.Storage,
 		})
@@ -441,6 +454,9 @@ func getAgent(k8s *K8sClient) gin.HandlerFunc {
 			Instructions:       agent.Spec.Instructions,
 			SystemPrompt:       agent.Spec.SystemPrompt,
 			CreatedAt:          agent.CreationTimestamp.UTC().Format(time.RFC3339),
+			Priority:           agent.Spec.Priority,
+			QueuePosition:      agent.Status.QueuePosition,
+			QueueReason:        agent.Status.QueueReason,
 			PodSpec:            agent.Spec.PodSpec,
 			Storage:            agent.Spec.Storage,
 		})
@@ -537,6 +553,7 @@ func getAgentEvents(worker *RedisWorker, k8s *K8sClient) gin.HandlerFunc {
 func listAgents(k8s *K8sClient) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ns := c.Query("namespace") // empty = all namespaces
+		statusFilter := c.Query("status")
 		defaultSkills, _ := k8s.ListDefaultSkillNames(c.Request.Context())
 		agents, err := k8s.ListAgents(c.Request.Context(), ns)
 		if err != nil {
@@ -546,6 +563,9 @@ func listAgents(k8s *K8sClient) gin.HandlerFunc {
 
 		resp := AgentListResponse{Agents: make([]AgentResponse, 0, len(agents))}
 		for _, a := range agents {
+			if statusFilter != "" && !strings.EqualFold(statusFilter, string(a.Status.Phase)) {
+				continue
+			}
 			resp.Agents = append(resp.Agents, AgentResponse{
 				Name:            a.Name,
 				Namespace:       a.Namespace,
@@ -565,6 +585,9 @@ func listAgents(k8s *K8sClient) gin.HandlerFunc {
 				Instructions:       a.Spec.Instructions,
 				SystemPrompt:       a.Spec.SystemPrompt,
 				CreatedAt:          a.CreationTimestamp.UTC().Format(time.RFC3339),
+				Priority:           a.Spec.Priority,
+				QueuePosition:      a.Status.QueuePosition,
+				QueueReason:        a.Status.QueueReason,
 				PodSpec:            a.Spec.PodSpec,
 				Storage:            a.Spec.Storage,
 			})
@@ -599,13 +622,13 @@ func patchAgent(k8s *K8sClient) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: " + err.Error()})
 			return
 		}
-		if req.Model == nil && req.Lifecycle == nil && req.Instructions == nil && req.TemplateRef == nil && req.SecretRefs == nil && req.Memories == nil && req.Skills == nil && req.Connectors == nil && req.SystemPrompt == nil && req.PodSpec == nil && req.Storage == nil {
+		if req.Model == nil && req.Lifecycle == nil && req.Instructions == nil && req.TemplateRef == nil && req.SecretRefs == nil && req.Memories == nil && req.Skills == nil && req.Connectors == nil && req.SystemPrompt == nil && req.Priority == nil && req.PodSpec == nil && req.Storage == nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "no fields to update"})
 			return
 		}
 
 		// 1. Patch CR spec first — this is the source of truth.
-		if err := k8s.PatchAgentSpec(c.Request.Context(), ns, name, req.Model, req.Lifecycle, req.Instructions, req.TemplateRef, req.SystemPrompt); err != nil {
+		if err := k8s.PatchAgentSpec(c.Request.Context(), ns, name, req.Model, req.Lifecycle, req.Instructions, req.TemplateRef, req.SystemPrompt, req.Priority); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to patch agent: " + err.Error()})
 			return
 		}
@@ -732,6 +755,9 @@ func patchAgent(k8s *K8sClient) gin.HandlerFunc {
 			SystemPrompt:       updated.Spec.SystemPrompt,
 			Connectors:         updated.Spec.Connectors,
 			CreatedAt:          updated.CreationTimestamp.UTC().Format(time.RFC3339),
+			Priority:           updated.Spec.Priority,
+			QueuePosition:      updated.Status.QueuePosition,
+			QueueReason:        updated.Status.QueueReason,
 			PodSpec:            updated.Spec.PodSpec,
 			Storage:            updated.Spec.Storage,
 		})

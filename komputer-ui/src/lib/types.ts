@@ -1,3 +1,5 @@
+export type AgentStatus = 'Pending' | 'Running' | 'Queued' | 'Sleeping' | 'Succeeded' | 'Failed';
+
 export interface StorageOverride {
   size?: string;
   storageClassName?: string;
@@ -7,7 +9,7 @@ export interface AgentResponse {
   name: string;
   namespace: string;
   model: string;
-  status: 'Pending' | 'Running' | 'Sleeping' | 'Succeeded' | 'Failed';
+  status: AgentStatus;
   taskStatus?: 'InProgress' | 'Complete' | 'Error';
   lastTaskMessage?: string;
   lifecycle?: '' | 'Sleep' | 'AutoDelete';
@@ -22,6 +24,9 @@ export interface AgentResponse {
   instructions?: string;
   systemPrompt?: string;
   createdAt: string;
+  priority?: number;
+  queuePosition?: number;
+  queueReason?: string;
   podSpec?: Record<string, unknown>;
   storage?: StorageOverride;
 }
@@ -102,6 +107,7 @@ export interface CreateAgentRequest {
   secretRefs?: string[];
   lifecycle?: '' | 'Sleep' | 'AutoDelete';
   systemPrompt?: string;
+  priority?: number;
   podSpec?: Record<string, unknown>;
   storage?: StorageOverride;
 }
@@ -132,6 +138,7 @@ export interface PatchAgentRequest {
   skills?: string[];
   connectors?: string[];
   systemPrompt?: string;
+  priority?: number;
   podSpec?: Record<string, unknown>;
   storage?: StorageOverride;
 }
@@ -174,6 +181,7 @@ export interface TemplateResponse {
   name: string;
   scope: 'namespace' | 'cluster';
   namespace?: string;
+  maxConcurrentAgents?: number;
 }
 
 export interface TemplateListResponse {

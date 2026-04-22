@@ -63,6 +63,7 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
   const [showAllSecrets, setShowAllSecrets] = useState(false);
   const [createSecretOpen, setCreateSecretOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [priority, setPriority] = useState(0);
   const [cpu, setCpu] = useState("");
   const [memoryLimit, setMemoryLimit] = useState("");
   const [storageSize, setStorageSize] = useState("");
@@ -87,6 +88,7 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
     setSelectedSkills([]);
     setSelectedConnectors([]);
     setAdvancedOpen(false);
+    setPriority(0);
     setCpu("");
     setMemoryLimit("");
     setStorageSize("");
@@ -185,6 +187,7 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
         skills: selectedSkills.length > 0 ? selectedSkills : undefined,
         connectors: selectedConnectors.length > 0 ? selectedConnectors : undefined,
         systemPrompt: systemPrompt.trim() || undefined,
+        priority: priority !== 0 ? priority : undefined,
         podSpec: podSpecOverride,
         storage: storageSize.trim() ? { size: storageSize.trim() } : undefined,
       };
@@ -439,6 +442,18 @@ export function CreateAgentModal({ open, onOpenChange, onCreated, initialValues 
                         </div>
                       </div>
 
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="priority-input">Priority</Label>
+                        <input
+                          id="priority-input"
+                          type="number"
+                          value={priority}
+                          onChange={(e) => setPriority(parseInt(e.target.value, 10) || 0)}
+                          placeholder="0"
+                          className="flex h-9 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-muted)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-brand-blue)]"
+                        />
+                        <p className="text-xs text-[var(--color-text-secondary)]">Higher priority agents are admitted first when the template capacity limit is reached. Default: 0.</p>
+                      </div>
                       <div className="flex flex-col gap-1.5">
                         <Label>Template</Label>
                         <Select value={templateRef} onValueChange={(v) => v && setTemplateRef(v)}>

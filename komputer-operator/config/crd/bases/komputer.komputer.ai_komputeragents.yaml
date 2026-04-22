@@ -27,6 +27,9 @@ spec:
     - jsonPath: .spec.model
       name: Model
       type: string
+    - jsonPath: .status.queuePosition
+      name: Queue
+      type: integer
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
@@ -98,8 +101,9 @@ spec:
               podSpec:
                 description: |-
                   PodSpec, when set, overrides the template's PodSpec for this agent.
-                  The full corev1.PodSpec is replaced — there is no field-level merge.
-                  Takes effect on next pod start (existing pods are not mutated).
+                  Container fields are merged by name; non-zero fields from this PodSpec
+                  override the template's container fields. Takes effect on next pod start
+                  (existing pods are not mutated).
                 properties:
                   activeDeadlineSeconds:
                     description: |-
@@ -8081,6 +8085,14 @@ spec:
                 required:
                 - containers
                 type: object
+              priority:
+                default: 0
+                description: |-
+                  Priority controls admission order when the template's maxConcurrentAgents
+                  limit is reached. Higher number = admitted first (matches K8s PodPriority).
+                  Ties broken by creationTimestamp (older first). Defaults to 0.
+                format: int32
+                type: integer
               role:
                 default: manager
                 description: |-
@@ -8108,7 +8120,7 @@ spec:
               storage:
                 description: |-
                   Storage, when set, overrides the template's storage settings for this agent.
-                  Used at PVC creation time; existing PVCs are not resized.
+                  Existing PVCs are expanded in place when the storage class supports it.
                 properties:
                   size:
                     default: 5Gi
@@ -8163,6 +8175,18 @@ spec:
                 type: string
               pvcName:
                 description: PvcName is the name of the agent PVC.
+                type: string
+              queuePosition:
+                description: |-
+                  QueuePosition is the 1-based position in the template admission queue.
+                  Set by the operator when Phase=Queued. 0 when not queued.
+                  Owned by operator.
+                format: int32
+                type: integer
+              queueReason:
+                description: |-
+                  QueueReason explains why the agent is queued.
+                  Owned by operator.
                 type: string
               sessionId:
                 description: |-

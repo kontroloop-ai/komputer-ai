@@ -4,7 +4,9 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Trash2, Brain, Users, Save, Check } from "lucide-react";
+import { Trash2, Brain, Users, Save, Check, Pencil, Eye } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import { Button } from "@/components/kit/button";
 import { Badge } from "@/components/kit/badge";
@@ -158,6 +160,7 @@ function MemoryEditor({ memory, namespace, onSaved }: { memory: MemoryResponse; 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<"preview" | "edit">("preview");
 
   const hasChanges = content !== memory.content || description !== (memory.description ?? "");
 
@@ -187,39 +190,66 @@ function MemoryEditor({ memory, namespace, onSaved }: { memory: MemoryResponse; 
       transition={{ duration: 0.3, delay: 0.1 }}
       className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 space-y-4"
     >
-      <h3 className="text-[11px] uppercase tracking-wider font-semibold text-[var(--color-text-muted)]">Content</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-[11px] uppercase tracking-wider font-semibold text-[var(--color-text-muted)]">Content</h3>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => setMode((m) => (m === "preview" ? "edit" : "preview"))}
+        >
+          {mode === "preview" ? (
+            <><Pencil className="size-3 mr-1" /> Edit</>
+          ) : (
+            <><Eye className="size-3 mr-1" /> Preview</>
+          )}
+        </Button>
+      </div>
 
       <div className="flex flex-col gap-1.5">
         <Label>Description</Label>
-        <Input
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Short description (optional)"
-        />
+        {mode === "edit" ? (
+          <Input
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Short description (optional)"
+          />
+        ) : (
+          <p className="text-sm text-[var(--color-text-secondary)] min-h-[2rem]">
+            {description || <span className="italic text-[var(--color-text-muted)]">No description</span>}
+          </p>
+        )}
       </div>
 
       <div className="flex flex-col gap-1.5">
         <Label>Memory Content</Label>
-        <Textarea
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          style={{ minHeight: 300 }}
-        />
+        {mode === "edit" ? (
+          <Textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            style={{ minHeight: 300 }}
+          />
+        ) : (
+          <div className="prose-chat text-sm text-[var(--color-text)] rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg)] p-4 min-h-[300px]">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+          </div>
+        )}
       </div>
 
       {error && <p className="text-sm text-red-400">{error}</p>}
 
-      <div className="flex items-center gap-2">
-        <Button size="sm" onClick={handleSave} disabled={!hasChanges || saving}>
-          {saved ? (
-            <><Check className="size-3 mr-1" /> Saved</>
-          ) : saving ? (
-            "Saving..."
-          ) : (
-            <><Save className="size-3 mr-1" /> Save Changes</>
-          )}
-        </Button>
-      </div>
+      {mode === "edit" && (
+        <div className="flex items-center gap-2">
+          <Button size="sm" onClick={handleSave} disabled={!hasChanges || saving}>
+            {saved ? (
+              <><Check className="size-3 mr-1" /> Saved</>
+            ) : saving ? (
+              "Saving..."
+            ) : (
+              <><Save className="size-3 mr-1" /> Save Changes</>
+            )}
+          </Button>
+        </div>
+      )}
     </motion.div>
   );
 }

@@ -32,7 +32,7 @@ export function AgentCards({ agents, onDelete, selected, onToggleSelect }: Agent
   const selectionMode = !!selected && selected.size > 0;
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2.5">
-      <AnimatePresence>
+      <AnimatePresence mode="popLayout">
         {agents.map((agent, i) => {
           const cfg = statusConfig[agent.status] ?? defaultStatus;
           const StatusIcon = cfg.icon;
@@ -54,11 +54,12 @@ export function AgentCards({ agents, onDelete, selected, onToggleSelect }: Agent
 
           return (
             <motion.div
-              key={agent.name}
+              key={agentKey(agent)}
+              layout
               initial={{ opacity: 0, y: 12, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 0.97 }}
-              transition={{ duration: 0.25, delay: i * 0.04 }}
+              transition={{ duration: 0.25, delay: i * 0.04, layout: { duration: 0.25, ease: "easeOut" } }}
             >
               <Link href={`/agents/${agent.name}?namespace=${agent.namespace}`} className="block group" onClick={handleCardClick}>
                 <div

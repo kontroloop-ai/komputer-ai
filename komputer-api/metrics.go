@@ -1,6 +1,10 @@
 package main
 
 import (
+	"strconv"
+	"time"
+
+	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -39,6 +43,38 @@ var (
 		[]string{"namespace", "model", "outcome", "agent_name"},
 	)
 
+	httpRequestDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "komputer_api_http_request_duration_seconds",
+			Help:    "Wall-clock duration of HTTP requests handled by the API.",
+			Buckets: prometheus.DefBuckets,
+		},
+		[]string{"method", "path"},
+	)
+
+	wsConnectionsActive = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "komputer_api_ws_connections_active",
+			Help: "Currently open WebSocket connections to /agents/:name/ws.",
+		},
+		[]string{"mode"}, // broadcast or group
+	)
+
+	wsDispatchTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "komputer_api_ws_dispatch_total",
+			Help: "Events dispatched to WebSocket clients.",
+		},
+		[]string{"mode", "result"}, // mode=broadcast|group, result=delivered|claimed_by_other|write_failed
+	)
+
+	redisXreadMessagesTotal = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "komputer_api_redis_xread_messages_total",
+			Help: "Total messages read from Redis streams by the broadcast worker.",
+		},
+	)
+
 	// Build-info gauges (value=1) give each registry at least one active metric
 	// and expose version information to dashboards.
 	apiBuildInfo = prometheus.NewGaugeVec(
@@ -67,6 +103,10 @@ func newMetricsRegistries(perAgentLabels bool) (*prometheus.Registry, *prometheu
 	agentRegistry = prometheus.NewRegistry()
 
 	apiRegistry.MustRegister(httpRequestsTotal)
+	apiRegistry.MustRegister(httpRequestDuration)
+	apiRegistry.MustRegister(wsConnectionsActive)
+	apiRegistry.MustRegister(wsDispatchTotal)
+	apiRegistry.MustRegister(redisXreadMessagesTotal)
 	apiRegistry.MustRegister(apiBuildInfo)
 	agentRegistry.MustRegister(agentTasksTotal)
 	agentRegistry.MustRegister(agentBuildInfo)
@@ -84,4 +124,21 @@ func agentNameLabel(name string) string {
 		return name
 	}
 	return ""
+}
+
+// metricsMiddleware records HTTP request count and duration for every handled request.
+// Path is the route template (e.g. "/agents/:name") so cardinality stays bounded.
+func metricsMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+		c.Next()
+		path := c.FullPath()
+		if path == "" {
+			path = "unmatched"
+		}
+		method := c.Request.Method
+		status := strconv.Itoa(c.Writer.Status())
+		httpRequestsTotal.WithLabelValues(method, path, status).Inc()
+		httpRequestDuration.WithLabelValues(method, path).Observe(time.Since(start).Seconds())
+	}
 }

@@ -277,6 +277,7 @@ func StartRedisWorker(ctx context.Context, cfg RedisWorkerConfig, k8s *K8sClient
 			for _, stream := range results {
 				for _, msg := range stream.Messages {
 					lastIDs[stream.Stream] = msg.ID
+					redisXreadMessagesTotal.Inc()
 
 					event, err := parseStreamMessage(msg)
 					if err != nil {

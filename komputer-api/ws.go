@@ -47,6 +47,7 @@ func (h *Hub) SubscribeBroadcast(agentName string, conn *websocket.Conn) {
 		h.broadcast[agentName] = make(map[*websocket.Conn]struct{})
 	}
 	h.broadcast[agentName][conn] = struct{}{}
+	wsConnectionsActive.WithLabelValues("broadcast").Inc()
 }
 
 // SubscribeGroup adds a connection to a named group. Within the group, each
@@ -61,6 +62,7 @@ func (h *Hub) SubscribeGroup(agentName, group string, conn *websocket.Conn) {
 		h.groups[agentName][group] = make(map[*websocket.Conn]struct{})
 	}
 	h.groups[agentName][group][conn] = struct{}{}
+	wsConnectionsActive.WithLabelValues("group").Inc()
 }
 
 // Unsubscribe removes a connection from broadcast and any groups for the agent.
@@ -68,15 +70,19 @@ func (h *Hub) Unsubscribe(agentName string, conn *websocket.Conn) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if clients, ok := h.broadcast[agentName]; ok {
-		delete(clients, conn)
-		if len(clients) == 0 {
-			delete(h.broadcast, agentName)
+		if _, had := clients[conn]; had {
+			delete(clients, conn)
+			wsConnectionsActive.WithLabelValues("broadcast").Dec()
+			if len(clients) == 0 {
+				delete(h.broadcast, agentName)
+			}
 		}
 	}
 	if perGroup, ok := h.groups[agentName]; ok {
 		for group, clients := range perGroup {
 			if _, has := clients[conn]; has {
 				delete(clients, conn)
+				wsConnectionsActive.WithLabelValues("group").Dec()
 				if len(clients) == 0 {
 					delete(perGroup, group)
 				}
@@ -116,8 +122,11 @@ func (h *Hub) Dispatch(ctx context.Context, agentName, msgID string, message []b
 	// Broadcast bucket: send to all.
 	for _, conn := range bcast {
 		if err := conn.WriteMessage(websocket.TextMessage, message); err != nil {
+			wsDispatchTotal.WithLabelValues("broadcast", "write_failed").Inc()
 			conn.Close()
 			h.Unsubscribe(agentName, conn)
+		} else {
+			wsDispatchTotal.WithLabelValues("broadcast", "delivered").Inc()
 		}
 	}
 
@@ -127,6 +136,7 @@ func (h *Hub) Dispatch(ctx context.Context, agentName, msgID string, message []b
 		claimKey := "wsclaim:" + agentName + ":" + group + ":" + msgID
 		ok, err := h.rdb.SetNX(ctx, claimKey, h.replicaID, h.claimTTL).Result()
 		if err != nil || !ok {
+			wsDispatchTotal.WithLabelValues("group", "claimed_by_other").Inc()
 			continue
 		}
 
@@ -143,11 +153,13 @@ func (h *Hub) Dispatch(ctx context.Context, agentName, msgID string, message []b
 				h.Unsubscribe(agentName, pick)
 				continue // try next member in this group
 			}
+			wsDispatchTotal.WithLabelValues("group", "delivered").Inc()
 			delivered = true
 			break
 		}
 
 		if !delivered {
+			wsDispatchTotal.WithLabelValues("group", "write_failed").Inc()
 			// All local members failed. Release the claim so a future event
 			// re-evaluates routing (a different replica may have live members).
 			// This event itself is lost for the group; clients reconcile via REST history.

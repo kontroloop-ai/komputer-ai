@@ -44,6 +44,9 @@ func SetupRoutes(r *gin.Engine, k8s *K8sClient, hub *Hub, worker *RedisWorker) {
 	r.GET("/api/metrics", gin.WrapH(promhttp.HandlerFor(apiReg, promhttp.HandlerOpts{Registry: apiReg})))
 	r.GET("/agent/metrics", gin.WrapH(promhttp.HandlerFor(agentReg, promhttp.HandlerOpts{Registry: agentReg})))
 
+	// HTTP instrumentation — records request count and duration for all routes.
+	r.Use(metricsMiddleware())
+
 	// Health check endpoints (outside /api/v1 for k8s probes).
 	r.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})

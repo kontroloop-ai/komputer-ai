@@ -2,9 +2,11 @@ package main
 
 import (
 	"net/http"
+	"os"
 	"regexp"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // isValidK8sName checks if a string is a valid Kubernetes DNS subdomain name.
@@ -36,6 +38,12 @@ func collectSecretKeys(ctx gin.Context, k8s *K8sClient, ns string, secretNames [
 }
 
 func SetupRoutes(r *gin.Engine, k8s *K8sClient, hub *Hub, worker *RedisWorker) {
+	// Metrics — two separate registries scraped by different ServiceMonitors.
+	perAgentLabels := os.Getenv("KOMPUTER_METRICS_PER_AGENT") == "true"
+	apiReg, agentReg := newMetricsRegistries(perAgentLabels)
+	r.GET("/api/metrics", gin.WrapH(promhttp.HandlerFor(apiReg, promhttp.HandlerOpts{Registry: apiReg})))
+	r.GET("/agent/metrics", gin.WrapH(promhttp.HandlerFor(agentReg, promhttp.HandlerOpts{Registry: agentReg})))
+
 	// Health check endpoints (outside /api/v1 for k8s probes).
 	r.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})

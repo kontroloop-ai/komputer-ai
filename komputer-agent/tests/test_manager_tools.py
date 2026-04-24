@@ -1,5 +1,6 @@
 import pytest
 import json
+import asyncio
 
 import manager_tools
 
@@ -303,3 +304,33 @@ async def test_list_templates(mock_api):
     mock_api.set("GET", "/api/v1/templates", {"templates": [{"name": "default"}, {"name": "gpu"}]})
     result = await manager_tools.list_templates.handler({})
     assert not result.get("isError")
+
+
+def test_manager_server_registers_all_new_tools():
+    server_dict = manager_tools.create_manager_server()
+    # create_manager_server() returns a dict {"type": "sdk", "name": ..., "instance": <Server>}.
+    # The MCP Server stores tools in its ListToolsRequest handler; call it synchronously via asyncio.
+    import mcp.types
+    inst = server_dict["instance"]
+    handler = inst.request_handlers[mcp.types.ListToolsRequest]
+    loop = asyncio.new_event_loop()
+    try:
+        result = loop.run_until_complete(
+            handler(mcp.types.ListToolsRequest(method="tools/list"))
+        )
+    finally:
+        loop.close()
+    tool_names = {t.name for t in result.root.tools}
+
+    # Spot-check a representative sample from each category.
+    expected = {
+        "create_agent", "sleep_agent", "wake_agent", "list_agents", "get_agent",
+        "list_schedules", "update_schedule",
+        "list_memories", "update_memory", "detach_memory",
+        "list_skills", "delete_skill", "detach_skill",
+        "list_connectors", "attach_connector", "detach_connector",
+        "list_secrets", "create_secret", "attach_secret",
+        "list_namespaces", "list_templates",
+    }
+    missing = expected - tool_names
+    assert not missing, f"Missing tools in MCP server registration: {missing}"

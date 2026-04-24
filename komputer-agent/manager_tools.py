@@ -444,9 +444,80 @@ async def update_agent(args):
     return await _request("PATCH", f"/api/v1/agents/{full_name}", timeout=30, json=payload)
 
 
+@tool(
+    name="sleep_agent",
+    description="Put an agent to sleep — pod is deleted, PVC (workspace) is preserved. The agent can be woken later with a new task. Defaults to the current agent if no name is given.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "Agent to sleep. Defaults to the current agent."},
+        },
+    },
+)
+async def sleep_agent(args):
+    name = args.get("name")
+    if name:
+        name = _sanitize_name(name)
+    else:
+        name = os.environ.get("KOMPUTER_AGENT_NAME", "")
+        if not name:
+            return _err("No name provided and KOMPUTER_AGENT_NAME not set.")
+    return await _request("PATCH", f"/api/v1/agents/{name}", timeout=30, json={"lifecycle": "Sleep"})
+
+
+@tool(
+    name="wake_agent",
+    description="Wake a sleeping agent (or trigger a new task on a running one) by sending it instructions. Equivalent to calling create_agent with the same name — the API routes the call to the existing agent.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "Agent to wake."},
+            "instructions": {"type": "string", "description": "Task instructions for this run."},
+        },
+        "required": ["name", "instructions"],
+    },
+)
+async def wake_agent(args):
+    if not args.get("instructions"):
+        return _err("wake_agent requires 'instructions'.")
+    name = _sanitize_name(args["name"])
+    payload = {"name": name, "instructions": args["instructions"], "namespace": NAMESPACE}
+    return await _request("POST", "/api/v1/agents", timeout=30, json=payload)
+
+
+@tool(
+    name="list_agents",
+    description="List all agents in the current namespace, with name, status, lifecycle, model, and last task summary.",
+    input_schema={"type": "object", "properties": {}},
+)
+async def list_agents(args):
+    return await _request("GET", "/api/v1/agents")
+
+
+@tool(
+    name="get_agent",
+    description="Get full details of an agent: spec (model, instructions, skills, memories, connectors, secrets, podSpec, storage, priority) and live status (phase, taskStatus, cost, tokens). Use this to inspect a sub-agent's full configuration.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "Agent name. Defaults to the current agent."},
+        },
+    },
+)
+async def get_agent(args):
+    name = args.get("name")
+    if name:
+        name = _sanitize_name(name)
+    else:
+        name = os.environ.get("KOMPUTER_AGENT_NAME", "")
+        if not name:
+            return _err("No name provided and KOMPUTER_AGENT_NAME not set.")
+    return await _request("GET", f"/api/v1/agents/{name}")
+
+
 def create_manager_server():
     """Create the MCP server with manager orchestration tools."""
     return create_sdk_mcp_server(
         name="komputer",
-        tools=[create_agent, schedule_agent, get_agent_status, get_agent_events, cancel_agent, delete_agent, delete_schedule, create_memory, attach_memory, create_skill, attach_skill, update_agent],
+        tools=[create_agent, schedule_agent, get_agent_status, get_agent_events, cancel_agent, delete_agent, delete_schedule, create_memory, attach_memory, create_skill, attach_skill, update_agent, sleep_agent, wake_agent, list_agents, get_agent],
     )

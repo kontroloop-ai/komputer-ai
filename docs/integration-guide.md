@@ -260,6 +260,26 @@ ws://localhost:8080/api/v1/agents/:name/ws
 
 The connection stays open until you disconnect. Events arrive as JSON lines:
 
+### Delivery modes: broadcast vs. consumer group
+
+The WebSocket endpoint supports two delivery modes via the optional `?group=<name>` query parameter:
+
+| Mode | URL | Behavior | When to use |
+|------|-----|----------|-------------|
+| **Broadcast** (default) | `/api/v1/agents/:name/ws` | Every connected client receives every event. | UIs, dashboards, debugging — any consumer where seeing the same event multiple times across separate connections is fine or desired. |
+| **Consumer group** | `/api/v1/agents/:name/ws?group=my-app` | Each event in the stream is delivered to **exactly one** client per group, across all API replicas. | Distributed systems with multiple service instances watching the same agent — e.g. a Slack bot or webhook forwarder running 3 replicas, where only one replica should react per event. |
+
+**Why this matters in distributed deployments.** Without a `group`, two replicas of your service connecting to the same agent will each receive every event independently — you'll process every message twice. With `?group=my-bot`, the API uses Redis-coordinated routing to pick one connected client per event, so duplicate processing is eliminated regardless of how many replicas you run.
+
+**Group semantics:**
+- The group name is opaque — pick anything (`my-app`, `slack-bot-prod`, `audit-pipeline`).
+- Group membership is per-agent: `?group=my-app` on agent `A` is independent of `?group=my-app` on agent `B`.
+- Routing is best-effort: if the chosen client's WebSocket fails mid-write, that event is lost for the group. For exactly-once processing, use the [`/events` REST endpoint](#get-apiv1agentsnameevents) on reconnect to backfill any missed events.
+- A group with one connected client behaves identically to broadcast.
+- Mixing modes works: ungrouped clients still get every event; grouped clients share within their group.
+
+
+
 ```json
 {"agentName":"my-agent","namespace":"production","type":"task_started","timestamp":"2026-03-27T10:00:01Z","payload":{"instructions":"Analyze the latest sales data..."}}
 {"agentName":"my-agent","namespace":"production","type":"thinking","timestamp":"2026-03-27T10:00:02Z","payload":{"content":"I need to look at the sales data..."}}

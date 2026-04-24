@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	urlpkg "net/url"
 	"strings"
 
 	"github.com/gorilla/websocket"
@@ -56,7 +57,28 @@ func dedupKey(e *AgentEvent) string {
 //	    if err != nil { break }
 //	    fmt.Println(event.Type, event.Payload)
 //	}
-func (c *Client) WatchAgent(ctx context.Context, name string) (*AgentEventStream, error) {
+// WatchOption customizes WatchAgent behavior.
+type WatchOption func(*watchOptions)
+
+type watchOptions struct {
+	group string
+}
+
+// WithGroup makes this watcher join a consumer group. Each event in the
+// stream is delivered to exactly one client per group across all API
+// replicas — useful when running multiple SDK instances in a distributed
+// system that should not each process the same event.
+//
+// Without WithGroup, every connected client receives every event (broadcast).
+func WithGroup(group string) WatchOption {
+	return func(o *watchOptions) { o.group = group }
+}
+
+func (c *Client) WatchAgent(ctx context.Context, name string, opts ...WatchOption) (*AgentEventStream, error) {
+	o := watchOptions{}
+	for _, fn := range opts {
+		fn(&o)
+	}
 	// 1. Fetch history via REST.
 	var history []*AgentEvent
 	seen := make(map[string]struct{})
@@ -87,9 +109,12 @@ func (c *Client) WatchAgent(ctx context.Context, name string) (*AgentEventStream
 	// 2. Open WebSocket for live events.
 	wsURL := strings.Replace(c.baseURL, "http://", "ws://", 1)
 	wsURL = strings.Replace(wsURL, "https://", "wss://", 1)
-	url := fmt.Sprintf("%s/api/v1/agents/%s/ws", wsURL, name)
+	wsEndpoint := fmt.Sprintf("%s/api/v1/agents/%s/ws", wsURL, name)
+	if o.group != "" {
+		wsEndpoint = fmt.Sprintf("%s?group=%s", wsEndpoint, urlpkg.QueryEscape(o.group))
+	}
 
-	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
+	conn, _, err := websocket.DefaultDialer.Dial(wsEndpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("websocket dial: %w", err)
 	}

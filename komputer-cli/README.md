@@ -143,6 +143,18 @@ Stream events from an agent via WebSocket (stays connected until Ctrl+C):
 komputer watch my-agent
 ```
 
+By default this opens a **broadcast** subscription — every CLI/SDK/UI client connected to this agent receives every event independently. If you're running the same `watch` command on multiple machines and want each event to land on only one of them (queue-style), use `--group`:
+
+```bash
+# Run on machine A:
+komputer watch my-agent --group ops-team
+# Run on machine B (same group):
+komputer watch my-agent --group ops-team
+# Each event is delivered to A or B — never both.
+```
+
+The group name is opaque (pick anything, e.g. `ops-team`, `audit-pipeline`). Without `--group`, every client sees every event — which is what you want for live debugging.
+
 ### Cancel a task
 
 ```bash

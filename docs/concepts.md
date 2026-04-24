@@ -385,5 +385,5 @@ The typical flow:
 2. External system creates a **KomputerAgent** via the API, optionally with secrets and a lifecycle mode
 3. The operator resolves the template, creates a pod and workspace, and starts the agent
 4. The agent executes the task, streaming events through Redis to the API
-5. The external system consumes events via WebSocket or polls the events endpoint
+5. The external system consumes events via WebSocket (broadcast or `?group=` consumer group for distributed deployments — see [integration guide](integration-guide.md#delivery-modes-broadcast-vs-consumer-group)) or polls the events endpoint
 6. Based on lifecycle: agent stays alive (default), sleeps (pod deleted, PVC kept), or auto-deletes

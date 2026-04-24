@@ -648,13 +648,14 @@ func registerAgentCommands(root *cobra.Command) {
 	root.AddCommand(configCmd)
 
 	// ── watch ────────────────────────────────────────────────────────────
-	root.AddCommand(&cobra.Command{
+	watchCmd := &cobra.Command{
 		Use:   "watch <name>",
 		Short: "Stream live events from an agent via WebSocket",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			ep := resolveEndpoint(cmd)
 			agentName := args[0]
+			group, _ := cmd.Flags().GetString("group")
 
 			// Verify agent exists before connecting WebSocket
 			_, status, err := apiRequest("GET", fmt.Sprintf("%s/api/v1/agents/%s%s", ep, url.PathEscape(agentName), nsQuery(cmd)), nil)
@@ -671,6 +672,9 @@ func registerAgentCommands(root *cobra.Command) {
 			wsURL := strings.Replace(ep, "https://", "wss://", 1)
 			wsURL = strings.Replace(wsURL, "http://", "ws://", 1)
 			wsURL = fmt.Sprintf("%s/api/v1/agents/%s/ws", wsURL, url.PathEscape(agentName))
+			if group != "" {
+				wsURL = fmt.Sprintf("%s?group=%s", wsURL, url.QueryEscape(group))
+			}
 
 			fmt.Println(titleStyle.Render(fmt.Sprintf("  Watching %s  ", agentName)))
 			fmt.Println(dimStyle.Render(fmt.Sprintf("  Connected to %s", wsURL)))
@@ -741,7 +745,9 @@ func registerAgentCommands(root *cobra.Command) {
 				}
 			}
 		},
-	})
+	}
+	watchCmd.Flags().String("group", "", "Join a consumer group: each event is delivered to exactly one client per group across all API replicas")
+	root.AddCommand(watchCmd)
 
 	// ── run (create + watch) ─────────────────────────────────────────────
 	runCmd := &cobra.Command{

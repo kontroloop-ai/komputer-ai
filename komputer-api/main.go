@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 
@@ -55,8 +56,6 @@ func main() {
 	}
 	log.Println("kubernetes client initialized")
 
-	hub := NewHub()
-
 	hostname := os.Getenv("CONSUMER_NAME")
 	if hostname == "" {
 		hostname, _ = os.Hostname()
@@ -64,6 +63,9 @@ func main() {
 	if hostname == "" {
 		hostname = fmt.Sprintf("worker-%d", os.Getpid())
 	}
+
+	rdbForHub := redis.NewClient(&redis.Options{Addr: redisAddr, Password: redisPassword, DB: 0})
+	hub := NewHub(rdbForHub, hostname)
 
 	rw := StartRedisWorker(ctx, RedisWorkerConfig{
 		Address:      redisAddr,

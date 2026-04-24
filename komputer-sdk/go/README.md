@@ -163,3 +163,21 @@ for {
 ```
 
 Event types: `task_started`, `thinking`, `tool_use`, `tool_result`, `text`, `task_completed`, `task_cancelled`, `error`.
+
+#### Distributed consumers — `WithGroup`
+
+By default, `WatchAgent` opens a **broadcast** subscription: every connected client receives every event. If you run multiple instances of your service (e.g. 3 replicas of a Slack bot) and they all call `WatchAgent("my-agent")` without further options, **each instance will process every event** — duplicate work.
+
+To get queue-style delivery (each event handled by exactly one instance across your fleet), pass `WithGroup`:
+
+```go
+stream, err := c.WatchAgent(ctx, "my-agent", client.WithGroup("my-bot"))
+```
+
+The API uses Redis-coordinated routing to deliver each event to exactly one client per group, regardless of how many replicas connect or which API replica they hit. Pick any string for the group name (`my-bot`, `audit-pipeline`, `prod-webhook-fwd`).
+
+**Use broadcast** for: dashboards, debugging, single-instance workers, anywhere "see everything" is the goal.
+**Use `WithGroup`** for: distributed services, webhook forwarders, anywhere you'd otherwise dedupe events yourself.
+
+Routing is best-effort — if a chosen client's WebSocket fails mid-write, that event is lost for the group. Use `GetAgentEvents(ctx, name, ...)` to backfill on reconnect if you need stronger guarantees.
+

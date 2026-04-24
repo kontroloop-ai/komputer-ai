@@ -375,7 +375,7 @@ The agent is instructed to check `SECRET_*` env vars when credentials are needed
 2. **Reconcile** — Operator detects the CR, creates a PVC (persistent workspace) and Pod
 3. **Execute** — Agent pod starts, runs Claude with the given instructions
 4. **Stream** — Agent publishes structured events to Redis (tool calls, messages, results)
-5. **Consume** — API worker reads events, updates CR status (`InProgress`/`Complete`), broadcasts via WebSocket
+5. **Consume** — API worker reads events, updates CR status (`InProgress`/`Complete`), and dispatches via WebSocket — either broadcast to all subscribers or queue-routed via consumer groups (`?group=` query param) for distributed deployments. See the [integration guide](docs/integration-guide.md#delivery-modes-broadcast-vs-consumer-group)
 6. **Persist** — Agent pod stays running after task completion, accepting new tasks via FastAPI
 
 ### Event Types

@@ -97,6 +97,15 @@ func main() {
 }
 ```
 
+## Streaming modes: broadcast vs. consumer group
+
+All three SDKs offer two delivery modes for `watchAgent` / `watch_agent` / `WatchAgent`:
+
+- **Broadcast (default)** — every connected client receives every event. Right for dashboards, debugging, and single-instance services.
+- **Consumer group** — pass `group="my-app"` (Python), `WithGroup("my-app")` (Go), or `{ group: "my-app" }` (TypeScript). Each event is delivered to exactly one client per group across all API replicas. Right for distributed services running multiple replicas where you don't want to process the same event N times.
+
+See the per-SDK READMEs ([go](go/README.md#distributed-consumers--withgroup), [python](python/README.md#distributed-consumers--group), [typescript](typescript/README.md#distributed-consumers--group)) and the [WebSocket section of the integration guide](../docs/integration-guide.md#delivery-modes-broadcast-vs-consumer-group).
+
 ## Regenerating
 
 When the API changes, regenerate the SDKs:

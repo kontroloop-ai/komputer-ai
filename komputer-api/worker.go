@@ -291,7 +291,7 @@ func StartRedisWorker(ctx context.Context, cfg RedisWorkerConfig, k8s *K8sClient
 						continue
 					}
 
-					hub.Broadcast(event.AgentName, raw)
+					hub.Dispatch(ctx, event.AgentName, msg.ID, raw)
 				}
 			}
 		}

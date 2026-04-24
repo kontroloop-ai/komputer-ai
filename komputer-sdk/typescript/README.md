@@ -127,6 +127,23 @@ for await (const event of stream) {
 }
 ```
 
+#### Distributed consumers — `{ group }`
+
+By default, `watchAgent` opens a **broadcast** subscription: every connected client receives every event. If you run multiple instances of your service (e.g. 3 replicas of a Slack bot) and they all call `client.watchAgent("my-agent")` without further options, **each instance will process every event** — duplicate work.
+
+To get queue-style delivery (each event handled by exactly one instance across your fleet), pass `{ group }`:
+
+```ts
+const stream = await client.watchAgent("my-agent", { group: "my-bot" });
+```
+
+The API uses Redis-coordinated routing to deliver each event to exactly one client per group, regardless of how many replicas connect or which API replica they hit. Pick any string for the group name (`my-bot`, `audit-pipeline`, `prod-webhook-fwd`).
+
+**Use broadcast** for: dashboards, debugging, single-instance workers, anywhere "see everything" is the goal.
+**Use `{ group }`** for: distributed services, webhook forwarders, anywhere you'd otherwise dedupe events yourself.
+
+Routing is best-effort — if a chosen client's WebSocket fails mid-write, that event is lost for the group. Use `client.getAgentEvents({ name, limit: ... })` to backfill on reconnect if you need stronger guarantees.
+
 ### Direct API access
 
 For advanced use cases, the underlying generated API clients are available:

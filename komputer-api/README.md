@@ -249,6 +249,17 @@ Upgrade to a WebSocket connection to stream real-time events as the agent works.
 ws://localhost:8080/api/v1/agents/my-agent/ws
 ```
 
+#### Delivery modes
+
+| Mode | URL | Behavior |
+|------|-----|----------|
+| **Broadcast** (default) | `…/ws` | Every connected client receives every event. |
+| **Consumer group** | `…/ws?group=<name>` | Each event is delivered to exactly one client per group, across all API replicas. |
+
+Use **broadcast** for UIs, dashboards, and any case where multiple consumers should each see every event. Use **consumer group** when you run multiple replicas of the same service and want each event handled exactly once across them — without it, two replicas of your bot calling `/ws` will both receive every event and process the same work twice.
+
+The API coordinates group routing across replicas using a short-TTL Redis claim key (`SET NX wsclaim:<agent>:<group>:<msgID>`), so adding clients does not add Redis connections or goroutines. Routing is best-effort — if the chosen client's WebSocket fails mid-write, that event is lost for the group; clients should backfill via [`GET /agents/:name/events`](#get-apiv1agentsnameevents) on reconnect when stronger guarantees are needed.
+
 Each message is a JSON object:
 
 ```json
@@ -288,7 +299,7 @@ All error responses use:
 The API runs a background goroutine that consumes agent events from Redis Streams. For each event it:
 
 1. Logs the raw event
-2. Broadcasts to WebSocket subscribers for that agent
+2. Dispatches to WebSocket subscribers for that agent — fan-out to broadcast clients, plus one-per-group routing for clients connected with `?group=` (Redis-coordinated across replicas)
 3. Patches the `KomputerAgent` CR status (`taskStatus` and `lastTaskMessage`) in the correct namespace
 
 Events include a `namespace` field so the worker can update CRs across namespaces.

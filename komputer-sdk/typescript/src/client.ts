@@ -241,7 +241,17 @@ export class KomputerClient {
 
   // --- WebSocket ---
 
-  async watchAgent(name: string): Promise<AgentEventStream> {
+  /**
+   * Stream live agent events.
+   *
+   * @param name Agent name.
+   * @param options.group Optional consumer group name. When set, this watcher joins
+   *   a group and each event is delivered to exactly one client per group across all
+   *   API replicas — useful when running multiple SDK instances in a distributed system
+   *   that should not each process the same event. Without `group`, every connected
+   *   client receives every event (broadcast).
+   */
+  async watchAgent(name: string, options?: { group?: string }): Promise<AgentEventStream> {
     const wsUrl = this._baseUrl.replace("http://", "ws://").replace("https://", "wss://");
     let history: AgentEvent[] = [];
     try {
@@ -257,6 +267,6 @@ export class KomputerClient {
     } catch {
       // History fetch failed — proceed with live-only.
     }
-    return new AgentEventStream(wsUrl, name, history);
+    return new AgentEventStream(wsUrl, name, history, options?.group);
   }
 }

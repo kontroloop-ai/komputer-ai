@@ -28,7 +28,7 @@ export class AgentEventStream implements AsyncIterable<AgentEvent> {
   private done = false;
   private seen = new Set<string>();
 
-  constructor(wsUrl: string, agentName: string, historyEvents?: AgentEvent[]) {
+  constructor(wsUrl: string, agentName: string, historyEvents?: AgentEvent[], group?: string) {
     this.agentName = agentName;
 
     // Seed dedup set and queue with history events.
@@ -40,7 +40,11 @@ export class AgentEventStream implements AsyncIterable<AgentEvent> {
       }
     }
 
-    this.ws = new WebSocket(`${wsUrl}/api/v1/agents/${agentName}/ws`);
+    let endpoint = `${wsUrl}/api/v1/agents/${agentName}/ws`;
+    if (group) {
+      endpoint += `?group=${encodeURIComponent(group)}`;
+    }
+    this.ws = new WebSocket(endpoint);
 
     this.ws.onmessage = (event) => {
       const data = JSON.parse(event.data as string);

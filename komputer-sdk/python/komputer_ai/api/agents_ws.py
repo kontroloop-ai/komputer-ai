@@ -49,7 +49,7 @@ class AgentEventStream(Iterator[AgentEvent]):
             print(event.type, event.payload)
     """
 
-    def __init__(self, ws_url: str, agent_name: str, history_events: list = None):
+    def __init__(self, ws_url: str, agent_name: str, history_events: list = None, group: str = ""):
         self._agent_name = agent_name
         self._history_queue = list(history_events) if history_events else []
         self._seen: set = set()
@@ -57,7 +57,11 @@ class AgentEventStream(Iterator[AgentEvent]):
             norm_type = "user_message" if e.type == "task_started" else e.type
             self._seen.add(f"{e.timestamp}:{norm_type}")
         self._ws = websocket.WebSocket()
-        self._ws.connect(f"{ws_url}/api/v1/agents/{agent_name}/ws")
+        endpoint = f"{ws_url}/api/v1/agents/{agent_name}/ws"
+        if group:
+            from urllib.parse import quote
+            endpoint = f"{endpoint}?group={quote(group)}"
+        self._ws.connect(endpoint)
 
     def __iter__(self) -> Self:
         return self

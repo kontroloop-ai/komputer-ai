@@ -204,8 +204,16 @@ class KomputerClient:
 
     # --- WebSocket ---
 
-    def watch_agent(self, name: str) -> AgentEventStream:
+    def watch_agent(self, name: str, group: str = "") -> AgentEventStream:
         """Stream real-time events from an agent via WebSocket, prefetching history.
+
+        Args:
+            name: Agent name.
+            group: Optional consumer group name. When set, this watcher joins a group;
+                each event is delivered to exactly one client per group across all API
+                replicas — useful when running multiple SDK instances in a distributed
+                system that should not each process the same event. Without `group`,
+                every connected client receives every event (broadcast).
 
         Requires: pip install websocket-client
         """
@@ -227,7 +235,7 @@ class KomputerClient:
                 ]
         except Exception:
             pass
-        return AgentEventStream(ws_url, name, history)
+        return AgentEventStream(ws_url, name, history, group=group)
 
     # --- Lifecycle ---
 

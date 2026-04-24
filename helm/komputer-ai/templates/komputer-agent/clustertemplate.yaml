@@ -30,6 +30,25 @@ spec:
             name: {{ .Values.anthropicApiKeySecret.name }}
             key: {{ .Values.anthropicApiKeySecret.key }}
       {{- end }}
+      {{- if .Values.metrics.perAgentLabels }}
+      - name: KOMPUTER_METRICS_PER_AGENT
+        value: "true"
+      {{- end }}
+      {{- if .Values.metrics.agent.remoteWrite.enabled }}
+      - name: KOMPUTER_METRICS_REMOTE_WRITE_URL
+        value: {{ .Values.metrics.agent.remoteWrite.url | quote }}
+      {{- if .Values.metrics.agent.remoteWrite.intervalSeconds }}
+      - name: KOMPUTER_METRICS_REMOTE_WRITE_INTERVAL
+        value: {{ .Values.metrics.agent.remoteWrite.intervalSeconds | quote }}
+      {{- end }}
+      {{- if .Values.metrics.agent.remoteWrite.bearerTokenSecret }}
+      - name: KOMPUTER_METRICS_REMOTE_WRITE_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: {{ .Values.metrics.agent.remoteWrite.bearerTokenSecret }}
+            key: token
+      {{- end }}
+      {{- end }}
       resources:
         {{- toYaml .Values.clusterTemplate.resources | nindent 8 }}
   storage:

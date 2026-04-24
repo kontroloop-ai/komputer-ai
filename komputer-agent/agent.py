@@ -98,6 +98,7 @@ async def run_agent(instructions: str, model: str, publisher, system_prompt: str
     publisher.publish("task_started", {
         "instructions": user_task,
         "resuming_session": session_id is not None,
+        "model": model,
     })
 
     async def post_tool_hook(input, session_id, ctx):
@@ -262,6 +263,7 @@ async def run_agent(instructions: str, model: str, publisher, system_prompt: str
                     "usage": result.usage,
                     "last_usage": last_usage,
                     "context_window": _fetch_context_window(model),
+                    "model": model,
                 })
 
     # Clear the queue reference so server.py won't try to push to a dead queue.

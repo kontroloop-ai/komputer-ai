@@ -234,4 +234,8 @@ def start_flush_task(loop: Optional[asyncio.AbstractEventLoop] = None):
     if not os.environ.get("KOMPUTER_METRICS_REMOTE_WRITE_URL", "").strip():
         return  # No remote-write configured, no flush task.
     loop = loop or asyncio.get_event_loop()
-    _flush_task = loop.create_task(flush_loop())
+    try:
+        interval = float(os.environ.get("KOMPUTER_METRICS_REMOTE_WRITE_INTERVAL", "15"))
+    except ValueError:
+        interval = 15.0
+    _flush_task = loop.create_task(flush_loop(interval))

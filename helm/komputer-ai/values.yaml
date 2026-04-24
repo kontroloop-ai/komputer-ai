@@ -204,18 +204,19 @@ metrics:
       enabled: false
       interval: 30s
       labels: {}
-    # Operator metrics are disabled by default in upstream Kubebuilder; we
-    # bind to :8080 by default here so the SM has something to scrape.
-    bindAddress: ":8080"
+    # Operator metrics bind to :8082 (avoids collision with the API on :8080
+    # when port-forwarding both, and with the operator's own probe on :8081).
+    bindAddress: ":8082"
 
   agent:
-    # NOTE: Setting these does not currently propagate to agent pods automatically.
-    # The operator does not yet read remote-write config from the chart. To enable
-    # remote-write today, set the env vars on KomputerAgentClusterTemplate.spec.podSpec
-    # directly or via a manual env injection.
+    # Push agent-side metrics (steering, mcp_status, subagent_wait) to a
+    # Prometheus remote-write endpoint. When enabled, env vars are injected
+    # into the default KomputerAgentClusterTemplate so every spawned agent
+    # pod inherits them.
     remoteWrite:
       enabled: false
       url: ""  # e.g. http://prometheus.monitoring:9090/api/v1/write
+      intervalSeconds: 15
       bearerTokenSecret: ""  # name of K8s Secret with key 'token'
 
 # -- Default KomputerAgentClusterTemplate settings

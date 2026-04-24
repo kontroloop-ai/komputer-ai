@@ -4,12 +4,12 @@ komputer-ai exposes Prometheus metrics from every component, plus a sample Grafa
 
 ## Components and endpoints
 
-| Component | Endpoint | Always served? | What's exposed |
-|---|---|---|---|
-| API | `:8080/api/metrics` | yes | HTTP request rate/latency, WebSocket connections, Redis stream throughput |
-| API | `:8080/agent/metrics` | yes | Per-task cost, tokens, duration; tool invocations and durations; agent action counts; agents-by-phase, tasks-in-progress, schedules-active gauges (queried from K8s at scrape time) |
-| Operator | `:8080/metrics` | only when bind address set (Helm value `metrics.operator.bindAddress`, default `:8080`) | Built-in controller-runtime metrics + `komputer_operator_template_cap_reached_total` |
-| Agent | `:8000/metrics` | yes (FastAPI server) | Steering events, MCP connector status, subagent wait time |
+| Component | Endpoint | What's exposed |
+|---|---|---|
+| API | `:8080/api/metrics` | HTTP request rate/latency, WebSocket connections, Redis stream throughput |
+| API | `:8080/agent/metrics` | Per-task cost, tokens, duration; tool invocations and durations; agent action counts; agents-by-phase, tasks-in-progress, schedules-active gauges (queried from K8s at scrape time) |
+| Operator | `:8082/metrics` | Built-in controller-runtime metrics + `komputer_operator_template_cap_reached_total` |
+| Agent | `:8000/metrics` | Steering events, MCP connector status, subagent wait time |
 
 ## Enabling Prometheus scraping
 
@@ -66,15 +66,18 @@ metrics:
     remoteWrite:
       enabled: true
       url: http://prometheus.monitoring.svc.cluster.local:9090/api/v1/write
-      # Optional bearer token (from a K8s Secret with key 'KOMPUTER_METRICS_REMOTE_WRITE_TOKEN'):
+      intervalSeconds: 15
+      # Optional bearer token (from a K8s Secret with key 'token'):
       bearerTokenSecret: prometheus-remote-write-token
 ```
 
-The agent flushes every 15 seconds. Failures are logged but never crash the agent.
+The chart injects `KOMPUTER_METRICS_REMOTE_WRITE_URL`, `KOMPUTER_METRICS_REMOTE_WRITE_INTERVAL`, optionally `KOMPUTER_METRICS_REMOTE_WRITE_TOKEN`, and (when `metrics.perAgentLabels=true`) `KOMPUTER_METRICS_PER_AGENT=true` into the default `KomputerAgentClusterTemplate`, so every agent pod inherits them automatically.
+
+Failures during flush are logged but never crash the agent.
 
 Your remote-write target must have receiver enabled. For Prometheus: `--web.enable-remote-write-receiver`. For Mimir/Cortex/Thanos: native support.
 
-> **Note:** the env vars `KOMPUTER_METRICS_REMOTE_WRITE_URL` and `KOMPUTER_METRICS_PER_AGENT` are not yet automatically injected from Helm values into agent pods. To enable today, set them on `KomputerAgentClusterTemplate.spec.podSpec.containers[0].env` directly.
+For local kind dev, the sample `KomputerAgentClusterTemplate` at `komputer-operator/config/samples/komputer_v1alpha1_komputeragentclustertemplate.yaml` already wires the agent to the local Prometheus from `monitoring/docker-compose.yml`. See [local-development.md](local-development.md) and [monitoring/README.md](../monitoring/README.md).
 
 ## Free metrics from kube-state-metrics
 

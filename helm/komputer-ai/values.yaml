@@ -176,6 +176,49 @@ config:
 defaultSkills:
   enabled: true
 
+# --- Monitoring & metrics ---
+metrics:
+  # When true, agent_name is exposed as a real label on per-agent metrics.
+  # When false (default), agent_name is present-but-empty so dashboards
+  # stay schema-stable. Trade-off: high cardinality if you have many agents.
+  perAgentLabels: false
+
+  api:
+    serviceMonitor:
+      # Scrape /api/metrics on the API service. Requires kube-prometheus-stack.
+      enabled: false
+      interval: 30s
+      labels: {}  # extra labels for the SM CR (e.g. release: kube-prom)
+
+  agentMetrics:
+    serviceMonitor:
+      # Scrape /agent/metrics on the API service (same pod, separate endpoint).
+      # Splits API plumbing metrics from agent business metrics so they can be
+      # scraped/retained separately if desired.
+      enabled: false
+      interval: 30s
+      labels: {}
+
+  operator:
+    serviceMonitor:
+      enabled: false
+      interval: 30s
+      labels: {}
+    # Operator metrics bind to :8082 (avoids collision with the API on :8080
+    # when port-forwarding both, and with the operator's own probe on :8081).
+    bindAddress: ":8082"
+
+  agent:
+    # Push agent-side metrics (steering, mcp_status, subagent_wait) to a
+    # Prometheus remote-write endpoint. When enabled, env vars are injected
+    # into the default KomputerAgentClusterTemplate so every spawned agent
+    # pod inherits them.
+    remoteWrite:
+      enabled: false
+      url: ""  # e.g. http://prometheus.monitoring:9090/api/v1/write
+      intervalSeconds: 15
+      bearerTokenSecret: ""  # name of K8s Secret with key 'token'
+
 # -- Default KomputerAgentClusterTemplate settings
 clusterTemplate:
   # -- PVC storage size for agent workspaces

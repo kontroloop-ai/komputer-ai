@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 
 import httpx
+import metrics as agent_metrics
 
 from claude_agent_sdk import (
     AssistantMessage,
@@ -97,6 +98,7 @@ async def run_agent(instructions: str, model: str, publisher, system_prompt: str
     publisher.publish("task_started", {
         "instructions": user_task,
         "resuming_session": session_id is not None,
+        "model": model,
     })
 
     async def post_tool_hook(input, session_id, ctx):
@@ -157,6 +159,7 @@ async def run_agent(instructions: str, model: str, publisher, system_prompt: str
                         if token:
                             cfg["headers"] = {"Authorization": f"Bearer {token}"}
                 mcp_servers[name] = cfg
+                agent_metrics.set_mcp_status(name, healthy=True)
         except Exception as e:
             print(f"[komputer] failed to parse KOMPUTER_MCP_SERVERS: {e}")
 
@@ -260,6 +263,7 @@ async def run_agent(instructions: str, model: str, publisher, system_prompt: str
                     "usage": result.usage,
                     "last_usage": last_usage,
                     "context_window": _fetch_context_window(model),
+                    "model": model,
                 })
 
     # Clear the queue reference so server.py won't try to push to a dead queue.

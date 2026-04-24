@@ -14,12 +14,19 @@ spec:
               secretKeyRef:
                 name: anthropic-api-key
                 key: api-key
-        resources:
-          requests:
-            cpu: "100m"
-            memory: "256Mi"
-          limits:
-            cpu: "2"
-            memory: "2Gi"
+          # Push agent-side metrics to the local Prometheus started via
+          # `monitoring/docker-compose.yml` on the host. Prometheus there has
+          # --web.enable-remote-write-receiver enabled. Comment out to disable.
+          - name: KOMPUTER_METRICS_PER_AGENT
+            value: "true"
+          - name: KOMPUTER_METRICS_REMOTE_WRITE_URL
+            value: "http://host.docker.internal:9090/api/v1/write"
+        # resources:
+        #   requests:
+        #     cpu: "100m"
+        #     memory: "256Mi"
+        #   limits:
+        #     cpu: "2"
+        #     memory: "2Gi"
   storage:
     size: "5Gi"

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
@@ -78,6 +79,20 @@ func TestHTTPMiddlewareObservesDuration(t *testing.T) {
 	count := testutil.CollectAndCount(httpRequestDuration)
 	if count == 0 {
 		t.Errorf("expected histogram to have observations")
+	}
+}
+
+func TestCRCollectorEmitsExpectedDescriptors(t *testing.T) {
+	c := newCRCollector(nil) // k8s nil — Collect will silently skip due to error returns
+	ch := make(chan *prometheus.Desc, 3)
+	c.Describe(ch)
+	close(ch)
+	descs := []*prometheus.Desc{}
+	for d := range ch {
+		descs = append(descs, d)
+	}
+	if len(descs) != 3 {
+		t.Errorf("expected 3 descriptors, got %d", len(descs))
 	}
 }
 

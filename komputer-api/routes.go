@@ -41,6 +41,7 @@ func SetupRoutes(r *gin.Engine, k8s *K8sClient, hub *Hub, worker *RedisWorker) {
 	// Metrics — two separate registries scraped by different ServiceMonitors.
 	perAgentLabels := os.Getenv("KOMPUTER_METRICS_PER_AGENT") == "true"
 	apiReg, agentReg := newMetricsRegistries(perAgentLabels)
+	agentReg.MustRegister(newCRCollector(k8s))
 	r.GET("/api/metrics", gin.WrapH(promhttp.HandlerFor(apiReg, promhttp.HandlerOpts{Registry: apiReg})))
 	r.GET("/agent/metrics", gin.WrapH(promhttp.HandlerFor(agentReg, promhttp.HandlerOpts{Registry: agentReg})))
 

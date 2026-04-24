@@ -1,12 +1,16 @@
 package main
 
 import (
+	"context"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
+	komputerv1alpha1 "github.com/komputer-ai/komputer-operator/api/v1alpha1"
+	"k8s.io/apimachinery/pkg/labels"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Populated at build time via -ldflags "-X main.version=... -X main.commit=..."
@@ -208,6 +212,87 @@ func (t *toolCallTrackerT) consumeDuration(agent, toolUseID string, endAt time.T
 	}
 	delete(t.starts, key)
 	return endAt.Sub(startAt), true
+}
+
+// crCollector lists KomputerAgent and KomputerSchedule CRs at scrape time
+// and exposes counts as gauges. No goroutines, no cache drift.
+// Implements prometheus.Collector.
+type crCollector struct {
+	k8s *K8sClient
+
+	tasksInProgress *prometheus.Desc
+	schedulesActive *prometheus.Desc
+	agentsByPhase   *prometheus.Desc
+}
+
+func newCRCollector(k8s *K8sClient) *crCollector {
+	return &crCollector{
+		k8s: k8s,
+		tasksInProgress: prometheus.NewDesc(
+			"komputer_tasks_inprogress",
+			"Number of agent tasks currently in progress (taskStatus=InProgress).",
+			// agent_name is always present so dashboards stay schema-stable.
+			// Empty string when KOMPUTER_METRICS_PER_AGENT=false, real name when true.
+			[]string{"namespace", "model", "agent_name"}, nil,
+		),
+		schedulesActive: prometheus.NewDesc(
+			"komputer_schedules_active",
+			"Number of KomputerSchedule resources defined.",
+			[]string{"namespace"}, nil,
+		),
+		agentsByPhase: prometheus.NewDesc(
+			"komputer_agents_active",
+			"Number of agents in each lifecycle phase.",
+			[]string{"namespace", "phase"}, nil,
+		),
+	}
+}
+
+func (c *crCollector) Describe(ch chan<- *prometheus.Desc) {
+	ch <- c.tasksInProgress
+	ch <- c.schedulesActive
+	ch <- c.agentsByPhase
+}
+
+func (c *crCollector) Collect(ch chan<- prometheus.Metric) {
+	// 5s timeout: scrapes that take longer get truncated. Caller (Prometheus) typically
+	// gives us 10s before giving up entirely, so this leaves headroom.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var agents komputerv1alpha1.KomputerAgentList
+	if err := c.k8s.client.List(ctx, &agents, &client.ListOptions{LabelSelector: labels.Everything()}); err == nil {
+		// tasksInProgress: when perAgentLabels=true, one series per agent (value=1).
+		// When false, aggregated by (namespace, model) with agent_name="" (sum is the count).
+		inProg := map[[3]string]int{} // (namespace, model, agent_name) -> count
+		// agentsByPhase: always aggregated count per (namespace, phase).
+		byPhase := map[[2]string]int{} // (namespace, phase) -> count
+		for _, a := range agents.Items {
+			byPhase[[2]string{a.Namespace, string(a.Status.Phase)}]++
+			if a.Status.TaskStatus == "InProgress" {
+				inProg[[3]string{a.Namespace, a.Spec.Model, agentNameLabel(a.Name)}]++
+			}
+		}
+		for k, v := range inProg {
+			ch <- prometheus.MustNewConstMetric(c.tasksInProgress, prometheus.GaugeValue, float64(v), k[0], k[1], k[2])
+		}
+		for k, v := range byPhase {
+			ch <- prometheus.MustNewConstMetric(c.agentsByPhase, prometheus.GaugeValue, float64(v), k[0], k[1])
+		}
+	}
+	// List errors are silently dropped — we don't have a good way to expose collector errors
+	// through the standard interface. The metric just won't appear that scrape.
+
+	var schedules komputerv1alpha1.KomputerScheduleList
+	if err := c.k8s.client.List(ctx, &schedules); err == nil {
+		byNs := map[string]int{}
+		for _, s := range schedules.Items {
+			byNs[s.Namespace]++
+		}
+		for ns, v := range byNs {
+			ch <- prometheus.MustNewConstMetric(c.schedulesActive, prometheus.GaugeValue, float64(v), ns)
+		}
+	}
 }
 
 // metricsMiddleware records HTTP request count and duration for every handled request.

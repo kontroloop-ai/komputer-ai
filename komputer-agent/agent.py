@@ -135,6 +135,7 @@ async def run_agent(instructions: str, model: str, publisher, system_prompt: str
     if os.environ.get("KOMPUTER_ROLE") == "manager":
         from manager_tools import create_manager_server
         mcp_servers["komputer"] = create_manager_server()
+        agent_metrics.set_mcp_status("komputer", healthy=True)
 
     mcp_env = os.environ.get("KOMPUTER_MCP_SERVERS")
     if mcp_env:

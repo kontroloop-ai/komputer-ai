@@ -94,6 +94,14 @@ def set_mcp_status(connector: str, healthy: bool):
         _mcp_status.labels(
             agent_name=_agent_name_label, connector=connector, status="healthy"
         ).set(1.0 if healthy else 0.0)
+        # Best-effort immediate flush so short-lived pods don't lose this value
+        # before the next 15s flush tick.
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(_flush_once())
+        except Exception:
+            pass
 
 
 def observe_subagent_wait(seconds: float):

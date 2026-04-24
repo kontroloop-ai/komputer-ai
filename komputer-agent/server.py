@@ -22,7 +22,19 @@ app = FastAPI()
 
 @app.on_event("startup")
 async def _on_startup():
+    agent_metrics.init()
     agent_metrics.start_flush_task()
+
+
+@app.on_event("shutdown")
+async def _on_shutdown():
+    # Force a final flush before the pod dies so short-lived agents
+    # don't lose their last metric state (especially the mcp_connector
+    # gauge that's only set once at task start).
+    try:
+        await agent_metrics._flush_once()
+    except Exception:
+        pass
 
 
 @app.exception_handler(HTTPException)

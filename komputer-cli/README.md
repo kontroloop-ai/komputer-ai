@@ -137,23 +137,35 @@ komputer get my-agent
 
 ### Watch live events
 
-Stream events from an agent via WebSocket (stays connected until Ctrl+C):
+Stream events from an agent via WebSocket. By default the command exits when the current task ends (`task_completed`, `task_cancelled`, or `error`):
 
 ```bash
 komputer watch my-agent
 ```
 
-By default this opens a **broadcast** subscription — every CLI/SDK/UI client connected to this agent receives every event independently. If you're running the same `watch` command on multiple machines and want each event to land on only one of them (queue-style), use `--group`:
+#### `--follow` — stay connected across tasks
+
+To keep streaming after a task ends (Ctrl+C to stop), use `--follow`:
+
+```bash
+komputer watch my-agent --follow
+```
+
+Useful for long-lived monitoring sessions, dashboards piping events elsewhere, or watching an agent that handles many sequential tasks.
+
+#### `--group` — distributed consumers
+
+By default `watch` opens a **broadcast** subscription — every CLI/SDK/UI client connected to this agent receives every event independently. If you're running the same `watch` command on multiple machines and want each event to land on only one of them (queue-style), use `--group`:
 
 ```bash
 # Run on machine A:
-komputer watch my-agent --group ops-team
+komputer watch my-agent --group ops-team --follow
 # Run on machine B (same group):
-komputer watch my-agent --group ops-team
+komputer watch my-agent --group ops-team --follow
 # Each event is delivered to A or B — never both.
 ```
 
-The group name is opaque (pick anything, e.g. `ops-team`, `audit-pipeline`). Without `--group`, every client sees every event — which is what you want for live debugging.
+The group name is opaque (pick anything, e.g. `ops-team`, `audit-pipeline`). Without `--group`, every client sees every event — which is what you want for live debugging. Combine with `--follow` so the watchers don't exit at the first `task_completed` and miss subsequent task events.
 
 ### Cancel a task
 
@@ -216,7 +228,7 @@ komputer update <name>              Patch existing agent       [--model, --instr
 komputer chat <name>                Interactive conversation   [--model, --lifecycle]
 komputer list                       List all agents            [--status queued]  (alias: ls)
 komputer get <name>                 Get agent details
-komputer watch <name>               Stream live events (WS)
+komputer watch <name>               Stream live events (WS)   [--follow, --group]
 komputer cancel <name>              Cancel running task
 komputer delete <name> [name...]    Delete one or more agents (alias: rm)
 ```

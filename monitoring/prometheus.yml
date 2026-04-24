@@ -1,0 +1,25 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: komputer-api
+    metrics_path: /api/metrics
+    static_configs:
+      - targets:
+          # host.docker.internal works on Docker Desktop (Mac/Windows).
+          # Linux users without Docker Desktop need either:
+          # 1. Run docker compose with --add-host=host.docker.internal:host-gateway
+          # 2. Or replace this with the actual host IP
+          - host.docker.internal:8080
+
+  - job_name: komputer-agent-metrics
+    metrics_path: /agent/metrics
+    static_configs:
+      - targets:
+          - host.docker.internal:8080
+
+  - job_name: komputer-operator
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - host.docker.internal:8081

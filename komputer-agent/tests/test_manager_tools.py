@@ -115,3 +115,47 @@ async def test_detach_connector(mock_api):
     result = await manager_tools.detach_connector.handler({"connector_name": "slack", "agent_name": "foo"})
     assert not result.get("isError")
     assert mock_api.last_json == {"connectors": ["github"]}
+
+
+@pytest.mark.asyncio
+async def test_list_secrets(mock_api):
+    mock_api.set("GET", "/api/v1/secrets", {"secrets": [{"name": "OPENAI"}]})
+    result = await manager_tools.list_secrets.handler({})
+    assert not result.get("isError")
+
+
+@pytest.mark.asyncio
+async def test_create_secret(mock_api):
+    mock_api.set("POST", "/api/v1/secrets", {"name": "OPENAI"})
+    result = await manager_tools.create_secret.handler({"name": "OPENAI", "value": "sk-test"})
+    assert not result.get("isError")
+    assert mock_api.last_json["name"] == "OPENAI"
+    assert mock_api.last_json["value"] == "sk-test"
+    assert mock_api.last_json["namespace"] == "default"
+
+
+@pytest.mark.asyncio
+async def test_delete_secret(mock_api):
+    mock_api.set("DELETE", "/api/v1/secrets/OPENAI", {"deleted": "OPENAI"})
+    result = await manager_tools.delete_secret.handler({"name": "OPENAI"})
+    assert not result.get("isError")
+    assert ("DELETE", "/api/v1/secrets/OPENAI") in mock_api.calls
+
+
+@pytest.mark.asyncio
+async def test_attach_secret_appends(mock_api):
+    mock_api.set("GET", "/api/v1/agents/foo", {"name": "foo", "secrets": []})
+    mock_api.set("PATCH", "/api/v1/agents/foo", {"name": "foo"})
+    result = await manager_tools.attach_secret.handler({"secret_name": "OPENAI", "agent_name": "foo"})
+    assert not result.get("isError")
+    # PATCH field is "secretRefs" (request field) but GET field is "secrets" (response field).
+    assert mock_api.last_json == {"secretRefs": ["OPENAI"]}
+
+
+@pytest.mark.asyncio
+async def test_detach_secret(mock_api):
+    mock_api.set("GET", "/api/v1/agents/foo", {"name": "foo", "secrets": ["OPENAI", "GITHUB"]})
+    mock_api.set("PATCH", "/api/v1/agents/foo", {"name": "foo"})
+    result = await manager_tools.detach_secret.handler({"secret_name": "OPENAI", "agent_name": "foo"})
+    assert not result.get("isError")
+    assert mock_api.last_json == {"secretRefs": ["GITHUB"]}

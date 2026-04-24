@@ -631,9 +631,117 @@ async def detach_connector(args):
     return await _agent_list_field_patch(agent, "connectors", mutator)
 
 
+def _sanitize_secret_name(name: str) -> str:
+    """Secret names are env var names — uppercase + underscores. Strip whitespace only."""
+    return (name or "").strip()
+
+
+@tool(
+    name="list_secrets",
+    description="List managed secrets (Kubernetes Secret resources tagged for komputer.ai) in the current namespace. Returns names only — values are never exposed.",
+    input_schema={"type": "object", "properties": {}},
+)
+async def list_secrets(args):
+    return await _request("GET", "/api/v1/secrets")
+
+
+@tool(
+    name="create_secret",
+    description="Create a managed secret in the current namespace. The secret can then be attached to any agent with attach_secret. Use this when an agent needs a new API key, token, or credential.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "Secret name (env var style: UPPER_SNAKE_CASE, e.g. 'GITHUB_TOKEN')."},
+            "value": {"type": "string", "description": "Secret value."},
+        },
+        "required": ["name", "value"],
+    },
+)
+async def create_secret(args):
+    name = _sanitize_secret_name(args["name"])
+    if not name:
+        return _err("Secret name cannot be empty.")
+    payload = {"name": name, "value": args["value"], "namespace": NAMESPACE}
+    return await _request("POST", "/api/v1/secrets", timeout=30, json=payload)
+
+
+@tool(
+    name="delete_secret",
+    description="Delete a managed secret from the current namespace. Detach it from any agents first — leaving stale references can break the agent's pod start.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "Secret name."},
+        },
+        "required": ["name"],
+    },
+)
+async def delete_secret(args):
+    name = _sanitize_secret_name(args["name"])
+    return await _request("DELETE", f"/api/v1/secrets/{name}", timeout=30)
+
+
+@tool(
+    name="attach_secret",
+    description="Attach a secret to an agent. The secret's value will be exposed as an env var (named after the secret) in the agent's pod on next start.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "secret_name": {"type": "string", "description": "Name of the secret to attach."},
+            "agent_name": {"type": "string", "description": "Agent to attach to. Defaults to the current agent."},
+        },
+        "required": ["secret_name"],
+    },
+)
+async def attach_secret(args):
+    secret = _sanitize_secret_name(args["secret_name"])
+    agent, err = _resolve_agent(args)
+    if err:
+        return err
+
+    get_result = await _request("GET", f"/api/v1/agents/{agent}")
+    if get_result.get("isError"):
+        return get_result
+    agent_data = json.loads(get_result["content"][0]["text"])
+    current = list(agent_data.get("secrets") or [])
+    if secret in current:
+        return _ok(f"Secret '{secret}' is already attached to '{agent}'.")
+    current.append(secret)
+    return await _request("PATCH", f"/api/v1/agents/{agent}", timeout=30, json={"secretRefs": current})
+
+
+@tool(
+    name="detach_secret",
+    description="Detach a secret from an agent. The env var will not be set in the next pod start.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "secret_name": {"type": "string", "description": "Name of the secret to detach."},
+            "agent_name": {"type": "string", "description": "Agent to detach from. Defaults to the current agent."},
+        },
+        "required": ["secret_name"],
+    },
+)
+async def detach_secret(args):
+    secret = _sanitize_secret_name(args["secret_name"])
+    agent, err = _resolve_agent(args)
+    if err:
+        return err
+
+    get_result = await _request("GET", f"/api/v1/agents/{agent}")
+    if get_result.get("isError"):
+        return get_result
+    agent_data = json.loads(get_result["content"][0]["text"])
+    current = list(agent_data.get("secrets") or [])
+    if secret not in current:
+        return _ok(f"Secret '{secret}' is not attached to '{agent}'.")
+    current.remove(secret)
+    return await _request("PATCH", f"/api/v1/agents/{agent}", timeout=30, json={"secretRefs": current})
+
+
 def create_manager_server():
     """Create the MCP server with manager orchestration tools."""
     return create_sdk_mcp_server(
         name="komputer",
-        tools=[create_agent, schedule_agent, get_agent_status, get_agent_events, cancel_agent, delete_agent, delete_schedule, create_memory, attach_memory, create_skill, attach_skill, update_agent, sleep_agent, wake_agent, list_agents, get_agent, list_connectors, list_connector_templates, get_connector, attach_connector, detach_connector],
+        tools=[create_agent, schedule_agent, get_agent_status, get_agent_events, cancel_agent, delete_agent, delete_schedule, create_memory, attach_memory, create_skill, attach_skill, update_agent, sleep_agent, wake_agent, list_agents, get_agent, list_connectors, list_connector_templates, get_connector, attach_connector, detach_connector, list_secrets, create_secret, delete_secret, attach_secret, detach_secret],
     )

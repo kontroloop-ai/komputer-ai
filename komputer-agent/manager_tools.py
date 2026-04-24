@@ -515,9 +515,125 @@ async def get_agent(args):
     return await _request("GET", f"/api/v1/agents/{name}")
 
 
+@tool(
+    name="list_connectors",
+    description="List configured connectors (KomputerConnector resources) in the current namespace. Each connector defines an MCP server an agent can use (Slack, GitHub, etc.). Use this before attach_connector to see what's available.",
+    input_schema={"type": "object", "properties": {}},
+)
+async def list_connectors(args):
+    return await _request("GET", "/api/v1/connectors")
+
+
+@tool(
+    name="list_connector_templates",
+    description="List built-in connector templates (catalog of known MCP integrations like Slack, GitHub, Linear). Use this when you want to set up a new connector and want to see what's supported.",
+    input_schema={"type": "object", "properties": {}},
+)
+async def list_connector_templates(args):
+    return await _request("GET", "/api/v1/connector-templates")
+
+
+@tool(
+    name="get_connector",
+    description="Get full details of a connector: auth type, MCP server URL, and configuration.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "Connector name."},
+        },
+        "required": ["name"],
+    },
+)
+async def get_connector(args):
+    name = _sanitize_name(args["name"])
+    return await _request("GET", f"/api/v1/connectors/{name}")
+
+
+async def _agent_list_field_patch(agent_name, field_name, mutator):
+    """Helper: GET agent, mutate one of its list fields, PATCH it back.
+
+    mutator(current_list) -> (new_list_or_None, message_if_no_op)
+    Returns the tool result (either the PATCH result or _ok with message).
+    """
+    get_result = await _request("GET", f"/api/v1/agents/{agent_name}")
+    if get_result.get("isError"):
+        return get_result
+    agent_data = json.loads(get_result["content"][0]["text"])
+    current = agent_data.get(field_name) or []
+    new_list, no_op_msg = mutator(list(current))
+    if new_list is None:
+        return _ok(no_op_msg)
+    return await _request("PATCH", f"/api/v1/agents/{agent_name}", timeout=30, json={field_name: new_list})
+
+
+def _resolve_agent(args):
+    """Resolve agent_name arg or fall back to KOMPUTER_AGENT_NAME. Returns (name, error_dict_or_None)."""
+    agent = args.get("agent_name")
+    if agent:
+        return _sanitize_name(agent), None
+    agent = os.environ.get("KOMPUTER_AGENT_NAME", "")
+    if not agent:
+        return None, _err("No agent_name provided and KOMPUTER_AGENT_NAME not set.")
+    return agent, None
+
+
+@tool(
+    name="attach_connector",
+    description="Attach a connector (MCP server) to an agent. The connector's tools become available in the agent's next task.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "connector_name": {"type": "string", "description": "Name of the connector to attach."},
+            "agent_name": {"type": "string", "description": "Agent to attach to. Defaults to the current agent."},
+        },
+        "required": ["connector_name"],
+    },
+)
+async def attach_connector(args):
+    connector = _sanitize_name(args["connector_name"])
+    agent, err = _resolve_agent(args)
+    if err:
+        return err
+
+    def mutator(current):
+        if connector in current:
+            return None, f"Connector '{connector}' is already attached to '{agent}'."
+        current.append(connector)
+        return current, None
+
+    return await _agent_list_field_patch(agent, "connectors", mutator)
+
+
+@tool(
+    name="detach_connector",
+    description="Detach a connector from an agent. Its tools will not be available in the agent's next task.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "connector_name": {"type": "string", "description": "Name of the connector to detach."},
+            "agent_name": {"type": "string", "description": "Agent to detach from. Defaults to the current agent."},
+        },
+        "required": ["connector_name"],
+    },
+)
+async def detach_connector(args):
+    connector = _sanitize_name(args["connector_name"])
+    agent, err = _resolve_agent(args)
+    if err:
+        return err
+
+    def mutator(current):
+        if connector not in current:
+            return None, f"Connector '{connector}' is not attached to '{agent}'."
+        current.remove(connector)
+        return current, None
+
+    return await _agent_list_field_patch(agent, "connectors", mutator)
+
+
 def create_manager_server():
     """Create the MCP server with manager orchestration tools."""
     return create_sdk_mcp_server(
         name="komputer",
-        tools=[create_agent, schedule_agent, get_agent_status, get_agent_events, cancel_agent, delete_agent, delete_schedule, create_memory, attach_memory, create_skill, attach_skill, update_agent, sleep_agent, wake_agent, list_agents, get_agent],
+        tools=[create_agent, schedule_agent, get_agent_status, get_agent_events, cancel_agent, delete_agent, delete_schedule, create_memory, attach_memory, create_skill, attach_skill, update_agent, sleep_agent, wake_agent, list_agents, get_agent, list_connectors, list_connector_templates, get_connector, attach_connector, detach_connector],
     )

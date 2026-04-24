@@ -67,3 +67,51 @@ async def test_get_agent_returns_full_spec(mock_api):
     assert not result.get("isError")
     body = json.loads(result["content"][0]["text"])
     assert body["model"] == "claude-haiku-4-5"
+
+
+@pytest.mark.asyncio
+async def test_list_connectors(mock_api):
+    mock_api.set("GET", "/api/v1/connectors", {"connectors": [{"name": "slack"}]})
+    result = await manager_tools.list_connectors.handler({})
+    assert not result.get("isError")
+
+
+@pytest.mark.asyncio
+async def test_list_connector_templates(mock_api):
+    mock_api.set("GET", "/api/v1/connector-templates", {"templates": [{"id": "slack"}]})
+    result = await manager_tools.list_connector_templates.handler({})
+    assert not result.get("isError")
+
+
+@pytest.mark.asyncio
+async def test_get_connector(mock_api):
+    mock_api.set("GET", "/api/v1/connectors/slack", {"name": "slack", "authType": "token"})
+    result = await manager_tools.get_connector.handler({"name": "slack"})
+    assert not result.get("isError")
+
+
+@pytest.mark.asyncio
+async def test_attach_connector_appends_to_existing(mock_api):
+    mock_api.set("GET", "/api/v1/agents/foo", {"name": "foo", "connectors": ["github"]})
+    mock_api.set("PATCH", "/api/v1/agents/foo", {"name": "foo"})
+    result = await manager_tools.attach_connector.handler({"connector_name": "slack", "agent_name": "foo"})
+    assert not result.get("isError")
+    assert mock_api.last_json == {"connectors": ["github", "slack"]}
+
+
+@pytest.mark.asyncio
+async def test_attach_connector_idempotent(mock_api):
+    mock_api.set("GET", "/api/v1/agents/foo", {"name": "foo", "connectors": ["slack"]})
+    result = await manager_tools.attach_connector.handler({"connector_name": "slack", "agent_name": "foo"})
+    assert not result.get("isError")
+    # No PATCH made because slack was already attached.
+    assert ("PATCH", "/api/v1/agents/foo") not in mock_api.calls
+
+
+@pytest.mark.asyncio
+async def test_detach_connector(mock_api):
+    mock_api.set("GET", "/api/v1/agents/foo", {"name": "foo", "connectors": ["slack", "github"]})
+    mock_api.set("PATCH", "/api/v1/agents/foo", {"name": "foo"})
+    result = await manager_tools.detach_connector.handler({"connector_name": "slack", "agent_name": "foo"})
+    assert not result.get("isError")
+    assert mock_api.last_json == {"connectors": ["github"]}

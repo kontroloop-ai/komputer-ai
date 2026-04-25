@@ -165,7 +165,7 @@ async def run_agent(instructions: str, model: str, publisher, system_prompt: str
                 mcp_servers[name] = cfg
                 agent_metrics.set_mcp_status(name, healthy=True)
         except Exception as e:
-            logger.error("failed to parse KOMPUTER_MCP_SERVERS", extra={"error": str(e)})
+            logger.exception("failed to parse KOMPUTER_MCP_SERVERS", extra={"error": str(e)})
 
     if mcp_servers:
         options.mcp_servers = mcp_servers
@@ -182,7 +182,7 @@ async def run_agent(instructions: str, model: str, publisher, system_prompt: str
                 debug_servers[n] = d
             else:
                 debug_servers[n] = "<sdk_server>"
-        logger.info("registered MCP servers", extra={"servers": debug_servers})
+        logger.debug("registered MCP servers", extra={"servers": debug_servers})
         logger.debug("allowed_tools", extra={"allowed_tools": options.allowed_tools})
 
     # Resume previous session if one exists

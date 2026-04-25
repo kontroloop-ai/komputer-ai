@@ -66,7 +66,7 @@ async def _interrupt_client():
         if state.active_client:
             await state.active_client.interrupt()
     except Exception as e:
-        logger.error("error interrupting client", extra={"error": str(e)})
+        logger.exception("error interrupting client", extra={"error": str(e)})
 
 
 def main():
@@ -125,7 +125,7 @@ def main():
             except asyncio.CancelledError:
                 publisher.publish("task_cancelled", {"reason": "Cancelled by signal"})
             except Exception as e:
-                logger.error("initial task failed", extra={"error": str(e)})
+                logger.exception("initial task failed", extra={"error": str(e)})
                 publisher.publish("error", {"error": str(e)})
             finally:
                 state.set_active_client(None)

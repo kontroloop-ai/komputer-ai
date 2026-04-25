@@ -50,7 +50,7 @@ class EventPublisher:
             try:
                 self.client.xadd(stream_key, event, maxlen=200, approximate=True)
             except redis.RedisError as e:
-                logger.error("failed to publish event", extra={"error": str(e)})
+                logger.exception("failed to publish event", extra={"error": str(e)})
             self._queue.task_done()
 
     def ping(self) -> bool:
@@ -88,7 +88,7 @@ class EventPublisher:
                 pipe.xadd(stream_key, event, maxlen=200, approximate=True)
                 pipe.execute()
             except redis.RedisError as e:
-                logger.error("failed to publish task_started", extra={"error": str(e)})
+                logger.exception("failed to publish task_started", extra={"error": str(e)})
             return
 
         # All other events: enqueue for background publisher — returns immediately.

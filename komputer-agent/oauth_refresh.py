@@ -22,5 +22,5 @@ async def refresh_oauth_token(connector_name: str) -> str | None:
                 data = resp.json()
                 return data.get("access_token")
     except Exception as e:
-        logger.error("oauth refresh failed", extra={"connector_name": connector_name, "error": str(e)})
+        logger.exception("oauth refresh failed", extra={"connector_name": connector_name, "error": str(e)})
     return None

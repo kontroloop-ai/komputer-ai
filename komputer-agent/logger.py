@@ -4,8 +4,17 @@ when running interactively. Override with LOG_FORMAT=json|text."""
 import logging
 import os
 import sys
+from datetime import datetime, timezone
 
 from pythonjsonlogger import jsonlogger
+
+
+def _iso_timestamp(record: logging.LogRecord) -> str:
+    """ISO 8601 with millisecond precision and UTC offset, matching the API's
+    zap output so logs from both components correlate cleanly."""
+    dt = datetime.fromtimestamp(record.created, tz=timezone.utc)
+    millis = f"{dt.microsecond // 1000:03d}"
+    return f"{dt.strftime('%Y-%m-%dT%H:%M:%S')}.{millis}Z"
 
 
 _COMPONENT = "komputer-agent"
@@ -25,7 +34,7 @@ class _ConsoleFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         color = self.COLORS.get(record.levelname, "")
-        ts = self.formatTime(record, datefmt="%Y-%m-%dT%H:%M:%S")
+        ts = _iso_timestamp(record)
         extras = {
             k: v for k, v in record.__dict__.items()
             if k not in (
@@ -49,7 +58,7 @@ class _JsonFormatter(jsonlogger.JsonFormatter):
 
     def add_fields(self, log_record: dict, record: logging.LogRecord, message_dict: dict) -> None:
         super().add_fields(log_record, record, message_dict)
-        log_record["timestamp"] = self.formatTime(record, datefmt="%Y-%m-%dT%H:%M:%S")
+        log_record["timestamp"] = _iso_timestamp(record)
         log_record["level"] = record.levelname.lower()
         log_record["component"] = _COMPONENT
         if "message" not in log_record and record.getMessage():

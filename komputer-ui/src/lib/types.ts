@@ -272,6 +272,35 @@ export interface ConnectorTemplateListResponse {
   templates: ConnectorTemplate[];
 }
 
+export interface SquadMember {
+  name: string;
+  ready: boolean;
+  taskStatus?: string;
+}
+
+export interface Squad {
+  name: string;
+  namespace: string;
+  phase: 'Pending' | 'Running' | 'Orphaned' | 'Failed';
+  podName?: string;
+  members: SquadMember[];
+  orphanTTL?: string;
+  orphanedSince?: string;
+  message?: string;
+  createdAt: string;
+}
+
+export interface SquadListResponse {
+  squads: Squad[];
+}
+
+export interface CreateSquadRequest {
+  name: string;
+  namespace?: string;
+  members: Array<{ ref?: { name: string; namespace?: string } } | { spec: unknown }>;
+  orphanTTL?: string;
+}
+
 export interface TaskBreakdown {
   index: number;
   startedAt: string;

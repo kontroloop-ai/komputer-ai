@@ -24,6 +24,9 @@ import type {
   CreateConnectorRequest,
   ConnectorTemplateListResponse,
   CostBreakdownResponse,
+  Squad,
+  SquadListResponse,
+  CreateSquadRequest,
 } from './types';
 import { getConfig } from './config';
 
@@ -205,6 +208,34 @@ export const listTemplates = (ns?: string) =>
 // Connector templates
 export const listConnectorTemplates = () =>
   request<ConnectorTemplateListResponse>('/connector-templates');
+
+// Squads
+export const listSquads = (ns?: string) =>
+  MOCK_EMPTY
+    ? Promise.resolve({ squads: [] } as SquadListResponse)
+    : request<SquadListResponse>(`/squads${ns ? `?namespace=${ns}` : ''}`);
+
+export const getSquad = (name: string, ns?: string) =>
+  request<Squad>(`/squads/${name}${ns ? `?namespace=${ns}` : ''}`);
+
+export const createSquad = (data: CreateSquadRequest) =>
+  request<Squad>('/squads', { method: 'POST', body: JSON.stringify(data) });
+
+export const deleteSquad = (name: string, ns?: string) =>
+  request<void>(`/squads/${name}${ns ? `?namespace=${ns}` : ''}`, { method: 'DELETE' });
+
+export const addSquadMember = (
+  squadName: string,
+  ns: string,
+  member: { ref?: { name: string; namespace?: string }; spec?: unknown },
+) =>
+  request<Squad>(`/squads/${squadName}/members?namespace=${ns}`, {
+    method: 'POST',
+    body: JSON.stringify(member),
+  });
+
+export const removeSquadMember = (squadName: string, ns: string, agentName: string) =>
+  request<Squad>(`/squads/${squadName}/members/${agentName}?namespace=${ns}`, { method: 'DELETE' });
 
 // Health
 export const listNamespaces = () =>

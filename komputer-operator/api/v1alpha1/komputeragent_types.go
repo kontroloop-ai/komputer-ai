@@ -31,6 +31,8 @@ const (
 	AgentPhaseFailed    KomputerAgentPhase = "Failed"
 	AgentPhaseSleeping  KomputerAgentPhase = "Sleeping"
 	AgentPhaseQueued    KomputerAgentPhase = "Queued"
+	// KomputerAgentPhaseSquad indicates the agent is managed by a KomputerSquad.
+	KomputerAgentPhaseSquad KomputerAgentPhase = "Squad"
 )
 
 // AgentLifecycle controls what happens after task completion.

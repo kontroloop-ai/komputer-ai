@@ -223,6 +223,13 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "KomputerSchedule")
 		os.Exit(1)
 	}
+	if err = (&controller.KomputerSquadReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "KomputerSquad")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	if metricsCertWatcher != nil {

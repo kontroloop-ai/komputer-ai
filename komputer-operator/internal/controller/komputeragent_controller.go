@@ -76,6 +76,11 @@ func (r *KomputerAgentReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
+	// Skip agents owned by a squad — the squad controller is responsible for their lifecycle.
+	if agent.Status.Phase == komputerv1alpha1.KomputerAgentPhaseSquad {
+		return ctrl.Result{}, nil
+	}
+
 	// Handle office-cleanup finalizer for managers being deleted.
 	// Note: We delete the Office first (which has its own finalizer to clean up members),
 	// then remove this finalizer. The Office finalizer handles member cleanup independently.
@@ -873,6 +878,7 @@ func (r *KomputerAgentReconciler) buildPod(ctx context.Context, agent *komputerv
 			Namespace: agent.Namespace,
 			Labels: map[string]string{
 				"komputer.ai/agent-name": agent.Name,
+				"komputer.ai/squad":      "false",
 			},
 		},
 		Spec: podSpec,

@@ -150,3 +150,24 @@ type ConnectorTemplateResponse struct {
 type ConnectorTemplateListResponse struct {
 	Templates []ConnectorTemplateResponse `json:"templates"`
 }
+
+type SquadMemberRef struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace,omitempty"`
+}
+
+type SquadMember struct {
+	Ref SquadMemberRef `json:"ref"`
+}
+
+type SquadResponse struct {
+	Name      string        `json:"name"`
+	Namespace string        `json:"namespace"`
+	Members   []SquadMemberRef `json:"members"`
+	OrphanTTL string        `json:"orphanTTL,omitempty"`
+	CreatedAt string        `json:"createdAt"`
+}
+
+type SquadListResponse struct {
+	Squads []SquadResponse `json:"squads"`
+}

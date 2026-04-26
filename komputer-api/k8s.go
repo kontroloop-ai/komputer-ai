@@ -633,6 +633,50 @@ func (k *K8sClient) DeleteSquad(ctx context.Context, ns, name string) error {
 	return k.client.Delete(ctx, squad)
 }
 
+// FindSquadForAgent lists all squads in the namespace and returns the first one
+// that contains agentName as a ref member. Returns nil if the agent is not in any squad.
+func (k *K8sClient) FindSquadForAgent(ctx context.Context, ns, agentName string) (*komputerv1alpha1.KomputerSquad, error) {
+	squads, err := k.ListSquads(ctx, ns)
+	if err != nil {
+		return nil, err
+	}
+	for i := range squads {
+		for _, m := range squads[i].Spec.Members {
+			if m.Ref != nil && m.Ref.Name == agentName {
+				return &squads[i], nil
+			}
+		}
+	}
+	return nil, nil
+}
+
+// SteerAgent sends a steer message to a running agent pod. It looks up the pod by agent name.
+// Returns an error if the agent is not found, has no pod, or the pod is unreachable.
+func (k *K8sClient) SteerAgent(ctx context.Context, ns, agentName, message string) error {
+	agent := &komputerv1alpha1.KomputerAgent{}
+	if err := k.client.Get(ctx, types.NamespacedName{Name: agentName, Namespace: ns}, agent); err != nil {
+		return fmt.Errorf("agent not found: %w", err)
+	}
+	if agent.Status.PodName == "" {
+		return fmt.Errorf("agent %s has no running pod", agentName)
+	}
+	podIP, err := k.GetAgentPodIP(ctx, ns, agent.Status.PodName)
+	if err != nil {
+		return err
+	}
+	bodyJSON, _ := json.Marshal(map[string]string{"instructions": message})
+	_, err = k.postToAgentWithResponse(ctx, podIP, "/task", string(bodyJSON))
+	if err != nil {
+		// Fallback via kubectl exec
+		_, err = k.execInPodWithOutput(ctx, ns, agent.Status.PodName,
+			"curl", "-s", "-X", "POST",
+			"-H", "Content-Type: application/json",
+			"-d", string(bodyJSON),
+			"http://localhost:8000/task")
+	}
+	return err
+}
+
 func (k *K8sClient) CreateSchedule(ctx context.Context, ns string, req *CreateScheduleRequest) (*komputerv1alpha1.KomputerSchedule, error) {
 	schedule := &komputerv1alpha1.KomputerSchedule{
 		ObjectMeta: metav1.ObjectMeta{

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -401,6 +402,24 @@ func addSquadMember(k8s *K8sClient) gin.HandlerFunc {
 
 		Logger.Infow("added member to squad", "namespace", ns, "squad_name", name)
 		squadActionsTotal.WithLabelValues("add_member", "success").Inc()
+
+		// Best-effort: steer all other current members to inform them of the new arrival.
+		addedName := ""
+		if newMember.Ref != nil {
+			addedName = newMember.Ref.Name
+		}
+		if addedName != "" {
+			msg := fmt.Sprintf("%s joined the squad. Continue your task.", addedName)
+			for _, m := range updated.Spec.Members {
+				if m.Ref == nil || m.Ref.Name == addedName {
+					continue
+				}
+				if err := k8s.SteerAgent(c.Request.Context(), ns, m.Ref.Name, msg); err != nil {
+					Logger.Warnw("failed to steer squad member on add", "squad_name", name, "member", m.Ref.Name, "error", err)
+				}
+			}
+		}
+
 		c.JSON(http.StatusOK, squadToResponse(*updated))
 	}
 }
@@ -468,6 +487,18 @@ func removeSquadMember(k8s *K8sClient) gin.HandlerFunc {
 
 		Logger.Infow("removed member from squad", "namespace", ns, "squad_name", squadName, "agent_name", agentName)
 		squadActionsTotal.WithLabelValues("remove_member", "success").Inc()
+
+		// Best-effort: steer all remaining members to inform them of the departure.
+		msg := fmt.Sprintf("%s left the squad. Continue your task.", agentName)
+		for _, m := range updated.Spec.Members {
+			if m.Ref == nil {
+				continue
+			}
+			if err := k8s.SteerAgent(c.Request.Context(), ns, m.Ref.Name, msg); err != nil {
+				Logger.Warnw("failed to steer squad member on remove", "squad_name", squadName, "member", m.Ref.Name, "error", err)
+			}
+		}
+
 		c.JSON(http.StatusOK, squadToResponse(*updated))
 	}
 }

@@ -150,10 +150,21 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 		buildInternalSystemPrompt := func(memories []string) string {
 			memorySection, _ := k8s.ResolveMemoryContent(c.Request.Context(), ns, memories)
 			agentHeader := fmt.Sprintf("\n---\n\n**Agent Name:** %s", req.Name)
+			base := workerSystemPrompt
 			if role == "manager" {
-				return managerSystemPrompt + memorySection + agentHeader
+				base = managerSystemPrompt
 			}
-			return workerSystemPrompt + memorySection + agentHeader
+			prompt := base + memorySection + agentHeader
+			if squad, err := k8s.FindSquadForAgent(c.Request.Context(), ns, req.Name); err == nil && squad != nil {
+				memberNames := make([]string, 0, len(squad.Spec.Members))
+				for _, m := range squad.Spec.Members {
+					if m.Ref != nil && m.Ref.Name != req.Name {
+						memberNames = append(memberNames, m.Ref.Name)
+					}
+				}
+				prompt += fmt.Sprintf("\nYou are part of squad %q with members: %s. Their workspaces are mounted read/write at /agents/<name>/workspace.", squad.Name, strings.Join(memberNames, ", "))
+			}
+			return prompt
 		}
 
 		existing, err := k8s.GetAgent(c.Request.Context(), ns, req.Name)

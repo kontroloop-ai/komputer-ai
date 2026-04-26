@@ -219,6 +219,15 @@ metrics:
       intervalSeconds: 15
       bearerTokenSecret: ""  # name of K8s Secret with key 'token'
 
+webhooks:
+  # Enables the validating admission webhook for KomputerSquad.
+  # When enabled, the operator serves HTTPS on port 9443 and Kubernetes calls it
+  # on every KomputerSquad create/update to enforce membership uniqueness.
+  # Requires cert-manager to be installed in the cluster — it provisions the TLS
+  # certificate and injects the CA bundle into the ValidatingWebhookConfiguration.
+  # Set to false to disable the webhook if cert-manager is not available.
+  enabled: true
+
 # -- Default KomputerAgentClusterTemplate settings
 clusterTemplate:
   # -- PVC storage size for agent workspaces

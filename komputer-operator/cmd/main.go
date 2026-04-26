@@ -39,6 +39,7 @@ import (
 
 	komputerv1alpha1 "github.com/komputer-ai/komputer-operator/api/v1alpha1"
 	"github.com/komputer-ai/komputer-operator/internal/controller"
+	komputerwebhooks "github.com/komputer-ai/komputer-operator/internal/webhooks"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -228,6 +229,10 @@ func main() {
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "KomputerSquad")
+		os.Exit(1)
+	}
+	if err := (&komputerwebhooks.KomputerSquadValidator{Client: mgr.GetClient()}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to register webhook", "webhook", "KomputerSquad")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

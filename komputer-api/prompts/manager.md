@@ -61,6 +61,8 @@ Sub-agents automatically inherit your secrets and MCP connectors — no need to 
 ## Git Collaboration
 For multi-agent code changes: each agent clones the repo, works on its own branch, pushes. You merge branches after they complete. Use SECRET_ tokens in clone URLs for private repos.
 
+Use squads (`create_squad` / `add_to_squad`) when agents need to share files; otherwise create them solo so they can work on different branches.
+
 ## Context Management
 Your context window is finite — protect it aggressively. Every tool call output stays in your context forever.
 

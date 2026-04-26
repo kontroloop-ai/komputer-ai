@@ -54,6 +54,7 @@ async def _request(method: str, path: str, timeout: int = 10, **kwargs) -> dict:
             "templateRef": {"type": "string", "description": "Pod template name (optional, defaults to 'default')."},
             "systemPrompt": {"type": "string", "description": "Custom system prompt defining the sub-agent's behavior, persona, or constraints (optional)."},
             "priority": {"type": "integer", "description": "Queue priority. Higher = admitted first when the template's maxConcurrentAgents cap is reached. Default: 0."},
+            "squad": {"type": "string", "description": "Squad name to add the new agent to after creation (optional). The squad must already exist."},
         },
         "required": ["name", "instructions"],
     },
@@ -84,7 +85,22 @@ async def create_agent(args):
     if manager_name:
         payload["officeManager"] = manager_name
 
-    return await _request("POST", "/api/v1/agents", timeout=30, json=payload)
+    result = await _request("POST", "/api/v1/agents", timeout=30, json=payload)
+
+    # If a squad was specified, add the new agent to it.
+    if not result.get("isError") and args.get("squad"):
+        squad_name = _sanitize_name(args["squad"])
+        member_result = await _request(
+            "POST", f"/api/v1/squads/{squad_name}/members",
+            timeout=30, json={"ref": {"name": full_name}},
+        )
+        if member_result.get("isError"):
+            return _err(
+                f"Agent '{full_name}' created but failed to join squad '{squad_name}': "
+                f"{member_result['content'][0]['text']}"
+            )
+
+    return result
 
 
 @tool(
@@ -1000,9 +1016,106 @@ async def list_templates(args):
     return await _request("GET", "/api/v1/templates")
 
 
+@tool(
+    name="create_squad",
+    description="Create a new squad — a named group of agents that share a PVC workspace. Use when multiple agents need to read and write the same files (e.g. one agent writes code, another reviews it).",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "Unique squad name (lowercase, hyphens, no spaces)."},
+            "agents": {"type": "array", "items": {"type": "string"}, "description": "Names of existing agents to add as initial members."},
+            "orphan_ttl": {"type": "string", "description": "How long to keep the squad's shared PVC after all members leave (e.g. '10m', '1h'). Defaults to '10m'."},
+        },
+        "required": ["name", "agents"],
+    },
+)
+async def create_squad(args):
+    squad_name = _sanitize_name(args["name"])
+    members = [{"ref": {"name": _sanitize_name(a)}} for a in (args.get("agents") or [])]
+    payload = {
+        "name": squad_name,
+        "namespace": NAMESPACE,
+        "members": members,
+        "orphanTTL": args.get("orphan_ttl", "10m"),
+    }
+    return await _request("POST", "/api/v1/squads", timeout=30, json=payload)
+
+
+@tool(
+    name="add_to_squad",
+    description="Add an existing agent to a squad so it gains access to the squad's shared workspace.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "squad_name": {"type": "string", "description": "Name of the squad."},
+            "agent_name": {"type": "string", "description": "Name of the agent to add."},
+        },
+        "required": ["squad_name", "agent_name"],
+    },
+)
+async def add_to_squad(args):
+    squad_name = _sanitize_name(args["squad_name"])
+    agent_name = _sanitize_name(args["agent_name"])
+    return await _request(
+        "POST", f"/api/v1/squads/{squad_name}/members",
+        timeout=30, json={"ref": {"name": agent_name}},
+    )
+
+
+@tool(
+    name="remove_from_squad",
+    description="Remove an agent from a squad. The agent loses access to the squad's shared workspace.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "squad_name": {"type": "string", "description": "Name of the squad."},
+            "agent_name": {"type": "string", "description": "Name of the agent to remove."},
+        },
+        "required": ["squad_name", "agent_name"],
+    },
+)
+async def remove_from_squad(args):
+    squad_name = _sanitize_name(args["squad_name"])
+    agent_name = _sanitize_name(args["agent_name"])
+    return await _request("DELETE", f"/api/v1/squads/{squad_name}/members/{agent_name}")
+
+
+@tool(
+    name="delete_squad",
+    description="Delete a squad. The shared PVC is removed after the orphanTTL. Agents themselves are not deleted.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "Name of the squad to delete."},
+        },
+        "required": ["name"],
+    },
+)
+async def delete_squad(args):
+    squad_name = _sanitize_name(args["name"])
+    return await _request("DELETE", f"/api/v1/squads/{squad_name}")
+
+
+@tool(
+    name="list_squads",
+    description="List all squads in the current namespace, with their members and shared workspace status.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "namespace": {"type": "string", "description": "Namespace to list squads from. Defaults to the current namespace."},
+        },
+    },
+)
+async def list_squads(args):
+    params = {}
+    if args.get("namespace"):
+        params["namespace"] = args["namespace"]
+    return await _request("GET", "/api/v1/squads", params=params)
+
+
 def create_manager_server():
     """Create the MCP server with manager orchestration tools."""
     return create_sdk_mcp_server(
         name="komputer",
-        tools=[create_agent, schedule_agent, get_agent_status, get_agent_events, cancel_agent, delete_agent, delete_schedule, list_schedules, get_schedule, update_schedule, create_memory, attach_memory, create_skill, attach_skill, update_agent, sleep_agent, wake_agent, list_agents, get_agent, list_connectors, list_connector_templates, get_connector, attach_connector, detach_connector, list_secrets, create_secret, delete_secret, attach_secret, detach_secret, list_skills, get_skill, update_skill, delete_skill, detach_skill, list_memories, get_memory, update_memory, delete_memory, detach_memory, list_namespaces, list_templates],
+        tools=[create_agent, schedule_agent, get_agent_status, get_agent_events, cancel_agent, delete_agent, delete_schedule, list_schedules, get_schedule, update_schedule, create_memory, attach_memory, create_skill, attach_skill, update_agent, sleep_agent, wake_agent, list_agents, get_agent, list_connectors, list_connector_templates, get_connector, attach_connector, detach_connector, list_secrets, create_secret, delete_secret, attach_secret, detach_secret, list_skills, get_skill, update_skill, delete_skill, detach_skill, list_memories, get_memory, update_memory, delete_memory, detach_memory, list_namespaces, list_templates, create_squad, add_to_squad, remove_from_squad, delete_squad, list_squads],
     )

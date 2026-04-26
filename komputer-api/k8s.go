@@ -586,6 +586,53 @@ func (k *K8sClient) DeleteOffice(ctx context.Context, ns, name string) error {
 	return k.client.Delete(ctx, office)
 }
 
+// --- KomputerSquad helpers ---
+
+func (k *K8sClient) GetSquad(ctx context.Context, ns, name string) (*komputerv1alpha1.KomputerSquad, error) {
+	squad := &komputerv1alpha1.KomputerSquad{}
+	err := k.client.Get(ctx, types.NamespacedName{Name: name, Namespace: ns}, squad)
+	if err != nil {
+		return nil, err
+	}
+	return squad, nil
+}
+
+func (k *K8sClient) ListSquads(ctx context.Context, ns string) ([]komputerv1alpha1.KomputerSquad, error) {
+	list := &komputerv1alpha1.KomputerSquadList{}
+	var opts []client.ListOption
+	if ns != "" {
+		opts = append(opts, client.InNamespace(ns))
+	}
+	if err := k.client.List(ctx, list, opts...); err != nil {
+		return nil, err
+	}
+	return list.Items, nil
+}
+
+func (k *K8sClient) CreateSquad(ctx context.Context, ns string, squad *komputerv1alpha1.KomputerSquad) (*komputerv1alpha1.KomputerSquad, error) {
+	if err := k.client.Create(ctx, squad); err != nil {
+		return nil, err
+	}
+	return squad, nil
+}
+
+func (k *K8sClient) UpdateSquad(ctx context.Context, squad *komputerv1alpha1.KomputerSquad) (*komputerv1alpha1.KomputerSquad, error) {
+	if err := k.client.Update(ctx, squad); err != nil {
+		return nil, err
+	}
+	return squad, nil
+}
+
+func (k *K8sClient) DeleteSquad(ctx context.Context, ns, name string) error {
+	squad := &komputerv1alpha1.KomputerSquad{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+		},
+	}
+	return k.client.Delete(ctx, squad)
+}
+
 func (k *K8sClient) CreateSchedule(ctx context.Context, ns string, req *CreateScheduleRequest) (*komputerv1alpha1.KomputerSchedule, error) {
 	schedule := &komputerv1alpha1.KomputerSchedule{
 		ObjectMeta: metav1.ObjectMeta{

@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
@@ -578,7 +577,6 @@ func (r *KomputerAgentReconciler) ensurePod(ctx context.Context, agent *komputer
 
 // buildPod deep copies the template PodSpec and injects env/volumes/mounts.
 func (r *KomputerAgentReconciler) buildPod(ctx context.Context, agent *komputerv1alpha1.KomputerAgent, template *komputerv1alpha1.KomputerAgentTemplate, pvcName, podName string, config *komputerv1alpha1.KomputerConfig) (*corev1.Pod, error) {
-	log := logf.FromContext(ctx)
 	podSpec := *template.Spec.PodSpec.DeepCopy()
 
 	if len(podSpec.Containers) == 0 {
@@ -588,257 +586,23 @@ func (r *KomputerAgentReconciler) buildPod(ctx context.Context, agent *komputerv
 	// Set restart policy
 	podSpec.RestartPolicy = corev1.RestartPolicyNever
 
-	// Add volumes
-	podSpec.Volumes = append(podSpec.Volumes,
-		corev1.Volume{
-			Name: "workspace",
-			VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: pvcName,
-				},
-			},
-		},
-	)
+	// Add workspace volume (solo pod uses the plain name "workspace").
+	podSpec.Volumes = append(podSpec.Volumes, buildAgentVolumes("workspace", pvcName)...)
 
 	// Inject into first container
 	container := &podSpec.Containers[0]
 
-	// Add env vars
-	redis := config.Spec.Redis
-	envVars := []corev1.EnvVar{
-		{Name: "KOMPUTER_INSTRUCTIONS", Value: agent.Spec.Instructions},
-		{Name: "KOMPUTER_INTERNAL_SYSTEM_PROMPT", Value: agent.Spec.InternalSystemPrompt},
-		{Name: "KOMPUTER_SYSTEM_PROMPT", Value: agent.Spec.SystemPrompt},
-		{Name: "KOMPUTER_MODEL", Value: agent.Spec.Model},
-		{Name: "KOMPUTER_AGENT_NAME", Value: agent.Name},
-		{Name: "KOMPUTER_NAMESPACE", Value: agent.Namespace},
-		{Name: "CLAUDE_CONFIG_DIR", Value: "/workspace/.claude"},
-		// Redis config as env vars (no ConfigMap needed).
-		{Name: "KOMPUTER_REDIS_ADDRESS", Value: redis.Address},
-		{Name: "KOMPUTER_REDIS_DB", Value: fmt.Sprintf("%d", redis.DB)},
-		{Name: "KOMPUTER_REDIS_STREAM_PREFIX", Value: redis.StreamPrefix},
-	}
-	// Redis password from Secret (stays as a Secret, not plaintext).
-	if redis.PasswordSecret != nil && redis.PasswordSecret.Name != "" {
-		envVars = append(envVars, corev1.EnvVar{
-			Name: "KOMPUTER_REDIS_PASSWORD",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{Name: redis.PasswordSecret.Name},
-					Key:                  redis.PasswordSecret.Key,
-				},
-			},
-		})
-	}
-	if agent.Spec.Role == "manager" {
-		envVars = append(envVars,
-			corev1.EnvVar{Name: "KOMPUTER_ROLE", Value: agent.Spec.Role},
-			corev1.EnvVar{Name: "KOMPUTER_API_URL", Value: config.Spec.APIURL},
-		)
-	}
-	// Inject env vars from agent secrets as SECRET_<SECRETNAME>_<KEY>.
-	injectedSecrets := make(map[string]bool)
-	for _, secretName := range agent.Spec.Secrets {
-		injectedSecrets[secretName] = true
-		secret := &corev1.Secret{}
-		if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: agent.Namespace}, secret); err != nil {
-			log.Error(err, "Failed to get agent secret", "secret", secretName)
-			continue
-		}
-		sanitizedName := strings.ToUpper(strings.NewReplacer("-", "_", ".", "_").Replace(secretName))
-		for key := range secret.Data {
-			sanitizedKey := strings.ToUpper(strings.NewReplacer("-", "_", ".", "_").Replace(key))
-			envVars = append(envVars, corev1.EnvVar{
-				Name: "SECRET_" + sanitizedName + "_" + sanitizedKey,
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{Name: secretName},
-						Key:                  key,
-					},
-				},
-			})
-		}
-	}
-	// Inherit secrets from office manager (sub-agents get the same secrets as their manager).
-	if agent.Spec.OfficeManager != "" {
-		manager := &komputerv1alpha1.KomputerAgent{}
-		if err := r.Get(ctx, types.NamespacedName{Name: agent.Spec.OfficeManager, Namespace: agent.Namespace}, manager); err == nil {
-			for _, secretName := range manager.Spec.Secrets {
-				if injectedSecrets[secretName] {
-					continue
-				}
-				secret := &corev1.Secret{}
-				if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: agent.Namespace}, secret); err != nil {
-					continue
-				}
-				sanitizedName := strings.ToUpper(strings.NewReplacer("-", "_", ".", "_").Replace(secretName))
-				for key := range secret.Data {
-					sanitizedKey := strings.ToUpper(strings.NewReplacer("-", "_", ".", "_").Replace(key))
-					envVars = append(envVars, corev1.EnvVar{
-						Name: "SECRET_" + sanitizedName + "_" + sanitizedKey,
-						ValueFrom: &corev1.EnvVarSource{
-							SecretKeyRef: &corev1.SecretKeySelector{
-								LocalObjectReference: corev1.LocalObjectReference{Name: secretName},
-								Key:                  key,
-							},
-						},
-					})
-				}
-			}
-		}
+	// Build the full env var set via the shared helper.
+	envVars, err := buildAgentEnvVars(ctx, r.Client, agent, config)
+	if err != nil {
+		return nil, fmt.Errorf("build env vars for agent %s: %w", agent.Name, err)
 	}
 
-	// Inject skills as SKILL_* env vars (full markdown content).
-	// Start with default skills (labeled komputer.ai/default=true), then layer explicit skills on top.
-	injectedSkills := make(map[string]bool)
-	defaultSkills := &komputerv1alpha1.KomputerSkillList{}
-	if err := r.List(ctx, defaultSkills, client.MatchingLabels{"komputer.ai/default": "true"}); err == nil {
-		for i := range defaultSkills.Items {
-			skill := &defaultSkills.Items[i]
-			// Skip if the agent explicitly references this skill (explicit takes precedence).
-			if injectedSkills[skill.Name] {
-				continue
-			}
-			injectedSkills[skill.Name] = true
-			sanitized := strings.ToUpper(regexp.MustCompile(`[^A-Za-z0-9]`).ReplaceAllString(skill.Name, "_"))
-			md := fmt.Sprintf("---\nname: %s\ndescription: %s\n---\n\n%s", skill.Name, skill.Spec.Description, skill.Spec.Content)
-			envVars = append(envVars, corev1.EnvVar{
-				Name:  "SKILL_" + sanitized,
-				Value: md,
-			})
-		}
-	}
+	// Merge: new vars replace template vars with the same name.
+	container.Env = mergeEnvVars(container.Env, envVars)
 
-	for _, skillRef := range agent.Spec.Skills {
-		skillNs := agent.Namespace
-		skillName := skillRef
-		if parts := strings.SplitN(skillRef, "/", 2); len(parts) == 2 {
-			skillNs = parts[0]
-			skillName = parts[1]
-		}
-		if injectedSkills[skillName] {
-			continue
-		}
-		skill := &komputerv1alpha1.KomputerSkill{}
-		if err := r.Get(ctx, types.NamespacedName{Name: skillName, Namespace: skillNs}, skill); err != nil {
-			log.Info("Skill not found, skipping", "skill", skillRef)
-			continue
-		}
-		injectedSkills[skillName] = true
-		sanitized := strings.ToUpper(regexp.MustCompile(`[^A-Za-z0-9]`).ReplaceAllString(skillName, "_"))
-		md := fmt.Sprintf("---\nname: %s\ndescription: %s\n---\n\n%s", skillName, skill.Spec.Description, skill.Spec.Content)
-		envVars = append(envVars, corev1.EnvVar{
-			Name:  "SKILL_" + sanitized,
-			Value: md,
-		})
-	}
-
-	// Inherit connectors from office manager (sub-agents get the same connectors as their manager).
-	connectors := append([]string{}, agent.Spec.Connectors...)
-	if agent.Spec.OfficeManager != "" {
-		manager := &komputerv1alpha1.KomputerAgent{}
-		if err := r.Get(ctx, types.NamespacedName{Name: agent.Spec.OfficeManager, Namespace: agent.Namespace}, manager); err == nil {
-			seen := make(map[string]bool, len(connectors))
-			for _, c := range connectors {
-				seen[c] = true
-			}
-			for _, c := range manager.Spec.Connectors {
-				if !seen[c] {
-					connectors = append(connectors, c)
-				}
-			}
-		}
-	}
-
-	// Resolve connectors → build MCP server config JSON for the agent SDK.
-	// Auth tokens are mounted as separate env vars (CONNECTOR_<NAME>_TOKEN) and
-	// referenced in the JSON so secrets are not baked in as plaintext.
-	if len(connectors) > 0 {
-		type mcpServerEntry struct {
-			Type     string `json:"type"`
-			URL      string `json:"url"`
-			TokenEnv string `json:"tokenEnv,omitempty"` // env var name holding the Bearer token
-			AuthType string `json:"authType,omitempty"` // "token" or "oauth"
-		}
-		mcpServers := make(map[string]mcpServerEntry)
-		for _, connRef := range connectors {
-			connNs := agent.Namespace
-			connName := connRef
-			if parts := strings.SplitN(connRef, "/", 2); len(parts) == 2 {
-				connNs = parts[0]
-				connName = parts[1]
-			}
-			conn := &komputerv1alpha1.KomputerConnector{}
-			if err := r.Get(ctx, types.NamespacedName{Name: connName, Namespace: connNs}, conn); err != nil {
-				log.Info("Connector not found, skipping", "connector", connRef)
-				continue
-			}
-			sanitized := strings.ToUpper(strings.NewReplacer("-", "_", ".", "_").Replace(connName))
-			entry := mcpServerEntry{Type: "http", URL: conn.Spec.URL, AuthType: conn.Spec.AuthType}
-			// Mount auth secret as env var and reference it.
-			if conn.Spec.AuthSecretKeyRef != nil {
-				secretName := conn.Spec.AuthSecretKeyRef.Name
-				// Cross-namespace connector: secret lives in the connector's namespace,
-				// not the agent's. Sync it into the agent's namespace so the pod can
-				// mount it via SecretKeyRef (which only resolves within the same ns).
-				if connNs != agent.Namespace {
-					synced, err := r.syncConnectorSecret(ctx, secretName, connNs, agent.Namespace, connName)
-					if err != nil {
-						log.Info("Failed to sync connector secret across namespaces, skipping", "connector", connRef, "error", err.Error())
-						continue
-					}
-					secretName = synced
-				}
-				tokenEnvName := "CONNECTOR_" + sanitized + "_TOKEN"
-				entry.TokenEnv = tokenEnvName
-				envVars = append(envVars, corev1.EnvVar{
-					Name: tokenEnvName,
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{Name: secretName},
-							Key:                  conn.Spec.AuthSecretKeyRef.Key,
-						},
-					},
-				})
-			}
-			mcpServers[connName] = entry
-		}
-		if len(mcpServers) > 0 {
-			if mcpJSON, err := json.Marshal(mcpServers); err == nil {
-				envVars = append(envVars, corev1.EnvVar{
-					Name:  "KOMPUTER_MCP_SERVERS",
-					Value: string(mcpJSON),
-				})
-			}
-		}
-	}
-
-	// Dedup env vars: agent secrets override template env vars with same name.
-	existingKeys := make(map[string]bool, len(container.Env))
-	for _, env := range container.Env {
-		existingKeys[env.Name] = true
-	}
-	for _, env := range envVars {
-		if existingKeys[env.Name] {
-			// Replace existing env var from template.
-			for i, existing := range container.Env {
-				if existing.Name == env.Name {
-					container.Env[i] = env
-					break
-				}
-			}
-		} else {
-			container.Env = append(container.Env, env)
-		}
-	}
-
-	// Add volume mounts
-	container.VolumeMounts = append(container.VolumeMounts,
-		corev1.VolumeMount{
-			Name:      "workspace",
-			MountPath: "/workspace",
-		},
-	)
+	// Add workspace volume mount.
+	container.VolumeMounts = append(container.VolumeMounts, buildAgentVolumeMounts("workspace")...)
 
 	// Inject health probes (override any existing ones from the template).
 	container.LivenessProbe = &corev1.Probe{

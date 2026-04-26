@@ -377,14 +377,11 @@ func membershipChanged(pod *corev1.Pod, agents []*komputerv1alpha1.KomputerAgent
 //
 // Container spec is derived from the agent's resolved template (first container).
 //
-// NOTE: Skills, connectors, and secret injection are NOT applied here — squad
-// containers get the core env vars but not the template-level extras.
-// TODO: refactor KomputerAgentReconciler.buildPod to extract a per-agent
-// container builder that both controllers can call.
+// Each container gets the same env vars as a solo agent (secrets, connectors,
+// MCP servers, OAuth tokens) via the shared buildAgentEnvVars helper.
 func (r *KomputerSquadReconciler) buildSquadPodSpec(ctx context.Context, squad *komputerv1alpha1.KomputerSquad, agents []*komputerv1alpha1.KomputerAgent, config *komputerv1alpha1.KomputerConfig) (*corev1.Pod, error) {
 	log := logf.FromContext(ctx)
 	podName := squad.Name + "-pod"
-	redis := config.Spec.Redis
 
 	// Build the Volumes block: one PVC-backed volume per agent.
 	volumes := make([]corev1.Volume, 0, len(agents))
@@ -433,52 +430,13 @@ func (r *KomputerSquadReconciler) buildSquadPodSpec(ctx context.Context, squad *
 		c := *template.Spec.PodSpec.Containers[0].DeepCopy()
 		c.Name = agent.Name
 
-		// Core env vars (same as solo agent, minus skills/connectors/secrets).
-		// TODO: extract buildAgentEnvVars from KomputerAgentReconciler.buildPod so this
-		// list stays in sync automatically.
-		envVars := []corev1.EnvVar{
-			{Name: "KOMPUTER_INSTRUCTIONS", Value: agent.Spec.Instructions},
-			{Name: "KOMPUTER_INTERNAL_SYSTEM_PROMPT", Value: agent.Spec.InternalSystemPrompt},
-			{Name: "KOMPUTER_SYSTEM_PROMPT", Value: agent.Spec.SystemPrompt},
-			{Name: "KOMPUTER_MODEL", Value: agent.Spec.Model},
-			{Name: "KOMPUTER_AGENT_NAME", Value: agent.Name},
-			{Name: "KOMPUTER_NAMESPACE", Value: agent.Namespace},
-			{Name: "CLAUDE_CONFIG_DIR", Value: "/workspace/.claude"},
-			{Name: "KOMPUTER_REDIS_ADDRESS", Value: redis.Address},
-			{Name: "KOMPUTER_REDIS_DB", Value: fmt.Sprintf("%d", redis.DB)},
-			{Name: "KOMPUTER_REDIS_STREAM_PREFIX", Value: redis.StreamPrefix},
+		// Build env vars via the shared helper — picks up secrets, MCP connectors,
+		// OAuth tokens, etc. exactly like a solo agent does.
+		envVars, err := buildAgentEnvVars(ctx, r.Client, agent, config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build env vars for squad member %s: %w", agent.Name, err)
 		}
-		if redis.PasswordSecret != nil && redis.PasswordSecret.Name != "" {
-			envVars = append(envVars, corev1.EnvVar{
-				Name: "KOMPUTER_REDIS_PASSWORD",
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{Name: redis.PasswordSecret.Name},
-						Key:                  redis.PasswordSecret.Key,
-					},
-				},
-			})
-		}
-		if agent.Spec.Role == "manager" {
-			envVars = append(envVars,
-				corev1.EnvVar{Name: "KOMPUTER_ROLE", Value: agent.Spec.Role},
-				corev1.EnvVar{Name: "KOMPUTER_API_URL", Value: config.Spec.APIURL},
-			)
-		}
-
-		// Merge env vars: new vars replace template vars with the same name.
-		existingKeys := make(map[string]int, len(c.Env))
-		for i, env := range c.Env {
-			existingKeys[env.Name] = i
-		}
-		for _, env := range envVars {
-			if idx, ok := existingKeys[env.Name]; ok {
-				c.Env[idx] = env
-			} else {
-				c.Env = append(c.Env, env)
-				existingKeys[env.Name] = len(c.Env) - 1
-			}
-		}
+		c.Env = mergeEnvVars(c.Env, envVars)
 
 		// Volume mounts: own PVC at /workspace, siblings at /agents/<sibling>/workspace.
 		c.VolumeMounts = append(c.VolumeMounts,

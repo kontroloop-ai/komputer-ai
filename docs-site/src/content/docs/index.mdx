@@ -1,0 +1,64 @@
+---
+title: Komputer.AI
+description: Distributed Claude AI agents on Kubernetes — first-class cluster resources via CRDs and operators.
+template: splash
+hero:
+  tagline: Stateless, Kubernetes-native platform for running persistent Claude AI agents. Driven by external systems via REST + WebSocket.
+  image:
+    file: ../../assets/logo.png
+  actions:
+    - text: Get started
+      link: /komputer-ai/getting-started/concepts/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/komputer-ai/komputer-ai
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Why Komputer.AI
+
+<CardGrid stagger>
+  <Card title="Kubernetes-native" icon="seti:kubernetes">
+    Agents are first-class CRDs. The operator reconciles them like any other resource — Pods, PVCs, lifecycle, and all.
+  </Card>
+  <Card title="Stateless API" icon="seti:json">
+    No database. CR `.status` fields are the source of truth; Redis is just a transport. Restart anything, lose nothing.
+  </Card>
+  <Card title="Real-time streaming" icon="bars">
+    REST for control, WebSocket for live event streams from every agent — token-by-token output, tool calls, costs.
+  </Card>
+  <Card title="Squads & sub-agents" icon="puzzle">
+    Multi-agent shared workspaces via co-located Pods. Manager agents create and orchestrate workers via MCP tools.
+  </Card>
+  <Card title="Built-in observability" icon="approve-check">
+    Structured logs (JSON or human), Prometheus metrics, ServiceMonitors, and a Grafana dashboard ship with the chart.
+  </Card>
+  <Card title="MCP connectors" icon="setting">
+    Plug in MCP servers per agent or per template. Credentials managed via secrets, lifecycle managed by the operator.
+  </Card>
+</CardGrid>
+
+## Quick links
+
+<CardGrid>
+  <Card title="Concepts" icon="open-book">
+    Understand agents, tasks, templates, schedules, and the operator/API split.
+    [Read &rarr;](/komputer-ai/getting-started/concepts/)
+  </Card>
+  <Card title="Local development" icon="laptop">
+    Run the full stack on a kind cluster in minutes.
+    [Read &rarr;](/komputer-ai/getting-started/local-development/)
+  </Card>
+  <Card title="Integration guide" icon="rocket">
+    Drive komputer.ai from your own services using the SDKs.
+    [Read &rarr;](/komputer-ai/integration/integration-guide/)
+  </Card>
+  <Card title="Squads" icon="add-document">
+    Co-located multi-agent pods with shared workspaces.
+    [Read &rarr;](/komputer-ai/features/squads/)
+  </Card>
+</CardGrid>

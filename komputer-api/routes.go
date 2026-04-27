@@ -25,7 +25,7 @@ func resolveNamespace(c *gin.Context, k8s *K8sClient) string {
 }
 
 // collectSecretKeys gathers all key names from the agent's referenced K8s Secrets.
-func collectSecretKeys(ctx gin.Context, k8s *K8sClient, ns string, secretNames []string) []string {
+func collectSecretKeys(ctx *gin.Context, k8s *K8sClient, ns string, secretNames []string) []string {
 	var keys []string
 	for _, name := range secretNames {
 		k, err := k8s.GetSecretKeys(ctx.Request.Context(), ns, name)

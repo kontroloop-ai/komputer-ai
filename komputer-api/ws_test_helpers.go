@@ -49,7 +49,7 @@ func newWSTestServer(t *testing.T) *wsTestServer {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.GET("/api/v1/agents/:name/ws", HandleAgentWS(hub))
-	// r.GET("/api/v1/agents/events/ws", HandleMultiAgentWS(hub))
+	r.GET("/api/v1/agents/events/ws", HandleMultiAgentWS(hub))
 
 	srv := httptest.NewServer(r)
 	return &wsTestServer{t: t, mr: mr, rdb: rdb, hub: hub, srv: srv}

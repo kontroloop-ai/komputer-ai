@@ -103,6 +103,8 @@ Full SDK reference in [komputer-sdk/](komputer-sdk/).
 
 ## Documentation
 
+> 📖 **The full documentation site is at [komputer-ai.github.io/komputer-ai](https://komputer-ai.github.io/komputer-ai/)** — searchable, navigable, with the same content as the markdown below.
+
 1. [Concepts](docs/concepts/) — Agents, templates, config, secrets, namespaces — how the system fits together
 2. [Installation](#installation) — Deploy to any Kubernetes cluster in minutes
 3. [Integration Guide](docs/integration/) — How to connect external systems via HTTP API and WebSocket events

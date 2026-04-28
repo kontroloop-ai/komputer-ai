@@ -398,44 +398,9 @@ Events published by agents and streamed via WebSocket:
 
 ## Architecture
 
-```
-              ┌──────────────┐  ┌──────────────┐
-              │ komputer-cli │  │ komputer-ui  │
-              └──────┬───────┘  └──────┬───────┘
-                     └────────┬────────┘
-                              │
-                    ┌─────────▼───────┐
-                    │  komputer-api   │
-                    │  (Go / Gin)     │
-                    │                 │
-                    │  REST + WS API  │───── Creates KomputerAgent CRs
-                    │  Redis worker   │◄──── Consumes agent events
-                    └─────────────────┘
-                             │
-              ┌──────────────┼──────────────┐
-              │              │              │
-    ┌─────────▼──────┐  ┌───▼────┐  ┌──────▼──────────┐
-    │ AgentTemplate  │  │ Redis  │  │ KomputerAgent   │
-    │ ClusterTemplate│  │        │  │ (manager/worker)│
-    └─────────┬──────┘  └───▲────┘  └──────┬──────────┘
-              │              │              │
-       ┌──────▼──────────────┼──────────────┘
-       │ komputer-operator   │
-       │ (Go / operator-sdk) │
-       │                     │
-       │ Reconciles CRs →    │
-       │ creates Pods + PVCs │
-       └──────────┬──────────┘
-                  │
-       ┌──────────▼──────────┐
-       │ Agent Pod           │
-       │ (Python / Claude)   │
-       │                     │
-       │ Bash + Web Search   │──── Events → Redis
-       │ PVC at /workspace   │
-       │ FastAPI on :8000    │
-       └─────────────────────┘
-```
+![komputer.ai architecture](docs/assets/architecture.png)
+
+For a full breakdown of components, data flow, and tech stack, see the [architecture docs](https://komputer-ai.github.io/komputer-ai/docs/architecture).
 
 ## License
 

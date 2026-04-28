@@ -9,38 +9,7 @@ komputer.ai is a Kubernetes-native platform for running long-lived Claude AI age
 
 The platform is composed of four main services plus Redis. Each service is independently scalable and stateless (except for the agent pods, which own a PVC for their workspace).
 
-```
-                                    ┌──────────────────────────────────────┐
-                                    │           Kubernetes API             │
-                                    │   (etcd — source of truth for all    │
-                                    │    CRs and their .status fields)     │
-                                    └───────────┬──────────────────────────┘
-                                                │
-              ┌─────────────────────────────────┼─────────────────────────────────┐
-              │                                 │                                 │
-              ▼                                 ▼                                 ▼
-   ┌──────────────────┐            ┌──────────────────────┐           ┌────────────────────┐
-   │  komputer-ui     │   REST     │    komputer-api      │  watch /  │ komputer-operator  │
-   │  (Next.js)       │ ─────────▶ │   (Go, stateless)    │  patch    │   (Go, controller- │
-   │                  │   WS       │                      │ ◀────────▶│    runtime)        │
-   │  browser         │ ◀─────────▶│  REST + WebSocket    │           │                    │
-   └──────────────────┘            └─────────┬────────────┘           └─────────┬──────────┘
-                                             │                                  │ reconcile
-                                             │ XREAD                            │
-                                             ▼                                  ▼
-                                    ┌──────────────────┐              ┌──────────────────┐
-                                    │      Redis       │   XADD       │   Agent Pod(s)   │
-                                    │  (streams only — │ ◀────────────│  komputer-agent  │
-                                    │   not storage)   │              │  (Python +       │
-                                    └──────────────────┘              │   Claude SDK)    │
-                                                                       │  + PVC workspace │
-                                                                       └──────────────────┘
-                                                                                │
-                                                                                ▼
-                                                                       ┌──────────────────┐
-                                                                       │   Anthropic API  │
-                                                                       └──────────────────┘
-```
+![komputer.ai architecture](/architecture.png)
 
 ## Components
 

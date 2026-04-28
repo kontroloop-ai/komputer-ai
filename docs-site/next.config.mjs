@@ -9,9 +9,6 @@ const config = {
   basePath: '/komputer-ai',
   trailingSlash: true,
   reactStrictMode: true,
-  turbopack: {
-    resolveSymlinks: false,
-  },
   webpack(config) {
     config.resolve.symlinks = false;
     return config;

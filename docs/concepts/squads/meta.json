@@ -1,0 +1,5 @@
+{
+  "title": "Squads",
+  "defaultOpen": false,
+  "pages": ["index", "lifecycle", "manager-tools", "gitops", "caveats"]
+}

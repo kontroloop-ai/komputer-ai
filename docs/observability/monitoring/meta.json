@@ -1,0 +1,13 @@
+{
+  "title": "Monitoring",
+  "defaultOpen": false,
+  "pages": [
+    "index",
+    "cardinality",
+    "remote-write",
+    "kube-state-metrics",
+    "dashboard",
+    "local-stack",
+    "reference"
+  ]
+}

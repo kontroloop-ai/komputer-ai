@@ -1,0 +1,1 @@
+../../../../../docs/concepts/squads/manager-tools.md

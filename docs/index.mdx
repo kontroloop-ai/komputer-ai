@@ -1,0 +1,35 @@
+---
+title: Komputer.AI
+description: Distributed Claude AI agents on Kubernetes — first-class cluster resources via CRDs and operators.
+---
+
+# Komputer.AI
+
+**Distributed Claude AI agents on Kubernetes.** Stateless, Kubernetes-native platform for running persistent Claude AI agents — built on CRDs, operators, and the Kubernetes API. Agents are first-class cluster resources, driven externally via REST + WebSocket.
+
+## Get started
+
+- [Installation](/getting-started/installation) — deploy to any Kubernetes cluster with Helm in 5 minutes.
+- [Local development](/contribution/local-development) — build and run from source on a kind cluster.
+- [Architecture](/concepts/architecture) — Kubernetes as the database, operator + API + agent split.
+- [Integration overview](/integration/overview) — drive Komputer.AI from your own services.
+
+## Core concepts
+
+- [Agents](/concepts/agents) — the central entity, lifecycle modes, roles, overrides, concurrency.
+- [Squads](/concepts/squads) — multi-agent shared workspaces via co-located Pods.
+- [Connectors](/concepts/connectors) — MCP server connections; includes the supported-services compatibility matrix.
+
+## Observability
+
+- [Logging](/observability/logging) — structured JSON or human-readable logs across all components.
+- [Monitoring](/observability/monitoring) — Prometheus metrics, ServiceMonitors, and a Grafana dashboard.
+
+## Why Komputer.AI
+
+- **Kubernetes-native** — agents are CRDs reconciled by an operator. Pods, PVCs, lifecycle, GitOps — all standard K8s primitives.
+- **Stateless API** — no database. CR `.status` is the source of truth; Redis is just transport.
+- **Real-time streaming** — REST for control, WebSocket for live token-by-token output, tool calls, and costs.
+- **Squads & sub-agents** — co-located multi-agent pods. Manager agents create and orchestrate workers via MCP tools.
+- **Built-in observability** — structured logs, Prometheus metrics, and a Grafana dashboard ship with the chart.
+- **MCP connectors** — plug in MCP servers per agent or template; secrets and lifecycle managed by the operator.

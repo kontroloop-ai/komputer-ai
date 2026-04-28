@@ -5,7 +5,7 @@ End-to-end examples covering the full range of komputer.ai capabilities. Each ex
 ## Getting started
 
 All examples assume you have:
-- A running Kubernetes cluster with komputer.ai installed (see [Installation](../docs/local-development.md))
+- A running Kubernetes cluster with komputer.ai installed (see [Installation](../docs/getting-started/installation.md))
 - `kubectl` configured and pointing at your cluster
 - `komputer` CLI installed and logged in (`komputer login http://localhost:8080`)
 
@@ -26,9 +26,9 @@ All examples assume you have:
 
 ## Concepts covered
 
-- [Agent lifecycle modes](../docs/concepts.md#lifecycle-modes) (Default, Sleep, AutoDelete) — examples 02, 06
-- [Secrets injection](../docs/concepts.md#secrets) — example 03
-- [Manager/worker roles and offices](../docs/concepts.md#roles) — example 04
-- [Scheduled tasks](../docs/concepts.md#schedules) — example 05
-- [Custom images and templates](../docs/custom-agent-image.md) — example 07
-- [HTTP + WebSocket API](../docs/integration-guide.md) — examples 08, 09, 10
+- [Agent lifecycle modes](../docs/concepts/agents.md#lifecycle-modes) (Default, Sleep, AutoDelete) — examples 02, 06
+- [Secrets injection](../docs/concepts/secrets.md) — example 03
+- [Manager/worker roles and offices](../docs/concepts/agents.md#roles) — example 04
+- [Scheduled tasks](../docs/concepts/schedules.md) — example 05
+- [Custom images and templates](../docs/integration/custom-agent-image.md) — example 07
+- [HTTP + WebSocket API](../docs/integration/) — examples 08, 09, 10

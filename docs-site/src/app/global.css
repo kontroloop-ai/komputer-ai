@@ -1,0 +1,85 @@
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
+
+/* Heading permalinks (the <a data-card> Fumadocs wraps each heading text in)
+   must inherit the heading color, not the browser default link blue.
+   Without this, headings like "## Prerequisites" look invisible on dark mode. */
+.prose :is(h1, h2, h3, h4, h5, h6) a[data-card] {
+  color: inherit;
+  text-decoration: none;
+  font-weight: inherit;
+  transition: color 200ms ease;
+}
+.prose :is(h1, h2, h3, h4, h5, h6) a[data-card]:hover {
+  color: var(--color-fd-primary);
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Global interactive feel: smooth transitions on clickables
+   ────────────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: no-preference) {
+  a,
+  button,
+  [role='button'],
+  summary {
+    transition:
+      color 160ms ease,
+      background-color 160ms ease,
+      border-color 160ms ease,
+      transform 160ms ease,
+      opacity 160ms ease,
+      box-shadow 200ms ease;
+  }
+
+  a:active,
+  button:active,
+  [role='button']:active {
+    transform: scale(0.97);
+  }
+
+  /* Sidebar items: subtle slide on hover */
+  #nd-sidebar a:hover,
+  aside a:hover {
+    transform: translateX(2px);
+  }
+
+  /* Folder chevron rotates smoothly when expanding/collapsing */
+  #nd-sidebar [data-state] svg,
+  aside [data-state] svg {
+    transition: transform 200ms ease;
+  }
+
+  /* Smooth folder expand/collapse */
+  #nd-sidebar [data-state='open'] > div,
+  aside [data-state='open'] > div {
+    animation: fd-collapse-down 200ms ease-out;
+  }
+
+  /* Code blocks "copy" button: smoother appearance */
+  pre button,
+  pre [role='button'] {
+    transition: opacity 200ms ease, background-color 160ms ease;
+  }
+}
+
+@keyframes fd-collapse-down {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Hero gradient title shimmer (landing page only) */
+@keyframes shimmer-slow {
+  0%, 100% { filter: hue-rotate(0deg); }
+  50% { filter: hue-rotate(20deg); }
+}
+.bg-clip-text.bg-gradient-to-r {
+  animation: shimmer-slow 8s ease-in-out infinite;
+}

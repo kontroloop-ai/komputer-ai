@@ -147,7 +147,7 @@ webhooks:
 
 When disabled, two squads can claim the same agent. The squad controller will race over `Phase=Squad` and Pod ownership, causing the agent to flip between Pods and neither squad to stabilize. Only disable if cert-manager is genuinely unavailable.
 
-See [docs/squads.md](../../docs/squads.md) for the full squad feature guide.
+See [docs/concepts/squads/](../../docs/concepts/squads/) for the full squad feature guide.
 
 ### Ingress
 

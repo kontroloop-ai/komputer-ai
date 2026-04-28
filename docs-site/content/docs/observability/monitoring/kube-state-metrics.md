@@ -1,0 +1,1 @@
+../../../../../docs/observability/monitoring/kube-state-metrics.md

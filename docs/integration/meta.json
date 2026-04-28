@@ -1,0 +1,5 @@
+{
+  "title": "Integration",
+  "defaultOpen": false,
+  "pages": ["overview", "rest-api", "websocket", "patterns", "error-handling", "custom-agent-image"]
+}

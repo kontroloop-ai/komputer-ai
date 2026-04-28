@@ -121,7 +121,7 @@ When `KOMPUTER_ROLE=manager`, the agent additionally registers MCP orchestration
 | `add_to_squad` / `remove_from_squad` | Add or remove a member (the agent must be asleep to be adopted) |
 | `list_squads` / `delete_squad` | List squads in a namespace; delete a squad |
 
-See [docs/squads.md](../docs/squads.md) for semantics.
+See [docs/concepts/squads/](../docs/concepts/squads/) for semantics.
 
 **Memory tools:** `create_memory`, `list_memories`, `get_memory`, `update_memory`, `attach_memory`, `detach_memory`, `delete_memory`. `create_memory` and `attach_memory` accept `attach: true` / a target agent name; the content is injected into the target's system prompt on next task.
 

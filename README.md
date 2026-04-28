@@ -99,14 +99,14 @@ Full SDK reference in [komputer-sdk/](komputer-sdk/).
 
 ## Documentation
 
-1. [Concepts](docs/concepts.md) — Agents, templates, config, secrets, namespaces — how the system fits together
+1. [Concepts](docs/concepts/) — Agents, templates, config, secrets, namespaces — how the system fits together
 2. [Installation](#installation) — Deploy to any Kubernetes cluster in minutes
-3. [Integration Guide](docs/integration-guide.md) — How to connect external systems via HTTP API and WebSocket events
-4. [Custom Agent Images](docs/custom-agent-image.md) — Build custom agent images with your own packages and tools
-5. [Local Development](docs/local-development.md) — Build and run from source on a local cluster
-6. [Monitoring & Metrics](docs/monitoring.md) — Prometheus endpoints, ServiceMonitor setup, agent remote-write, sample Grafana dashboard
-7. [Logging](docs/logging.md) — Structured JSON logging, `LOG_LEVEL` / `LOG_FORMAT`, common fields
-8. [Squads](docs/squads.md) — Multi-agent shared workspace via co-located Pods
+3. [Integration Guide](docs/integration/) — How to connect external systems via HTTP API and WebSocket events
+4. [Custom Agent Images](docs/integration/custom-agent-image.md) — Build custom agent images with your own packages and tools
+5. [Local Development](docs/contribution/local-development.md) — Build and run from source on a local cluster
+6. [Monitoring & Metrics](docs/observability/monitoring/) — Prometheus endpoints, ServiceMonitor setup, agent remote-write, sample Grafana dashboard
+7. [Logging](docs/observability/logging.md) — Structured JSON logging, `LOG_LEVEL` / `LOG_FORMAT`, common fields
+8. [Squads](docs/concepts/squads/) — Multi-agent shared workspace via co-located Pods
 9. [Examples](examples/) — 10 end-to-end examples: hello world, secrets, managers, schedules, CI/CD, Slack, and more
 10. [Architecture](#architecture) — System diagram and component interactions
 11. Komputer Components
@@ -378,7 +378,7 @@ The agent is instructed to check `SECRET_*` env vars when credentials are needed
 2. **Reconcile** — Operator detects the CR, creates a PVC (persistent workspace) and Pod
 3. **Execute** — Agent pod starts, runs Claude with the given instructions
 4. **Stream** — Agent publishes structured events to Redis (tool calls, messages, results)
-5. **Consume** — API worker reads events, updates CR status (`InProgress`/`Complete`), and dispatches via WebSocket — either broadcast to all subscribers or queue-routed via consumer groups (`?group=` query param) for distributed deployments. See the [integration guide](docs/integration-guide.md#delivery-modes-broadcast-vs-consumer-group)
+5. **Consume** — API worker reads events, updates CR status (`InProgress`/`Complete`), and dispatches via WebSocket — either broadcast to all subscribers or queue-routed via consumer groups (`?group=` query param) for distributed deployments. See the [WebSocket events](docs/integration/websocket.md#delivery-modes-broadcast-vs-consumer-group)
 6. **Persist** — Agent pod stays running after task completion, accepting new tasks via FastAPI
 
 ### Event Types

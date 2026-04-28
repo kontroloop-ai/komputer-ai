@@ -33,9 +33,10 @@ jobs:
           cache-dependency-path: docs-site/package-lock.json
       - run: npm ci
       - run: npm run build
+      - run: touch docs-site/out/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: docs-site/dist
+          path: docs-site/out
 
   deploy:
     needs: build

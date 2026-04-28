@@ -1,0 +1,19 @@
+{
+  "title": "Concepts",
+  "defaultOpen": false,
+  "pages": [
+    "architecture",
+    "agents",
+    "squads",
+    "templates",
+    "config",
+    "secrets",
+    "namespaces",
+    "cost-tracking",
+    "offices",
+    "schedules",
+    "memories",
+    "skills",
+    "connectors"
+  ]
+}

@@ -61,5 +61,5 @@ with KomputerClient("http://localhost:8080") as client:
 - **`client.create_agent()`** — creates the agent or re-tasks it if it already exists (handles 409 automatically)
 - **`client.watch_agent()`** — returns an event stream that prefetches history from Redis before opening the WebSocket, so you never miss events that fired between create and connect
 - **`task_completed` or `error`** — always break on these; the stream stays open otherwise
-- See the [Integration Guide](../../docs/integration-guide.md) for all API endpoints and event types
+- See the [Integration Guide](../../docs/integration/) for all API endpoints and event types
 - See [komputer-sdk/](../../komputer-sdk/) for Go and TypeScript SDK equivalents

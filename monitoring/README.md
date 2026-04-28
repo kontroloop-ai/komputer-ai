@@ -38,7 +38,7 @@ For a local kind cluster, the sample `KomputerAgentClusterTemplate` at
 `komputer-operator/config/samples/komputer_v1alpha1_komputeragentclustertemplate.yaml`
 already sets `KOMPUTER_METRICS_PER_AGENT=true` and points the agent at
 `http://host.docker.internal:9090/api/v1/write`. Just `kubectl apply` it
-(see [docs/local-development.md](../docs/local-development.md)) and every
+(see [docs/contribution/local-development.md](../docs/contribution/local-development.md)) and every
 spawned agent will push to the local Prometheus.
 
 For a bare local agent process:

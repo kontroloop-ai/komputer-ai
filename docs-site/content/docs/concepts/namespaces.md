@@ -1,0 +1,1 @@
+../../../../docs/concepts/namespaces.md

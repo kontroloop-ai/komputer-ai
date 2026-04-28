@@ -52,4 +52,4 @@ Use `KomputerAgentClusterTemplate` for images that all namespaces can share.
 - **`USER komputer`** at the end — required; the Claude CLI refuses to run as root
 - **`KomputerAgentClusterTemplate`** — cluster-scoped template, any namespace can reference it by name
 - The agent's `templateRef: data-science` matches the template's `metadata.name`
-- See [docs/custom-agent-image.md](../../docs/custom-agent-image.md) for the full guide
+- See [docs/integration/custom-agent-image.md](../../docs/integration/custom-agent-image.md) for the full guide

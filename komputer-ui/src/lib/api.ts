@@ -50,10 +50,19 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 // Agents
-export const listAgents = (ns?: string) =>
-  MOCK_EMPTY
-    ? Promise.resolve({ agents: [] } as AgentListResponse)
-    : request<AgentListResponse>(`/agents${ns ? `?namespace=${ns}` : ''}`);
+export const listAgents = (
+  ns?: string,
+  opts?: { labelSelectors?: string[] },
+) => {
+  if (MOCK_EMPTY) return Promise.resolve({ agents: [] } as AgentListResponse);
+  const params = new URLSearchParams();
+  if (ns) params.set('namespace', ns);
+  for (const l of opts?.labelSelectors ?? []) {
+    params.append('label', l);
+  }
+  const qs = params.toString();
+  return request<AgentListResponse>(`/agents${qs ? `?${qs}` : ''}`);
+};
 
 export const getAgent = (name: string, ns?: string) =>
   request<AgentResponse>(`/agents/${name}${ns ? `?namespace=${ns}` : ''}`);

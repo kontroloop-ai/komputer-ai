@@ -472,9 +472,9 @@ func (r *KomputerAgentReconciler) ensurePVC(ctx context.Context, agent *komputer
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      pvcName,
 			Namespace: agent.Namespace,
-			Labels: map[string]string{
+			Labels: mergeLabels(agent.Spec.Labels, map[string]string{
 				"komputer.ai/agent-name": agent.Name,
-			},
+			}),
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
@@ -547,9 +547,9 @@ func (r *KomputerAgentReconciler) ensureConfigMap(ctx context.Context, agent *ko
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      configMapName,
 			Namespace: agent.Namespace,
-			Labels: map[string]string{
+			Labels: mergeLabels(agent.Spec.Labels, map[string]string{
 				"komputer.ai/agent-name": agent.Name,
-			},
+			}),
 		},
 		Data: map[string]string{
 			"config.json": string(configJSON),
@@ -699,11 +699,11 @@ func (r *KomputerAgentReconciler) buildPod(ctx context.Context, agent *komputerv
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
 			Namespace: agent.Namespace,
-			Labels: map[string]string{
+			Labels: mergeLabels(agent.Spec.Labels, map[string]string{
 				"komputer.ai/agent-name":           agent.Name,
 				"komputer.ai/squad":                "false",
 				"komputer.ai/member-" + agent.Name: "true",
-			},
+			}),
 		},
 		Spec: podSpec,
 	}
@@ -930,9 +930,9 @@ func (r *KomputerAgentReconciler) ensureAgentService(ctx context.Context, agent 
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      svcName,
 			Namespace: agent.Namespace,
-			Labels: map[string]string{
+			Labels: mergeLabels(agent.Spec.Labels, map[string]string{
 				"komputer.ai/agent-name": agent.Name,
-			},
+			}),
 		},
 		Spec: corev1.ServiceSpec{
 			Type: corev1.ServiceTypeClusterIP,

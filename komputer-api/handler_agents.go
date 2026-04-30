@@ -32,6 +32,10 @@ type CreateAgentRequest struct {
 	Priority      int32    `json:"priority,omitempty"` // queue priority; higher = admitted first
 	PodSpec       *corev1.PodSpec               `json:"podSpec,omitempty"`
 	Storage       *komputerv1alpha1.StorageSpec `json:"storage,omitempty"`
+	// Labels are user-defined key=value labels passed through to the agent CR.
+	// Reserved-prefix keys (komputer.ai/*) are rejected except for
+	// "komputer.ai/personal-agent" which is allow-listed.
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 type AgentResponse struct {
@@ -64,6 +68,7 @@ type AgentResponse struct {
 	// but live-pod sync failed). The CR change still took effect; the UI can surface these
 	// as toasts so the user knows something didn't fully apply.
 	Errors          []string                      `json:"errors,omitempty"`
+	Labels          map[string]string             `json:"labels,omitempty"`
 }
 
 // buildAgentInternalSystemPrompt assembles the internal system prompt for an
@@ -163,6 +168,7 @@ type PatchAgentRequest struct {
 	Priority     *int32    `json:"priority,omitempty"`    // pointer so 0 vs unset is distinguishable
 	PodSpec      *corev1.PodSpec               `json:"podSpec,omitempty"`
 	Storage      *komputerv1alpha1.StorageSpec `json:"storage,omitempty"`
+	Labels       map[string]string             `json:"labels,omitempty"`
 }
 
 // createOrTriggerAgent creates a new agent or sends a task to an existing one.

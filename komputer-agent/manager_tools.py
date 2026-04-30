@@ -54,6 +54,11 @@ async def _request(method: str, path: str, timeout: int = 10, **kwargs) -> dict:
             "templateRef": {"type": "string", "description": "Pod template name (optional, defaults to 'default')."},
             "systemPrompt": {"type": "string", "description": "Custom system prompt defining the sub-agent's behavior, persona, or constraints (optional)."},
             "priority": {"type": "integer", "description": "Queue priority. Higher = admitted first when the template's maxConcurrentAgents cap is reached. Default: 0."},
+            "labels": {
+                "type": "object",
+                "additionalProperties": {"type": "string"},
+                "description": "Optional user-defined key=value labels for grouping/filtering. Reserved-prefix keys (komputer.ai/*) are rejected except 'komputer.ai/personal-agent'.",
+            },
         },
         "required": ["name", "instructions"],
     },
@@ -77,6 +82,8 @@ async def create_agent(args):
         payload["systemPrompt"] = args["systemPrompt"]
     if args.get("priority") is not None:
         payload["priority"] = args["priority"]
+    if args.get("labels"):
+        payload["labels"] = args["labels"]
 
     # Identify this agent as the office manager so the operator can create/join an Office.
     # The API inherits connectors and the operator inherits secrets from the manager automatically.

@@ -18,6 +18,7 @@ import { listAgents, listOffices, listSchedules } from "@/lib/api";
 import { formatCost, formatRelativeTime } from "@/lib/utils";
 import type { AgentResponse, OfficeResponse, ScheduleResponse } from "@/lib/types";
 import { SuggestedTasks } from "@/components/dashboard/suggested-tasks";
+import { PersonalAgentPrompt } from "@/components/dashboard/personal-agent-prompt";
 
 // --- Animated number ---
 
@@ -206,6 +207,8 @@ export default function DashboardPage() {
             Your AI agent fleet management at scale.
           </p>
         </motion.div>
+
+        <PersonalAgentPrompt />
 
         {/* Stats row */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

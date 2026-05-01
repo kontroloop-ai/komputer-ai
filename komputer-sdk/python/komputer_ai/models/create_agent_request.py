@@ -31,6 +31,7 @@ class CreateAgentRequest(BaseModel):
     """ # noqa: E501
     connectors: Optional[List[StrictStr]] = Field(default=None, description="optional KomputerConnector names to attach")
     instructions: StrictStr
+    labels: Optional[Dict[str, StrictStr]] = Field(default=None, description="Labels are user-defined key=value labels passed through to the agent CR. Reserved-prefix keys (komputer.ai/*) are rejected except for \"komputer.ai/personal-agent\" which is allow-listed.")
     lifecycle: Optional[StrictStr] = Field(default=None, description="\"\", \"Sleep\", or \"AutoDelete\"")
     memories: Optional[List[StrictStr]] = Field(default=None, description="optional KomputerMemory names to attach")
     model: Optional[StrictStr] = None
@@ -45,7 +46,7 @@ class CreateAgentRequest(BaseModel):
     storage: Optional[V1alpha1StorageSpec] = None
     system_prompt: Optional[StrictStr] = Field(default=None, description="optional custom system prompt", alias="systemPrompt")
     template_ref: Optional[StrictStr] = Field(default=None, alias="templateRef")
-    __properties: ClassVar[List[str]] = ["connectors", "instructions", "lifecycle", "memories", "model", "name", "namespace", "officeManager", "podSpec", "priority", "role", "secretRefs", "skills", "storage", "systemPrompt", "templateRef"]
+    __properties: ClassVar[List[str]] = ["connectors", "instructions", "labels", "lifecycle", "memories", "model", "name", "namespace", "officeManager", "podSpec", "priority", "role", "secretRefs", "skills", "storage", "systemPrompt", "templateRef"]
 
     model_config = ConfigDict(
         validate_by_name=True,
@@ -106,6 +107,7 @@ class CreateAgentRequest(BaseModel):
         _obj = cls.model_validate({
             "connectors": obj.get("connectors"),
             "instructions": obj.get("instructions"),
+            "labels": obj.get("labels"),
             "lifecycle": obj.get("lifecycle"),
             "memories": obj.get("memories"),
             "model": obj.get("model"),

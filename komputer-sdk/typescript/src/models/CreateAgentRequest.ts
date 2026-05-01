@@ -47,6 +47,14 @@ export interface CreateAgentRequest {
      */
     instructions: string;
     /**
+     * Labels are user-defined key=value labels passed through to the agent CR.
+     * Reserved-prefix keys (komputer.ai/*) are rejected except for
+     * "komputer.ai/personal-agent" which is allow-listed.
+     * @type {{ [key: string]: string; }}
+     * @memberof CreateAgentRequest
+     */
+    labels?: { [key: string]: string; };
+    /**
      * "", "Sleep", or "AutoDelete"
      * @type {string}
      * @memberof CreateAgentRequest
@@ -153,6 +161,7 @@ export function CreateAgentRequestFromJSONTyped(json: any, ignoreDiscriminator: 
         
         'connectors': json['connectors'] == null ? undefined : json['connectors'],
         'instructions': json['instructions'],
+        'labels': json['labels'] == null ? undefined : json['labels'],
         'lifecycle': json['lifecycle'] == null ? undefined : json['lifecycle'],
         'memories': json['memories'] == null ? undefined : json['memories'],
         'model': json['model'] == null ? undefined : json['model'],
@@ -183,6 +192,7 @@ export function CreateAgentRequestToJSONTyped(value?: CreateAgentRequest | null,
         
         'connectors': value['connectors'],
         'instructions': value['instructions'],
+        'labels': value['labels'],
         'lifecycle': value['lifecycle'],
         'memories': value['memories'],
         'model': value['model'],

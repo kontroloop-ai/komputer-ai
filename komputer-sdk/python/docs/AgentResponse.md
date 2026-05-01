@@ -5,10 +5,12 @@
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
+**completion_time** | **str** |  | [optional] 
 **connectors** | **List[str]** | KomputerConnector names attached to this agent | [optional] 
 **created_at** | **str** |  | [optional] 
 **errors** | **List[str]** | Errors are non-fatal failures that occurred during the request (e.g. CR was patched but live-pod sync failed). The CR change still took effect; the UI can surface these as toasts so the user knows something didn&#39;t fully apply. | [optional] 
 **instructions** | **str** | User task (spec.instructions) | [optional] 
+**labels** | **Dict[str, str]** |  | [optional] 
 **last_task_cost_usd** | **str** |  | [optional] 
 **last_task_message** | **str** |  | [optional] 
 **lifecycle** | **str** |  | [optional] 

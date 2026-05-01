@@ -19,6 +19,7 @@ var _ MappedNullable = &AgentResponse{}
 
 // AgentResponse struct for AgentResponse
 type AgentResponse struct {
+	CompletionTime *string `json:"completionTime,omitempty"`
 	// KomputerConnector names attached to this agent
 	Connectors []string `json:"connectors,omitempty"`
 	CreatedAt *string `json:"createdAt,omitempty"`
@@ -26,6 +27,7 @@ type AgentResponse struct {
 	Errors []string `json:"errors,omitempty"`
 	// User task (spec.instructions)
 	Instructions *string `json:"instructions,omitempty"`
+	Labels *map[string]string `json:"labels,omitempty"`
 	LastTaskCostUSD *string `json:"lastTaskCostUSD,omitempty"`
 	LastTaskMessage *string `json:"lastTaskMessage,omitempty"`
 	Lifecycle *string `json:"lifecycle,omitempty"`
@@ -71,6 +73,38 @@ func NewAgentResponse() *AgentResponse {
 func NewAgentResponseWithDefaults() *AgentResponse {
 	this := AgentResponse{}
 	return &this
+}
+
+// GetCompletionTime returns the CompletionTime field value if set, zero value otherwise.
+func (o *AgentResponse) GetCompletionTime() string {
+	if o == nil || IsNil(o.CompletionTime) {
+		var ret string
+		return ret
+	}
+	return *o.CompletionTime
+}
+
+// GetCompletionTimeOk returns a tuple with the CompletionTime field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *AgentResponse) GetCompletionTimeOk() (*string, bool) {
+	if o == nil || IsNil(o.CompletionTime) {
+		return nil, false
+	}
+	return o.CompletionTime, true
+}
+
+// HasCompletionTime returns a boolean if a field has been set.
+func (o *AgentResponse) HasCompletionTime() bool {
+	if o != nil && !IsNil(o.CompletionTime) {
+		return true
+	}
+
+	return false
+}
+
+// SetCompletionTime gets a reference to the given string and assigns it to the CompletionTime field.
+func (o *AgentResponse) SetCompletionTime(v string) {
+	o.CompletionTime = &v
 }
 
 // GetConnectors returns the Connectors field value if set, zero value otherwise.
@@ -199,6 +233,38 @@ func (o *AgentResponse) HasInstructions() bool {
 // SetInstructions gets a reference to the given string and assigns it to the Instructions field.
 func (o *AgentResponse) SetInstructions(v string) {
 	o.Instructions = &v
+}
+
+// GetLabels returns the Labels field value if set, zero value otherwise.
+func (o *AgentResponse) GetLabels() map[string]string {
+	if o == nil || IsNil(o.Labels) {
+		var ret map[string]string
+		return ret
+	}
+	return *o.Labels
+}
+
+// GetLabelsOk returns a tuple with the Labels field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *AgentResponse) GetLabelsOk() (*map[string]string, bool) {
+	if o == nil || IsNil(o.Labels) {
+		return nil, false
+	}
+	return o.Labels, true
+}
+
+// HasLabels returns a boolean if a field has been set.
+func (o *AgentResponse) HasLabels() bool {
+	if o != nil && !IsNil(o.Labels) {
+		return true
+	}
+
+	return false
+}
+
+// SetLabels gets a reference to the given map[string]string and assigns it to the Labels field.
+func (o *AgentResponse) SetLabels(v map[string]string) {
+	o.Labels = &v
 }
 
 // GetLastTaskCostUSD returns the LastTaskCostUSD field value if set, zero value otherwise.
@@ -915,6 +981,9 @@ func (o AgentResponse) MarshalJSON() ([]byte, error) {
 
 func (o AgentResponse) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
+	if !IsNil(o.CompletionTime) {
+		toSerialize["completionTime"] = o.CompletionTime
+	}
 	if !IsNil(o.Connectors) {
 		toSerialize["connectors"] = o.Connectors
 	}
@@ -926,6 +995,9 @@ func (o AgentResponse) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Instructions) {
 		toSerialize["instructions"] = o.Instructions
+	}
+	if !IsNil(o.Labels) {
+		toSerialize["labels"] = o.Labels
 	}
 	if !IsNil(o.LastTaskCostUSD) {
 		toSerialize["lastTaskCostUSD"] = o.LastTaskCostUSD

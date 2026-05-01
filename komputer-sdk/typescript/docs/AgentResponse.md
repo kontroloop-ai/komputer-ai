@@ -6,10 +6,12 @@
 
 Name | Type
 ------------ | -------------
+`completionTime` | string
 `connectors` | Array&lt;string&gt;
 `createdAt` | string
 `errors` | Array&lt;string&gt;
 `instructions` | string
+`labels` | { [key: string]: string; }
 `lastTaskCostUSD` | string
 `lastTaskMessage` | string
 `lifecycle` | string
@@ -40,10 +42,12 @@ import type { AgentResponse } from '@komputer-ai/sdk'
 
 // TODO: Update the object below with actual values
 const example = {
+  "completionTime": null,
   "connectors": null,
   "createdAt": null,
   "errors": null,
   "instructions": null,
+  "labels": null,
   "lastTaskCostUSD": null,
   "lastTaskMessage": null,
   "lifecycle": null,

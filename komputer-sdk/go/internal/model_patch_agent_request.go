@@ -22,6 +22,7 @@ type PatchAgentRequest struct {
 	// connector names to attach
 	Connectors []string `json:"connectors,omitempty"`
 	Instructions *string `json:"instructions,omitempty"`
+	Labels *map[string]string `json:"labels,omitempty"`
 	Lifecycle *string `json:"lifecycle,omitempty"`
 	// memory names to attach
 	Memories []string `json:"memories,omitempty"`
@@ -118,6 +119,38 @@ func (o *PatchAgentRequest) HasInstructions() bool {
 // SetInstructions gets a reference to the given string and assigns it to the Instructions field.
 func (o *PatchAgentRequest) SetInstructions(v string) {
 	o.Instructions = &v
+}
+
+// GetLabels returns the Labels field value if set, zero value otherwise.
+func (o *PatchAgentRequest) GetLabels() map[string]string {
+	if o == nil || IsNil(o.Labels) {
+		var ret map[string]string
+		return ret
+	}
+	return *o.Labels
+}
+
+// GetLabelsOk returns a tuple with the Labels field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *PatchAgentRequest) GetLabelsOk() (*map[string]string, bool) {
+	if o == nil || IsNil(o.Labels) {
+		return nil, false
+	}
+	return o.Labels, true
+}
+
+// HasLabels returns a boolean if a field has been set.
+func (o *PatchAgentRequest) HasLabels() bool {
+	if o != nil && !IsNil(o.Labels) {
+		return true
+	}
+
+	return false
+}
+
+// SetLabels gets a reference to the given map[string]string and assigns it to the Labels field.
+func (o *PatchAgentRequest) SetLabels(v map[string]string) {
+	o.Labels = &v
 }
 
 // GetLifecycle returns the Lifecycle field value if set, zero value otherwise.
@@ -455,6 +488,9 @@ func (o PatchAgentRequest) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Instructions) {
 		toSerialize["instructions"] = o.Instructions
+	}
+	if !IsNil(o.Labels) {
+		toSerialize["labels"] = o.Labels
 	}
 	if !IsNil(o.Lifecycle) {
 		toSerialize["lifecycle"] = o.Lifecycle

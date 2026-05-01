@@ -8,6 +8,7 @@ Name | Type
 ------------ | -------------
 `connectors` | Array&lt;string&gt;
 `instructions` | string
+`labels` | { [key: string]: string; }
 `lifecycle` | string
 `memories` | Array&lt;string&gt;
 `model` | string
@@ -28,6 +29,7 @@ import type { PatchAgentRequest } from '@komputer-ai/sdk'
 const example = {
   "connectors": null,
   "instructions": null,
+  "labels": null,
   "lifecycle": null,
   "memories": null,
   "model": null,

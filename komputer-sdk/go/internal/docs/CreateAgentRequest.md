@@ -6,6 +6,7 @@ Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **Connectors** | Pointer to **[]string** | optional KomputerConnector names to attach | [optional] 
 **Instructions** | **string** |  | 
+**Labels** | Pointer to **map[string]string** | Labels are user-defined key&#x3D;value labels passed through to the agent CR. Reserved-prefix keys (komputer.ai/_*) are rejected except for \&quot;komputer.ai/personal-agent\&quot; which is allow-listed. | [optional] 
 **Lifecycle** | Pointer to **string** | \&quot;\&quot;, \&quot;Sleep\&quot;, or \&quot;AutoDelete\&quot; | [optional] 
 **Memories** | Pointer to **[]string** | optional KomputerMemory names to attach | [optional] 
 **Model** | Pointer to **string** |  | [optional] 
@@ -84,6 +85,31 @@ and a boolean to check if the value has been set.
 
 SetInstructions sets Instructions field to given value.
 
+
+### GetLabels
+
+`func (o *CreateAgentRequest) GetLabels() map[string]string`
+
+GetLabels returns the Labels field if non-nil, zero value otherwise.
+
+### GetLabelsOk
+
+`func (o *CreateAgentRequest) GetLabelsOk() (*map[string]string, bool)`
+
+GetLabelsOk returns a tuple with the Labels field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetLabels
+
+`func (o *CreateAgentRequest) SetLabels(v map[string]string)`
+
+SetLabels sets Labels field to given value.
+
+### HasLabels
+
+`func (o *CreateAgentRequest) HasLabels() bool`
+
+HasLabels returns a boolean if a field has been set.
 
 ### GetLifecycle
 

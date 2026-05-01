@@ -24,6 +24,8 @@ type CreateAgentRequest struct {
 	// optional KomputerConnector names to attach
 	Connectors []string `json:"connectors,omitempty"`
 	Instructions string `json:"instructions"`
+	// Labels are user-defined key=value labels passed through to the agent CR. Reserved-prefix keys (komputer.ai/_*) are rejected except for \"komputer.ai/personal-agent\" which is allow-listed.
+	Labels *map[string]string `json:"labels,omitempty"`
 	// \"\", \"Sleep\", or \"AutoDelete\"
 	Lifecycle *string `json:"lifecycle,omitempty"`
 	// optional KomputerMemory names to attach
@@ -124,6 +126,38 @@ func (o *CreateAgentRequest) GetInstructionsOk() (*string, bool) {
 // SetInstructions sets field value
 func (o *CreateAgentRequest) SetInstructions(v string) {
 	o.Instructions = v
+}
+
+// GetLabels returns the Labels field value if set, zero value otherwise.
+func (o *CreateAgentRequest) GetLabels() map[string]string {
+	if o == nil || IsNil(o.Labels) {
+		var ret map[string]string
+		return ret
+	}
+	return *o.Labels
+}
+
+// GetLabelsOk returns a tuple with the Labels field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CreateAgentRequest) GetLabelsOk() (*map[string]string, bool) {
+	if o == nil || IsNil(o.Labels) {
+		return nil, false
+	}
+	return o.Labels, true
+}
+
+// HasLabels returns a boolean if a field has been set.
+func (o *CreateAgentRequest) HasLabels() bool {
+	if o != nil && !IsNil(o.Labels) {
+		return true
+	}
+
+	return false
+}
+
+// SetLabels gets a reference to the given map[string]string and assigns it to the Labels field.
+func (o *CreateAgentRequest) SetLabels(v map[string]string) {
+	o.Labels = &v
 }
 
 // GetLifecycle returns the Lifecycle field value if set, zero value otherwise.
@@ -580,6 +614,9 @@ func (o CreateAgentRequest) ToMap() (map[string]interface{}, error) {
 		toSerialize["connectors"] = o.Connectors
 	}
 	toSerialize["instructions"] = o.Instructions
+	if !IsNil(o.Labels) {
+		toSerialize["labels"] = o.Labels
+	}
 	if !IsNil(o.Lifecycle) {
 		toSerialize["lifecycle"] = o.Lifecycle
 	}

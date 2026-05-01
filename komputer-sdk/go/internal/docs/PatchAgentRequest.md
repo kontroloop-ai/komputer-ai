@@ -6,6 +6,7 @@ Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **Connectors** | Pointer to **[]string** | connector names to attach | [optional] 
 **Instructions** | Pointer to **string** |  | [optional] 
+**Labels** | Pointer to **map[string]string** |  | [optional] 
 **Lifecycle** | Pointer to **string** |  | [optional] 
 **Memories** | Pointer to **[]string** | memory names to attach | [optional] 
 **Model** | Pointer to **string** |  | [optional] 
@@ -85,6 +86,31 @@ SetInstructions sets Instructions field to given value.
 `func (o *PatchAgentRequest) HasInstructions() bool`
 
 HasInstructions returns a boolean if a field has been set.
+
+### GetLabels
+
+`func (o *PatchAgentRequest) GetLabels() map[string]string`
+
+GetLabels returns the Labels field if non-nil, zero value otherwise.
+
+### GetLabelsOk
+
+`func (o *PatchAgentRequest) GetLabelsOk() (*map[string]string, bool)`
+
+GetLabelsOk returns a tuple with the Labels field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetLabels
+
+`func (o *PatchAgentRequest) SetLabels(v map[string]string)`
+
+SetLabels sets Labels field to given value.
+
+### HasLabels
+
+`func (o *PatchAgentRequest) HasLabels() bool`
+
+HasLabels returns a boolean if a field has been set.
 
 ### GetLifecycle
 

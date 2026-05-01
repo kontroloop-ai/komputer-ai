@@ -7,6 +7,7 @@ Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **connectors** | **List[str]** | optional KomputerConnector names to attach | [optional] 
 **instructions** | **str** |  | 
+**labels** | **Dict[str, str]** | Labels are user-defined key&#x3D;value labels passed through to the agent CR. Reserved-prefix keys (komputer.ai/*) are rejected except for \&quot;komputer.ai/personal-agent\&quot; which is allow-listed. | [optional] 
 **lifecycle** | **str** | \&quot;\&quot;, \&quot;Sleep\&quot;, or \&quot;AutoDelete\&quot; | [optional] 
 **memories** | **List[str]** | optional KomputerMemory names to attach | [optional] 
 **model** | **str** |  | [optional] 

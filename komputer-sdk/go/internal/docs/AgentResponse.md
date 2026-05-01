@@ -4,10 +4,12 @@
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
+**CompletionTime** | Pointer to **string** |  | [optional] 
 **Connectors** | Pointer to **[]string** | KomputerConnector names attached to this agent | [optional] 
 **CreatedAt** | Pointer to **string** |  | [optional] 
 **Errors** | Pointer to **[]string** | Errors are non-fatal failures that occurred during the request (e.g. CR was patched but live-pod sync failed). The CR change still took effect; the UI can surface these as toasts so the user knows something didn&#39;t fully apply. | [optional] 
 **Instructions** | Pointer to **string** | User task (spec.instructions) | [optional] 
+**Labels** | Pointer to **map[string]string** |  | [optional] 
 **LastTaskCostUSD** | Pointer to **string** |  | [optional] 
 **LastTaskMessage** | Pointer to **string** |  | [optional] 
 **Lifecycle** | Pointer to **string** |  | [optional] 
@@ -49,6 +51,31 @@ will change when the set of required properties is changed
 NewAgentResponseWithDefaults instantiates a new AgentResponse object
 This constructor will only assign default values to properties that have it defined,
 but it doesn't guarantee that properties required by API are set
+
+### GetCompletionTime
+
+`func (o *AgentResponse) GetCompletionTime() string`
+
+GetCompletionTime returns the CompletionTime field if non-nil, zero value otherwise.
+
+### GetCompletionTimeOk
+
+`func (o *AgentResponse) GetCompletionTimeOk() (*string, bool)`
+
+GetCompletionTimeOk returns a tuple with the CompletionTime field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetCompletionTime
+
+`func (o *AgentResponse) SetCompletionTime(v string)`
+
+SetCompletionTime sets CompletionTime field to given value.
+
+### HasCompletionTime
+
+`func (o *AgentResponse) HasCompletionTime() bool`
+
+HasCompletionTime returns a boolean if a field has been set.
 
 ### GetConnectors
 
@@ -149,6 +176,31 @@ SetInstructions sets Instructions field to given value.
 `func (o *AgentResponse) HasInstructions() bool`
 
 HasInstructions returns a boolean if a field has been set.
+
+### GetLabels
+
+`func (o *AgentResponse) GetLabels() map[string]string`
+
+GetLabels returns the Labels field if non-nil, zero value otherwise.
+
+### GetLabelsOk
+
+`func (o *AgentResponse) GetLabelsOk() (*map[string]string, bool)`
+
+GetLabelsOk returns a tuple with the Labels field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetLabels
+
+`func (o *AgentResponse) SetLabels(v map[string]string)`
+
+SetLabels sets Labels field to given value.
+
+### HasLabels
+
+`func (o *AgentResponse) HasLabels() bool`
+
+HasLabels returns a boolean if a field has been set.
 
 ### GetLastTaskCostUSD
 

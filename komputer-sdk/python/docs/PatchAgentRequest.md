@@ -7,6 +7,7 @@ Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **connectors** | **List[str]** | connector names to attach | [optional] 
 **instructions** | **str** |  | [optional] 
+**labels** | **Dict[str, str]** |  | [optional] 
 **lifecycle** | **str** |  | [optional] 
 **memories** | **List[str]** | memory names to attach | [optional] 
 **model** | **str** |  | [optional] 

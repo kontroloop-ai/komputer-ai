@@ -9,6 +9,7 @@ Name | Type
 `connectors` | Array&lt;string&gt;
 `instructions` | string
 `internalSystemPrompt` | string
+`labels` | { [key: string]: string; }
 `lifecycle` | [V1alpha1AgentLifecycle](V1alpha1AgentLifecycle.md)
 `memories` | Array&lt;string&gt;
 `model` | string
@@ -32,6 +33,7 @@ const example = {
   "connectors": null,
   "instructions": null,
   "internalSystemPrompt": null,
+  "labels": null,
   "lifecycle": null,
   "memories": null,
   "model": null,

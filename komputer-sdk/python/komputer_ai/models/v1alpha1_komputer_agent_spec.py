@@ -33,6 +33,7 @@ class V1alpha1KomputerAgentSpec(BaseModel):
     connectors: Optional[List[StrictStr]] = Field(default=None, description="Connectors is a list of KomputerConnector names to attach to this agent. Names can be \"name\" (same namespace) or \"namespace/name\" (cross-namespace). +optional")
     instructions: Optional[StrictStr] = Field(default=None, description="Instructions is the user's task for the Claude agent.")
     internal_system_prompt: Optional[StrictStr] = Field(default=None, description="InternalSystemPrompt is the built-in system prompt set by the API (role prompt + memories). +optional", alias="internalSystemPrompt")
+    labels: Optional[Dict[str, StrictStr]] = Field(default=None, description="Labels are user-defined key=value labels attached to this agent and propagated to all child resources (Pod, PVC, ConfigMap, Service). Keys starting with \"komputer.ai/\" are reserved for system labels and should not be set directly through the API. +optional")
     lifecycle: Optional[V1alpha1AgentLifecycle] = Field(default=None, description="Lifecycle controls what happens after task completion. Empty (default) keeps the pod running, \"Sleep\" deletes the pod but keeps the PVC, \"AutoDelete\" deletes the entire agent after task completion. +kubebuilder:validation:Enum=\"\";Sleep;AutoDelete +optional")
     memories: Optional[List[StrictStr]] = Field(default=None, description="Memories is a list of KomputerMemory names to attach to this agent. Names can be \"name\" (same namespace) or \"namespace/name\" (cross-namespace). +optional")
     model: Optional[StrictStr] = Field(default=None, description="Model is the Claude model to use. +kubebuilder:default=\"claude-sonnet-4-6\"")
@@ -45,7 +46,7 @@ class V1alpha1KomputerAgentSpec(BaseModel):
     storage: Optional[V1alpha1StorageSpec] = Field(default=None, description="Storage, when set, overrides the template's storage settings for this agent. Existing PVCs are expanded in place when the storage class supports it. +optional")
     system_prompt: Optional[StrictStr] = Field(default=None, description="SystemPrompt is a custom system prompt provided by the user, appended to the internal prompt. +optional", alias="systemPrompt")
     template_ref: Optional[StrictStr] = Field(default=None, description="TemplateRef is the name of the KomputerAgentTemplate to use. +kubebuilder:default=\"default\"", alias="templateRef")
-    __properties: ClassVar[List[str]] = ["connectors", "instructions", "internalSystemPrompt", "lifecycle", "memories", "model", "officeManager", "podSpec", "priority", "role", "secrets", "skills", "storage", "systemPrompt", "templateRef"]
+    __properties: ClassVar[List[str]] = ["connectors", "instructions", "internalSystemPrompt", "labels", "lifecycle", "memories", "model", "officeManager", "podSpec", "priority", "role", "secrets", "skills", "storage", "systemPrompt", "templateRef"]
 
     model_config = ConfigDict(
         validate_by_name=True,
@@ -107,6 +108,7 @@ class V1alpha1KomputerAgentSpec(BaseModel):
             "connectors": obj.get("connectors"),
             "instructions": obj.get("instructions"),
             "internalSystemPrompt": obj.get("internalSystemPrompt"),
+            "labels": obj.get("labels"),
             "lifecycle": obj.get("lifecycle"),
             "memories": obj.get("memories"),
             "model": obj.get("model"),

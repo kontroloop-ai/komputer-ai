@@ -31,6 +31,7 @@ class PatchAgentRequest(BaseModel):
     """ # noqa: E501
     connectors: Optional[List[StrictStr]] = Field(default=None, description="connector names to attach")
     instructions: Optional[StrictStr] = None
+    labels: Optional[Dict[str, StrictStr]] = None
     lifecycle: Optional[StrictStr] = None
     memories: Optional[List[StrictStr]] = Field(default=None, description="memory names to attach")
     model: Optional[StrictStr] = None
@@ -41,7 +42,7 @@ class PatchAgentRequest(BaseModel):
     storage: Optional[V1alpha1StorageSpec] = None
     system_prompt: Optional[StrictStr] = Field(default=None, description="custom system prompt", alias="systemPrompt")
     template_ref: Optional[StrictStr] = Field(default=None, alias="templateRef")
-    __properties: ClassVar[List[str]] = ["connectors", "instructions", "lifecycle", "memories", "model", "podSpec", "priority", "secretRefs", "skills", "storage", "systemPrompt", "templateRef"]
+    __properties: ClassVar[List[str]] = ["connectors", "instructions", "labels", "lifecycle", "memories", "model", "podSpec", "priority", "secretRefs", "skills", "storage", "systemPrompt", "templateRef"]
 
     model_config = ConfigDict(
         validate_by_name=True,
@@ -102,6 +103,7 @@ class PatchAgentRequest(BaseModel):
         _obj = cls.model_validate({
             "connectors": obj.get("connectors"),
             "instructions": obj.get("instructions"),
+            "labels": obj.get("labels"),
             "lifecycle": obj.get("lifecycle"),
             "memories": obj.get("memories"),
             "model": obj.get("model"),

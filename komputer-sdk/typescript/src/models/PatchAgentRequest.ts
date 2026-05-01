@@ -48,6 +48,12 @@ export interface PatchAgentRequest {
     instructions?: string;
     /**
      * 
+     * @type {{ [key: string]: string; }}
+     * @memberof PatchAgentRequest
+     */
+    labels?: { [key: string]: string; };
+    /**
+     * 
      * @type {string}
      * @memberof PatchAgentRequest
      */
@@ -127,6 +133,7 @@ export function PatchAgentRequestFromJSONTyped(json: any, ignoreDiscriminator: b
         
         'connectors': json['connectors'] == null ? undefined : json['connectors'],
         'instructions': json['instructions'] == null ? undefined : json['instructions'],
+        'labels': json['labels'] == null ? undefined : json['labels'],
         'lifecycle': json['lifecycle'] == null ? undefined : json['lifecycle'],
         'memories': json['memories'] == null ? undefined : json['memories'],
         'model': json['model'] == null ? undefined : json['model'],
@@ -153,6 +160,7 @@ export function PatchAgentRequestToJSONTyped(value?: PatchAgentRequest | null, i
         
         'connectors': value['connectors'],
         'instructions': value['instructions'],
+        'labels': value['labels'],
         'lifecycle': value['lifecycle'],
         'memories': value['memories'],
         'model': value['model'],

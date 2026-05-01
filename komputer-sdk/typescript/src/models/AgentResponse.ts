@@ -35,6 +35,12 @@ import {
  */
 export interface AgentResponse {
     /**
+     * 
+     * @type {string}
+     * @memberof AgentResponse
+     */
+    completionTime?: string;
+    /**
      * KomputerConnector names attached to this agent
      * @type {Array<string>}
      * @memberof AgentResponse
@@ -60,6 +66,12 @@ export interface AgentResponse {
      * @memberof AgentResponse
      */
     instructions?: string;
+    /**
+     * 
+     * @type {{ [key: string]: string; }}
+     * @memberof AgentResponse
+     */
+    labels?: { [key: string]: string; };
     /**
      * 
      * @type {string}
@@ -211,10 +223,12 @@ export function AgentResponseFromJSONTyped(json: any, ignoreDiscriminator: boole
     }
     return {
         
+        'completionTime': json['completionTime'] == null ? undefined : json['completionTime'],
         'connectors': json['connectors'] == null ? undefined : json['connectors'],
         'createdAt': json['createdAt'] == null ? undefined : json['createdAt'],
         'errors': json['errors'] == null ? undefined : json['errors'],
         'instructions': json['instructions'] == null ? undefined : json['instructions'],
+        'labels': json['labels'] == null ? undefined : json['labels'],
         'lastTaskCostUSD': json['lastTaskCostUSD'] == null ? undefined : json['lastTaskCostUSD'],
         'lastTaskMessage': json['lastTaskMessage'] == null ? undefined : json['lastTaskMessage'],
         'lifecycle': json['lifecycle'] == null ? undefined : json['lifecycle'],
@@ -251,10 +265,12 @@ export function AgentResponseToJSONTyped(value?: AgentResponse | null, ignoreDis
 
     return {
         
+        'completionTime': value['completionTime'],
         'connectors': value['connectors'],
         'createdAt': value['createdAt'],
         'errors': value['errors'],
         'instructions': value['instructions'],
+        'labels': value['labels'],
         'lastTaskCostUSD': value['lastTaskCostUSD'],
         'lastTaskMessage': value['lastTaskMessage'],
         'lifecycle': value['lifecycle'],

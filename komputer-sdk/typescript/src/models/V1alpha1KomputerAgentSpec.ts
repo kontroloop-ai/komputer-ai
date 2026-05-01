@@ -63,6 +63,16 @@ export interface V1alpha1KomputerAgentSpec {
      */
     internalSystemPrompt?: string;
     /**
+     * Labels are user-defined key=value labels attached to this agent and
+     * propagated to all child resources (Pod, PVC, ConfigMap, Service).
+     * Keys starting with "komputer.ai/" are reserved for system labels and
+     * should not be set directly through the API.
+     * +optional
+     * @type {{ [key: string]: string; }}
+     * @memberof V1alpha1KomputerAgentSpec
+     */
+    labels?: { [key: string]: string; };
+    /**
      * Lifecycle controls what happens after task completion.
      * Empty (default) keeps the pod running, "Sleep" deletes the pod but keeps the PVC,
      * "AutoDelete" deletes the entire agent after task completion.
@@ -188,6 +198,7 @@ export function V1alpha1KomputerAgentSpecFromJSONTyped(json: any, ignoreDiscrimi
         'connectors': json['connectors'] == null ? undefined : json['connectors'],
         'instructions': json['instructions'] == null ? undefined : json['instructions'],
         'internalSystemPrompt': json['internalSystemPrompt'] == null ? undefined : json['internalSystemPrompt'],
+        'labels': json['labels'] == null ? undefined : json['labels'],
         'lifecycle': json['lifecycle'] == null ? undefined : V1alpha1AgentLifecycleFromJSON(json['lifecycle']),
         'memories': json['memories'] == null ? undefined : json['memories'],
         'model': json['model'] == null ? undefined : json['model'],
@@ -217,6 +228,7 @@ export function V1alpha1KomputerAgentSpecToJSONTyped(value?: V1alpha1KomputerAge
         'connectors': value['connectors'],
         'instructions': value['instructions'],
         'internalSystemPrompt': value['internalSystemPrompt'],
+        'labels': value['labels'],
         'lifecycle': V1alpha1AgentLifecycleToJSON(value['lifecycle']),
         'memories': value['memories'],
         'model': value['model'],

@@ -7,6 +7,7 @@ Name | Type | Description | Notes
 **Connectors** | Pointer to **[]string** | Connectors is a list of KomputerConnector names to attach to this agent. Names can be \&quot;name\&quot; (same namespace) or \&quot;namespace/name\&quot; (cross-namespace). +optional | [optional] 
 **Instructions** | Pointer to **string** | Instructions is the user&#39;s task for the Claude agent. | [optional] 
 **InternalSystemPrompt** | Pointer to **string** | InternalSystemPrompt is the built-in system prompt set by the API (role prompt + memories). +optional | [optional] 
+**Labels** | Pointer to **map[string]string** | Labels are user-defined key&#x3D;value labels attached to this agent and propagated to all child resources (Pod, PVC, ConfigMap, Service). Keys starting with \&quot;komputer.ai/\&quot; are reserved for system labels and should not be set directly through the API. +optional | [optional] 
 **Lifecycle** | Pointer to [**V1alpha1AgentLifecycle**](V1alpha1AgentLifecycle.md) | Lifecycle controls what happens after task completion. Empty (default) keeps the pod running, \&quot;Sleep\&quot; deletes the pod but keeps the PVC, \&quot;AutoDelete\&quot; deletes the entire agent after task completion. +kubebuilder:validation:Enum&#x3D;\&quot;\&quot;;Sleep;AutoDelete +optional | [optional] 
 **Memories** | Pointer to **[]string** | Memories is a list of KomputerMemory names to attach to this agent. Names can be \&quot;name\&quot; (same namespace) or \&quot;namespace/name\&quot; (cross-namespace). +optional | [optional] 
 **Model** | Pointer to **string** | Model is the Claude model to use. +kubebuilder:default&#x3D;\&quot;claude-sonnet-4-6\&quot; | [optional] 
@@ -113,6 +114,31 @@ SetInternalSystemPrompt sets InternalSystemPrompt field to given value.
 `func (o *V1alpha1KomputerAgentSpec) HasInternalSystemPrompt() bool`
 
 HasInternalSystemPrompt returns a boolean if a field has been set.
+
+### GetLabels
+
+`func (o *V1alpha1KomputerAgentSpec) GetLabels() map[string]string`
+
+GetLabels returns the Labels field if non-nil, zero value otherwise.
+
+### GetLabelsOk
+
+`func (o *V1alpha1KomputerAgentSpec) GetLabelsOk() (*map[string]string, bool)`
+
+GetLabelsOk returns a tuple with the Labels field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetLabels
+
+`func (o *V1alpha1KomputerAgentSpec) SetLabels(v map[string]string)`
+
+SetLabels sets Labels field to given value.
+
+### HasLabels
+
+`func (o *V1alpha1KomputerAgentSpec) HasLabels() bool`
+
+HasLabels returns a boolean if a field has been set.
 
 ### GetLifecycle
 

@@ -25,6 +25,8 @@ type V1alpha1KomputerAgentSpec struct {
 	Instructions *string `json:"instructions,omitempty"`
 	// InternalSystemPrompt is the built-in system prompt set by the API (role prompt + memories). +optional
 	InternalSystemPrompt *string `json:"internalSystemPrompt,omitempty"`
+	// Labels are user-defined key=value labels attached to this agent and propagated to all child resources (Pod, PVC, ConfigMap, Service). Keys starting with \"komputer.ai/\" are reserved for system labels and should not be set directly through the API. +optional
+	Labels *map[string]string `json:"labels,omitempty"`
 	// Lifecycle controls what happens after task completion. Empty (default) keeps the pod running, \"Sleep\" deletes the pod but keeps the PVC, \"AutoDelete\" deletes the entire agent after task completion. +kubebuilder:validation:Enum=\"\";Sleep;AutoDelete +optional
 	Lifecycle *V1alpha1AgentLifecycle `json:"lifecycle,omitempty"`
 	// Memories is a list of KomputerMemory names to attach to this agent. Names can be \"name\" (same namespace) or \"namespace/name\" (cross-namespace). +optional
@@ -162,6 +164,38 @@ func (o *V1alpha1KomputerAgentSpec) HasInternalSystemPrompt() bool {
 // SetInternalSystemPrompt gets a reference to the given string and assigns it to the InternalSystemPrompt field.
 func (o *V1alpha1KomputerAgentSpec) SetInternalSystemPrompt(v string) {
 	o.InternalSystemPrompt = &v
+}
+
+// GetLabels returns the Labels field value if set, zero value otherwise.
+func (o *V1alpha1KomputerAgentSpec) GetLabels() map[string]string {
+	if o == nil || IsNil(o.Labels) {
+		var ret map[string]string
+		return ret
+	}
+	return *o.Labels
+}
+
+// GetLabelsOk returns a tuple with the Labels field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *V1alpha1KomputerAgentSpec) GetLabelsOk() (*map[string]string, bool) {
+	if o == nil || IsNil(o.Labels) {
+		return nil, false
+	}
+	return o.Labels, true
+}
+
+// HasLabels returns a boolean if a field has been set.
+func (o *V1alpha1KomputerAgentSpec) HasLabels() bool {
+	if o != nil && !IsNil(o.Labels) {
+		return true
+	}
+
+	return false
+}
+
+// SetLabels gets a reference to the given map[string]string and assigns it to the Labels field.
+func (o *V1alpha1KomputerAgentSpec) SetLabels(v map[string]string) {
+	o.Labels = &v
 }
 
 // GetLifecycle returns the Lifecycle field value if set, zero value otherwise.
@@ -566,6 +600,9 @@ func (o V1alpha1KomputerAgentSpec) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.InternalSystemPrompt) {
 		toSerialize["internalSystemPrompt"] = o.InternalSystemPrompt
+	}
+	if !IsNil(o.Labels) {
+		toSerialize["labels"] = o.Labels
 	}
 	if !IsNil(o.Lifecycle) {
 		toSerialize["lifecycle"] = o.Lifecycle

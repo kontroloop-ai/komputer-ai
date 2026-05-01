@@ -799,7 +799,7 @@ func patchAgent(k8s *K8sClient) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: " + err.Error()})
 			return
 		}
-		if req.Model == nil && req.Lifecycle == nil && req.Instructions == nil && req.TemplateRef == nil && req.SecretRefs == nil && req.Memories == nil && req.Skills == nil && req.Connectors == nil && req.SystemPrompt == nil && req.Priority == nil && req.PodSpec == nil && req.Storage == nil {
+		if req.Model == nil && req.Lifecycle == nil && req.Instructions == nil && req.TemplateRef == nil && req.SecretRefs == nil && req.Memories == nil && req.Skills == nil && req.Connectors == nil && req.SystemPrompt == nil && req.Priority == nil && req.PodSpec == nil && req.Storage == nil && len(req.Labels) == 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "no fields to update"})
 			return
 		}
@@ -835,6 +835,19 @@ func patchAgent(k8s *K8sClient) gin.HandlerFunc {
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to set sleeping phase: " + patchErr.Error()})
 					return
 				}
+			}
+		}
+
+		// 1a-labels. Merge user labels additively (existing keys overwritten, nothing removed).
+		if len(req.Labels) > 0 {
+			if err := validateUserLabels(req.Labels); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+			if err := k8s.MergeAgentLabels(c.Request.Context(), ns, name, req.Labels); err != nil {
+				agentActionsTotal.WithLabelValues(patchAction, "error").Inc()
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to patch agent labels: " + err.Error()})
+				return
 			}
 		}
 

@@ -13,6 +13,8 @@ import (
 	komputerv1alpha1 "github.com/komputer-ai/komputer-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 type CreateAgentRequest struct {
@@ -32,6 +34,10 @@ type CreateAgentRequest struct {
 	Priority      int32    `json:"priority,omitempty"` // queue priority; higher = admitted first
 	PodSpec       *corev1.PodSpec               `json:"podSpec,omitempty"`
 	Storage       *komputerv1alpha1.StorageSpec `json:"storage,omitempty"`
+	// Labels are user-defined key=value labels passed through to the agent CR.
+	// Reserved-prefix keys (komputer.ai/*) are rejected except for
+	// "komputer.ai/personal-agent" which is allow-listed.
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 type AgentResponse struct {
@@ -64,6 +70,8 @@ type AgentResponse struct {
 	// but live-pod sync failed). The CR change still took effect; the UI can surface these
 	// as toasts so the user knows something didn't fully apply.
 	Errors          []string                      `json:"errors,omitempty"`
+	Labels          map[string]string             `json:"labels,omitempty"`
+	CompletionTime  string                        `json:"completionTime,omitempty"`
 }
 
 // buildAgentInternalSystemPrompt assembles the internal system prompt for an
@@ -131,6 +139,34 @@ func buildSquadNameMap(ctx context.Context, k8s *K8sClient, ns string) map[strin
 	return out
 }
 
+const personalAgentLabel = "komputer.ai/personal-agent"
+
+// validateUserLabels rejects keys with the komputer.ai/ reserved prefix
+// (except the personal-agent allow-listed key) and validates that every
+// key/value conforms to K8s label rules.
+func validateUserLabels(labels map[string]string) error {
+	for k, v := range labels {
+		if strings.HasPrefix(k, "komputer.ai/") && k != personalAgentLabel {
+			return fmt.Errorf("label key %q is reserved", k)
+		}
+		if errs := validation.IsQualifiedName(k); len(errs) > 0 {
+			return fmt.Errorf("invalid label key %q: %s", k, strings.Join(errs, ", "))
+		}
+		if errs := validation.IsValidLabelValue(v); len(errs) > 0 {
+			return fmt.Errorf("invalid label value for key %q: %s", k, strings.Join(errs, ", "))
+		}
+	}
+	return nil
+}
+
+// formatTime formats a *metav1.Time as RFC3339, returning "" for nil/zero.
+func formatTime(t *metav1.Time) string {
+	if t == nil || t.IsZero() {
+		return ""
+	}
+	return t.UTC().Format(time.RFC3339)
+}
+
 // mergeDefaultSkills adds default skill names to the explicit list, deduplicating.
 func mergeDefaultSkills(explicit []string, defaults []string) []string {
 	seen := make(map[string]bool, len(explicit))
@@ -163,6 +199,7 @@ type PatchAgentRequest struct {
 	Priority     *int32    `json:"priority,omitempty"`    // pointer so 0 vs unset is distinguishable
 	PodSpec      *corev1.PodSpec               `json:"podSpec,omitempty"`
 	Storage      *komputerv1alpha1.StorageSpec `json:"storage,omitempty"`
+	Labels       map[string]string             `json:"labels,omitempty"`
 }
 
 // createOrTriggerAgent creates a new agent or sends a task to an existing one.
@@ -197,6 +234,11 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 		ns := req.Namespace
 		if ns == "" {
 			ns = resolveNamespace(c, k8s)
+		}
+
+		if err := validateUserLabels(req.Labels); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
 		}
 
 		// Build full instructions with system prompt early — needed for both new agents and wake-up.
@@ -287,6 +329,8 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 					QueueReason:     existing.Status.QueueReason,
 					PodSpec:         existing.Spec.PodSpec,
 					Storage:         existing.Spec.Storage,
+					Labels:          existing.Spec.Labels,
+					CompletionTime:  formatTime(existing.Status.CompletionTime),
 				})
 				return
 			}
@@ -353,6 +397,8 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 				QueueReason:     existing.Status.QueueReason,
 				PodSpec:         existing.Spec.PodSpec,
 				Storage:         existing.Spec.Storage,
+				Labels:          existing.Spec.Labels,
+				CompletionTime:  formatTime(existing.Status.CompletionTime),
 			})
 			return
 		}
@@ -379,7 +425,7 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 			}
 		}
 
-		agent, err := k8s.CreateAgent(c.Request.Context(), ns, req.Name, instructions, buildInternalSystemPrompt(req.Memories), req.SystemPrompt, req.Model, req.TemplateRef, role, req.SecretRefs, req.Memories, req.Skills, connectors, req.Lifecycle, req.OfficeManager, req.Priority, req.PodSpec, req.Storage)
+		agent, err := k8s.CreateAgent(c.Request.Context(), ns, req.Name, instructions, buildInternalSystemPrompt(req.Memories), req.SystemPrompt, req.Model, req.TemplateRef, role, req.SecretRefs, req.Memories, req.Skills, connectors, req.Lifecycle, req.OfficeManager, req.Priority, req.PodSpec, req.Storage, req.Labels)
 		if err != nil {
 			if errors.IsAlreadyExists(err) {
 				c.JSON(http.StatusConflict, gin.H{"error": "agent already exists: " + req.Name})
@@ -410,6 +456,8 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 			Priority:     agent.Spec.Priority,
 			PodSpec:      agent.Spec.PodSpec,
 			Storage:      agent.Spec.Storage,
+			Labels:       agent.Spec.Labels,
+			CompletionTime: formatTime(agent.Status.CompletionTime),
 		})
 	}
 }
@@ -572,6 +620,8 @@ func getAgent(k8s *K8sClient) gin.HandlerFunc {
 			Storage:            agent.Spec.Storage,
 			Squad:              agent.Status.Squad,
 			SquadName:          resolveSquadName(c.Request.Context(), k8s, agent),
+			Labels:             agent.Spec.Labels,
+			CompletionTime:     formatTime(agent.Status.CompletionTime),
 		})
 	}
 }
@@ -668,7 +718,30 @@ func listAgents(k8s *K8sClient) gin.HandlerFunc {
 		ns := c.Query("namespace") // empty = all namespaces
 		statusFilter := c.Query("status")
 		defaultSkills, _ := k8s.ListDefaultSkillNames(c.Request.Context())
-		agents, err := k8s.ListAgents(c.Request.Context(), ns)
+
+		// Parse repeated ?label=k=v query params.
+		rawLabels := c.QueryArray("label")
+		labelFilter := map[string]string{}
+		for _, p := range rawLabels {
+			eq := strings.Index(p, "=")
+			if eq <= 0 || eq == len(p)-1 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid label filter %q (expected key=value)", p)})
+				return
+			}
+			k := p[:eq]
+			v := p[eq+1:]
+			if errs := validation.IsQualifiedName(k); len(errs) > 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid label key %q: %s", k, strings.Join(errs, ", "))})
+				return
+			}
+			if errs := validation.IsValidLabelValue(v); len(errs) > 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid label value for %q: %s", k, strings.Join(errs, ", "))})
+				return
+			}
+			labelFilter[k] = v
+		}
+
+		agents, err := k8s.ListAgents(c.Request.Context(), ns, labelFilter)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list agents: " + err.Error()})
 			return
@@ -707,6 +780,8 @@ func listAgents(k8s *K8sClient) gin.HandlerFunc {
 				Storage:            a.Spec.Storage,
 				Squad:              a.Status.Squad,
 				SquadName:          squadByAgent[a.Namespace+"/"+a.Name],
+				Labels:             a.Spec.Labels,
+				CompletionTime:     formatTime(a.Status.CompletionTime),
 			})
 		}
 
@@ -739,7 +814,7 @@ func patchAgent(k8s *K8sClient) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: " + err.Error()})
 			return
 		}
-		if req.Model == nil && req.Lifecycle == nil && req.Instructions == nil && req.TemplateRef == nil && req.SecretRefs == nil && req.Memories == nil && req.Skills == nil && req.Connectors == nil && req.SystemPrompt == nil && req.Priority == nil && req.PodSpec == nil && req.Storage == nil {
+		if req.Model == nil && req.Lifecycle == nil && req.Instructions == nil && req.TemplateRef == nil && req.SecretRefs == nil && req.Memories == nil && req.Skills == nil && req.Connectors == nil && req.SystemPrompt == nil && req.Priority == nil && req.PodSpec == nil && req.Storage == nil && len(req.Labels) == 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "no fields to update"})
 			return
 		}
@@ -775,6 +850,19 @@ func patchAgent(k8s *K8sClient) gin.HandlerFunc {
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to set sleeping phase: " + patchErr.Error()})
 					return
 				}
+			}
+		}
+
+		// 1a-labels. Merge user labels additively (existing keys overwritten, nothing removed).
+		if len(req.Labels) > 0 {
+			if err := validateUserLabels(req.Labels); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+			if err := k8s.MergeAgentLabels(c.Request.Context(), ns, name, req.Labels); err != nil {
+				agentActionsTotal.WithLabelValues(patchAction, "error").Inc()
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to patch agent labels: " + err.Error()})
+				return
 			}
 		}
 
@@ -914,6 +1002,8 @@ func patchAgent(k8s *K8sClient) gin.HandlerFunc {
 			Squad:              updated.Status.Squad,
 			SquadName:          resolveSquadName(c.Request.Context(), k8s, updated),
 			Errors:             nonFatalErrors,
+			Labels:             updated.Spec.Labels,
+			CompletionTime:     formatTime(updated.Status.CompletionTime),
 		})
 	}
 }

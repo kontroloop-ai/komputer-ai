@@ -72,6 +72,15 @@ spec:
                 description: InternalSystemPrompt is the built-in system prompt set
                   by the API (role prompt + memories).
                 type: string
+              labels:
+                additionalProperties:
+                  type: string
+                description: |-
+                  Labels are user-defined key=value labels attached to this agent and
+                  propagated to all child resources (Pod, PVC, ConfigMap, Service).
+                  Keys starting with "komputer.ai/" are reserved for system labels and
+                  should not be set directly through the API.
+                type: object
               lifecycle:
                 description: |-
                   Lifecycle controls what happens after task completion.

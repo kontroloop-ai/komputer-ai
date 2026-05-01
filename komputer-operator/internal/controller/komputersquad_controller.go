@@ -343,10 +343,10 @@ func (r *KomputerSquadReconciler) ensureMemberPVCs(ctx context.Context, squad *k
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pvcName,
 				Namespace: agent.Namespace,
-				Labels: map[string]string{
+				Labels: mergeLabels(agent.Spec.Labels, map[string]string{
 					"komputer.ai/agent-name": agent.Name,
 					"komputer.ai/squad":      squad.Name,
-				},
+				}),
 			},
 			Spec: corev1.PersistentVolumeClaimSpec{
 				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
@@ -876,13 +876,25 @@ func (r *KomputerSquadReconciler) buildSquadPodSpec(ctx context.Context, squad *
 	// Pod labels include one "komputer.ai/member-<name>=true" label per squad
 	// member so the per-agent Service (selector: komputer.ai/member-<name>=true)
 	// can find the pod regardless of which container runs the agent.
-	podLabels := map[string]string{
+	// Build a union of user-supplied labels from all member agents (alphabetical
+	// sort for determinism when keys conflict).
+	sortedAgents := make([]*komputerv1alpha1.KomputerAgent, len(agents))
+	copy(sortedAgents, agents)
+	sort.Slice(sortedAgents, func(i, j int) bool { return sortedAgents[i].Name < sortedAgents[j].Name })
+	unionUserLabels := map[string]string{}
+	for _, m := range sortedAgents {
+		for k, v := range m.Spec.Labels {
+			unionUserLabels[k] = v
+		}
+	}
+	systemLabels := map[string]string{
 		"komputer.ai/squad":      "true",
 		"komputer.ai/squad-name": squad.Name,
 	}
 	for _, agent := range agents {
-		podLabels["komputer.ai/member-"+agent.Name] = "true"
+		systemLabels["komputer.ai/member-"+agent.Name] = "true"
 	}
+	podLabels := mergeLabels(unionUserLabels, systemLabels)
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

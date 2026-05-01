@@ -18,6 +18,7 @@ import { listAgents, listOffices, listSchedules } from "@/lib/api";
 import { formatCost, formatRelativeTime } from "@/lib/utils";
 import type { AgentResponse, OfficeResponse, ScheduleResponse } from "@/lib/types";
 import { SuggestedTasks } from "@/components/dashboard/suggested-tasks";
+import { PersonalAgentPrompt } from "@/components/dashboard/personal-agent-prompt";
 
 // --- Animated number ---
 
@@ -117,6 +118,9 @@ export default function DashboardPage() {
   const [schedules, setSchedules] = useState<ScheduleResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const showLoading = useDelayedLoading(loading);
+  // True while the prompt bar has an active streaming session — used to
+  // subtly blur the rest of the dashboard so the bubbles draw focus.
+  const [bubbleSessionActive, setBubbleSessionActive] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -192,12 +196,20 @@ export default function DashboardPage() {
         transition={{ duration: 0.3, ease: "easeOut" }}
         className="flex-1 overflow-y-auto p-6 space-y-6"
       >
-        {/* Hero */}
+        {/* Hero — blurred while a streaming session is active so the bubbles
+            draw focus. Inline style + an explicit transition declaration so
+            the property animation runs reliably regardless of class-toggle
+            timing. */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: "easeOut" }}
           className="text-center py-2"
+          style={{
+            filter: bubbleSessionActive ? "blur(2px)" : "blur(0px)",
+            opacity: bubbleSessionActive ? 0.6 : 1,
+            transition: "filter 400ms ease, opacity 400ms ease",
+          }}
         >
           <h1 className="text-xl font-semibold text-[var(--color-text)]">
             Welcome to <span className="bg-gradient-to-r from-[#9ca3af] via-[#ffffff] to-[#9ca3af] bg-clip-text text-transparent animate-shine">Komputer.AI</span>
@@ -206,6 +218,22 @@ export default function DashboardPage() {
             Your AI agent fleet management at scale.
           </p>
         </motion.div>
+
+        <PersonalAgentPrompt onSessionActiveChange={setBubbleSessionActive} />
+
+        {/* Everything below the prompt fades into a subtle blur while a
+            streaming session is active. Sidebar (outside this tree) stays
+            crisp; prompt bar + bubbles are unaffected because they're not
+            inside this wrapper. */}
+        <div
+          className="space-y-6"
+          style={{
+            filter: bubbleSessionActive ? "blur(2px)" : "blur(0px)",
+            opacity: bubbleSessionActive ? 0.6 : 1,
+            transition: "filter 400ms ease, opacity 400ms ease",
+            pointerEvents: bubbleSessionActive ? "none" : "auto",
+          }}
+        >
 
         {/* Stats row */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -441,6 +469,7 @@ export default function DashboardPage() {
 
         {/* Suggested Tasks (bottom when agents exist) */}
         {!loading && agents.length > 0 && <SuggestedTasks />}
+        </div>
       </motion.div>
     </div>
   );

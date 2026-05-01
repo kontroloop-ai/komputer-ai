@@ -258,7 +258,7 @@ func (k *K8sClient) UpdateManagedSecret(ctx context.Context, ns, name string, da
 	return secret, nil
 }
 
-func (k *K8sClient) CreateAgent(ctx context.Context, ns, name, instructions, internalSystemPrompt, systemPrompt, model, templateRef, role string, secretNames []string, memories []string, skills []string, connectors []string, lifecycle, officeManager string, priority int32, podSpec *corev1.PodSpec, storage *komputerv1alpha1.StorageSpec) (*komputerv1alpha1.KomputerAgent, error) {
+func (k *K8sClient) CreateAgent(ctx context.Context, ns, name, instructions, internalSystemPrompt, systemPrompt, model, templateRef, role string, secretNames []string, memories []string, skills []string, connectors []string, lifecycle, officeManager string, priority int32, podSpec *corev1.PodSpec, storage *komputerv1alpha1.StorageSpec, labels map[string]string) (*komputerv1alpha1.KomputerAgent, error) {
 	if model == "" {
 		model = "claude-sonnet-4-6"
 	}
@@ -290,6 +290,7 @@ func (k *K8sClient) CreateAgent(ctx context.Context, ns, name, instructions, int
 			Priority:             priority,
 			PodSpec:              podSpec,
 			Storage:              storage,
+			Labels:               labels,
 		},
 	}
 
@@ -301,6 +302,24 @@ func (k *K8sClient) CreateAgent(ctx context.Context, ns, name, instructions, int
 		return nil, err
 	}
 	return agent, nil
+}
+
+// MergeAgentLabels merges the given labels into the agent's Spec.Labels additively.
+// Existing keys are overwritten; no keys are removed.
+func (k *K8sClient) MergeAgentLabels(ctx context.Context, ns, agentName string, labels map[string]string) error {
+	agent := &komputerv1alpha1.KomputerAgent{}
+	key := types.NamespacedName{Name: agentName, Namespace: ns}
+	if err := k.client.Get(ctx, key, agent); err != nil {
+		return fmt.Errorf("failed to get agent %s: %w", agentName, err)
+	}
+	original := agent.DeepCopy()
+	if agent.Spec.Labels == nil {
+		agent.Spec.Labels = map[string]string{}
+	}
+	for k2, v := range labels {
+		agent.Spec.Labels[k2] = v
+	}
+	return k.client.Patch(ctx, agent, client.MergeFrom(original))
 }
 
 // PatchAgentOverrides patches the podSpec and/or storage overrides on a KomputerAgent CR.
@@ -367,11 +386,14 @@ func (k *K8sClient) GetAgent(ctx context.Context, ns, name string) (*komputerv1a
 	return agent, nil
 }
 
-func (k *K8sClient) ListAgents(ctx context.Context, ns string) ([]komputerv1alpha1.KomputerAgent, error) {
+func (k *K8sClient) ListAgents(ctx context.Context, ns string, labelFilter map[string]string) ([]komputerv1alpha1.KomputerAgent, error) {
 	list := &komputerv1alpha1.KomputerAgentList{}
 	var opts []client.ListOption
 	if ns != "" {
 		opts = append(opts, client.InNamespace(ns))
+	}
+	if len(labelFilter) > 0 {
+		opts = append(opts, client.MatchingLabels(labelFilter))
 	}
 	if err := k.client.List(ctx, list, opts...); err != nil {
 		return nil, err

@@ -120,6 +120,12 @@ type KomputerAgentSpec struct {
 	// Existing PVCs are expanded in place when the storage class supports it.
 	// +optional
 	Storage *StorageSpec `json:"storage,omitempty"`
+	// Labels are user-defined key=value labels attached to this agent and
+	// propagated to all child resources (Pod, PVC, ConfigMap, Service).
+	// Keys starting with "komputer.ai/" are reserved for system labels and
+	// should not be set directly through the API.
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 // KomputerAgentStatus defines the observed state of KomputerAgent.

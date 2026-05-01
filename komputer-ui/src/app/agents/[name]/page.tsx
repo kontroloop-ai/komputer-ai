@@ -923,6 +923,33 @@ function SettingsCard({ agent, agentNs, onSaved }: {
         </div>
       </div>
 
+      {/* Labels */}
+      <div className="flex flex-col gap-1.5">
+        <Label>Labels</Label>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {Object.entries(agent.labels ?? {})
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([k, v]) => (
+              <span
+                key={k}
+                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] ${
+                  k.startsWith("komputer.ai/")
+                    ? "border-[var(--color-brand-blue)]/40 bg-[var(--color-brand-blue)]/10 text-[var(--color-brand-blue-light)]"
+                    : "border-[var(--color-border)] text-[var(--color-text-secondary)]"
+                }`}
+              >
+                <span className="font-mono">{k}</span>=<span>{v}</span>
+              </span>
+            ))}
+          <AddLabelForm
+            onAdd={async (k, v) => {
+              await patchAgent(agent.name, { labels: { [k]: v } }, agentNs);
+              onSaved();
+            }}
+          />
+        </div>
+      </div>
+
       {error && <p className="text-sm text-red-400">{error}</p>}
 
       <div className="flex items-center gap-2">
@@ -967,6 +994,53 @@ function SquadAwareDeleteButton({
         </Button>
       }
     />
+  );
+}
+
+function AddLabelForm({ onAdd }: { onAdd: (k: string, v: string) => Promise<void> }) {
+  const [k, setK] = useState("");
+  const [v, setV] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    if (!k.trim() || !v.trim()) return;
+    setBusy(true);
+    try {
+      await onAdd(k.trim(), v.trim());
+      setK("");
+      setV("");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-[var(--color-border)] px-1.5 py-0.5">
+      <input
+        value={k}
+        onChange={(e) => setK(e.target.value)}
+        placeholder="key"
+        className="w-20 bg-transparent text-[11px] text-[var(--color-text)] focus:outline-none"
+        disabled={busy}
+      />
+      =
+      <input
+        value={v}
+        onChange={(e) => setV(e.target.value)}
+        placeholder="value"
+        className="w-24 bg-transparent text-[11px] text-[var(--color-text)] focus:outline-none"
+        disabled={busy}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") submit();
+        }}
+      />
+      <button
+        type="button"
+        onClick={submit}
+        disabled={busy || !k.trim() || !v.trim()}
+        className="text-[10px] text-[var(--color-brand-blue)] hover:underline disabled:opacity-40 cursor-pointer"
+      >
+        Add
+      </button>
+    </span>
   );
 }
 

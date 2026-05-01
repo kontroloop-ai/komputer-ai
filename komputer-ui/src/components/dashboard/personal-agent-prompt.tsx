@@ -92,6 +92,11 @@ export function PersonalAgentPrompt({ onSessionActiveChange }: PersonalAgentProm
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   // submitting: Go was clicked, request in flight or first event not yet received.
   const [submitting, setSubmitting] = useState(false);
+  // Bumping this value re-keys the textarea so a fresh animation plays.
+  // The `key` change forces React to unmount/remount the textarea, which
+  // triggers the CSS animation cleanly without React reconciliation
+  // stripping the animation class from a still-mounted element.
+  const [blurInToken, setBlurInToken] = useState(0);
   const [error, setError] = useState<string | null>(null);
   // Active streaming session — when non-null, the bubbles render below the textarea.
   const [session, setSession] = useState<StreamingSession | null>(null);
@@ -405,6 +410,7 @@ export function PersonalAgentPrompt({ onSessionActiveChange }: PersonalAgentProm
         <div aria-hidden />
 
         <textarea
+          key={`textarea-${blurInToken}`}
           ref={textareaRef}
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
@@ -418,7 +424,7 @@ export function PersonalAgentPrompt({ onSessionActiveChange }: PersonalAgentProm
           }}
           placeholder={session !== null ? "Enter another prompt for the agent..." : placeholder}
           rows={2}
-          className="w-full resize-none min-h-[3.25rem] max-h-[7rem] rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3.5 py-2.5 text-sm leading-relaxed text-[var(--color-text)] placeholder:text-[var(--color-text-muted)] shadow-[inset_0_1px_2px_rgba(0,0,0,0.15)] transition-[border-color,background-color,box-shadow,height] duration-150 hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-hover)] focus:border-[var(--color-brand-blue)]/60 focus:bg-[var(--color-surface)] focus:shadow-[inset_0_1px_2px_rgba(0,0,0,0.15),0_0_0_3px_rgba(63,133,217,0.15)] focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+          className={`w-full resize-none min-h-[3.25rem] max-h-[7rem] rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3.5 py-2.5 text-sm leading-relaxed text-[var(--color-text)] placeholder:text-[var(--color-text-muted)] shadow-[inset_0_1px_2px_rgba(0,0,0,0.15)] transition-[border-color,background-color,box-shadow,height] duration-150 hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-hover)] focus:border-[var(--color-brand-blue)]/60 focus:bg-[var(--color-surface)] focus:shadow-[inset_0_1px_2px_rgba(0,0,0,0.15),0_0_0_3px_rgba(63,133,217,0.15)] focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed${blurInToken > 0 ? " animate-text-blur-in" : ""}`}
           disabled={submitting}
         />
         <Button
@@ -481,12 +487,7 @@ export function PersonalAgentPrompt({ onSessionActiveChange }: PersonalAgentProm
             type="button"
             onClick={() => {
               setPrompt(p.prompt);
-              const el = textareaRef.current;
-              if (el) {
-                el.classList.remove("animate-text-blur-in");
-                void el.offsetWidth;
-                el.classList.add("animate-text-blur-in");
-              }
+              setBlurInToken((t) => t + 1);
             }}
             className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-0.5 text-[11px] text-[var(--color-text-secondary)] hover:border-[var(--color-border-hover)] hover:text-[var(--color-text)] transition-colors cursor-pointer"
           >

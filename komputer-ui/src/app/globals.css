@@ -174,6 +174,11 @@
    * (e.g. clicking a prompt pill). Uses color + text-shadow so only the glyphs
    * blur in — border, bg, and shadow stay still.
    */
+  /* Animate only the glyphs inside a <textarea> by hiding the real text
+     (color: transparent) and rendering a blurred copy via text-shadow.
+     The shadow shrinks to 0 to "focus" the text in. Driven by remounting
+     the textarea with a fresh `key` so the animation always plays from
+     scratch — see personal-agent-prompt.tsx. */
   @keyframes text-blur-in {
     from {
       color: transparent;
@@ -181,19 +186,17 @@
     }
     to {
       color: var(--color-text);
-      text-shadow: 0 0 0 transparent;
+      text-shadow: 0 0 0 var(--color-text);
     }
   }
   .animate-text-blur-in {
     animation: text-blur-in 320ms ease-out;
   }
 
-  /* Reverse: glyphs blur outward as they're cleared. Keeps `forwards` so the
-     final transparent state holds until JS removes the value and re-renders. */
   @keyframes text-blur-out {
     from {
       color: var(--color-text);
-      text-shadow: 0 0 0 transparent;
+      text-shadow: 0 0 0 var(--color-text);
     }
     to {
       color: transparent;

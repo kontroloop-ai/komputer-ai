@@ -13,6 +13,7 @@ import (
 	komputerv1alpha1 "github.com/komputer-ai/komputer-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 type CreateAgentRequest struct {
@@ -136,6 +137,26 @@ func buildSquadNameMap(ctx context.Context, k8s *K8sClient, ns string) map[strin
 	return out
 }
 
+const personalAgentLabel = "komputer.ai/personal-agent"
+
+// validateUserLabels rejects keys with the komputer.ai/ reserved prefix
+// (except the personal-agent allow-listed key) and validates that every
+// key/value conforms to K8s label rules.
+func validateUserLabels(labels map[string]string) error {
+	for k, v := range labels {
+		if strings.HasPrefix(k, "komputer.ai/") && k != personalAgentLabel {
+			return fmt.Errorf("label key %q is reserved", k)
+		}
+		if errs := validation.IsQualifiedName(k); len(errs) > 0 {
+			return fmt.Errorf("invalid label key %q: %s", k, strings.Join(errs, ", "))
+		}
+		if errs := validation.IsValidLabelValue(v); len(errs) > 0 {
+			return fmt.Errorf("invalid label value for key %q: %s", k, strings.Join(errs, ", "))
+		}
+	}
+	return nil
+}
+
 // mergeDefaultSkills adds default skill names to the explicit list, deduplicating.
 func mergeDefaultSkills(explicit []string, defaults []string) []string {
 	seen := make(map[string]bool, len(explicit))
@@ -203,6 +224,11 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 		ns := req.Namespace
 		if ns == "" {
 			ns = resolveNamespace(c, k8s)
+		}
+
+		if err := validateUserLabels(req.Labels); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
 		}
 
 		// Build full instructions with system prompt early — needed for both new agents and wake-up.
@@ -293,6 +319,7 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 					QueueReason:     existing.Status.QueueReason,
 					PodSpec:         existing.Spec.PodSpec,
 					Storage:         existing.Spec.Storage,
+					Labels:          existing.Spec.Labels,
 				})
 				return
 			}
@@ -359,6 +386,7 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 				QueueReason:     existing.Status.QueueReason,
 				PodSpec:         existing.Spec.PodSpec,
 				Storage:         existing.Spec.Storage,
+				Labels:          existing.Spec.Labels,
 			})
 			return
 		}
@@ -385,7 +413,7 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 			}
 		}
 
-		agent, err := k8s.CreateAgent(c.Request.Context(), ns, req.Name, instructions, buildInternalSystemPrompt(req.Memories), req.SystemPrompt, req.Model, req.TemplateRef, role, req.SecretRefs, req.Memories, req.Skills, connectors, req.Lifecycle, req.OfficeManager, req.Priority, req.PodSpec, req.Storage)
+		agent, err := k8s.CreateAgent(c.Request.Context(), ns, req.Name, instructions, buildInternalSystemPrompt(req.Memories), req.SystemPrompt, req.Model, req.TemplateRef, role, req.SecretRefs, req.Memories, req.Skills, connectors, req.Lifecycle, req.OfficeManager, req.Priority, req.PodSpec, req.Storage, req.Labels)
 		if err != nil {
 			if errors.IsAlreadyExists(err) {
 				c.JSON(http.StatusConflict, gin.H{"error": "agent already exists: " + req.Name})
@@ -416,6 +444,7 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 			Priority:     agent.Spec.Priority,
 			PodSpec:      agent.Spec.PodSpec,
 			Storage:      agent.Spec.Storage,
+			Labels:       agent.Spec.Labels,
 		})
 	}
 }
@@ -578,6 +607,7 @@ func getAgent(k8s *K8sClient) gin.HandlerFunc {
 			Storage:            agent.Spec.Storage,
 			Squad:              agent.Status.Squad,
 			SquadName:          resolveSquadName(c.Request.Context(), k8s, agent),
+			Labels:             agent.Spec.Labels,
 		})
 	}
 }
@@ -713,6 +743,7 @@ func listAgents(k8s *K8sClient) gin.HandlerFunc {
 				Storage:            a.Spec.Storage,
 				Squad:              a.Status.Squad,
 				SquadName:          squadByAgent[a.Namespace+"/"+a.Name],
+				Labels:             a.Spec.Labels,
 			})
 		}
 
@@ -920,6 +951,7 @@ func patchAgent(k8s *K8sClient) gin.HandlerFunc {
 			Squad:              updated.Status.Squad,
 			SquadName:          resolveSquadName(c.Request.Context(), k8s, updated),
 			Errors:             nonFatalErrors,
+			Labels:             updated.Spec.Labels,
 		})
 	}
 }

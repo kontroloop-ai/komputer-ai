@@ -45,8 +45,8 @@ func TestMergeLabels_BothPreserved(t *testing.T) {
 		map[string]string{"komputer.ai/agent-name": "alice", "komputer.ai/squad": "false"},
 	)
 	want := map[string]string{
-		"team": "core",
-		"env":  "prod",
+		"team":                   "core",
+		"env":                    "prod",
 		"komputer.ai/agent-name": "alice",
 		"komputer.ai/squad":      "false",
 	}

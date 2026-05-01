@@ -392,28 +392,13 @@ func (k *K8sClient) ListAgents(ctx context.Context, ns string, labelFilter map[s
 	if ns != "" {
 		opts = append(opts, client.InNamespace(ns))
 	}
+	if len(labelFilter) > 0 {
+		opts = append(opts, client.MatchingLabels(labelFilter))
+	}
 	if err := k.client.List(ctx, list, opts...); err != nil {
 		return nil, err
 	}
-	if len(labelFilter) == 0 {
-		return list.Items, nil
-	}
-	out := make([]komputerv1alpha1.KomputerAgent, 0, len(list.Items))
-	for _, a := range list.Items {
-		if matchesAllLabels(a.Spec.Labels, labelFilter) {
-			out = append(out, a)
-		}
-	}
-	return out, nil
-}
-
-func matchesAllLabels(have, want map[string]string) bool {
-	for k, v := range want {
-		if got, ok := have[k]; !ok || got != v {
-			return false
-		}
-	}
-	return true
+	return list.Items, nil
 }
 
 type TemplateInfo struct {

@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -74,6 +75,17 @@ func (r *KomputerAgentReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, err
+	}
+
+	// 1b. Propagate Spec.Labels onto the agent CR's own metadata.labels so that
+	// kubectl label selectors and client.MatchingLabels work natively on the CR.
+	desiredLabels := mergeLabels(agent.Spec.Labels, nil)
+	if !reflect.DeepEqual(agent.ObjectMeta.Labels, desiredLabels) {
+		patch := client.MergeFrom(agent.DeepCopy())
+		agent.ObjectMeta.Labels = desiredLabels
+		if err := r.Patch(ctx, agent, patch); err != nil {
+			return ctrl.Result{}, fmt.Errorf("patch agent labels: %w", err)
+		}
 	}
 
 	// Always ensure the per-agent Service exists, even for squad-managed agents.

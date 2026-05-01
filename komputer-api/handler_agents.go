@@ -13,6 +13,7 @@ import (
 	komputerv1alpha1 "github.com/komputer-ai/komputer-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
@@ -70,6 +71,7 @@ type AgentResponse struct {
 	// as toasts so the user knows something didn't fully apply.
 	Errors          []string                      `json:"errors,omitempty"`
 	Labels          map[string]string             `json:"labels,omitempty"`
+	CompletionTime  string                        `json:"completionTime,omitempty"`
 }
 
 // buildAgentInternalSystemPrompt assembles the internal system prompt for an
@@ -155,6 +157,14 @@ func validateUserLabels(labels map[string]string) error {
 		}
 	}
 	return nil
+}
+
+// formatTime formats a *metav1.Time as RFC3339, returning "" for nil/zero.
+func formatTime(t *metav1.Time) string {
+	if t == nil || t.IsZero() {
+		return ""
+	}
+	return t.UTC().Format(time.RFC3339)
 }
 
 // mergeDefaultSkills adds default skill names to the explicit list, deduplicating.
@@ -320,6 +330,7 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 					PodSpec:         existing.Spec.PodSpec,
 					Storage:         existing.Spec.Storage,
 					Labels:          existing.Spec.Labels,
+					CompletionTime:  formatTime(existing.Status.CompletionTime),
 				})
 				return
 			}
@@ -387,6 +398,7 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 				PodSpec:         existing.Spec.PodSpec,
 				Storage:         existing.Spec.Storage,
 				Labels:          existing.Spec.Labels,
+				CompletionTime:  formatTime(existing.Status.CompletionTime),
 			})
 			return
 		}
@@ -445,6 +457,7 @@ func createOrTriggerAgent(k8s *K8sClient) gin.HandlerFunc {
 			PodSpec:      agent.Spec.PodSpec,
 			Storage:      agent.Spec.Storage,
 			Labels:       agent.Spec.Labels,
+			CompletionTime: formatTime(agent.Status.CompletionTime),
 		})
 	}
 }
@@ -608,6 +621,7 @@ func getAgent(k8s *K8sClient) gin.HandlerFunc {
 			Squad:              agent.Status.Squad,
 			SquadName:          resolveSquadName(c.Request.Context(), k8s, agent),
 			Labels:             agent.Spec.Labels,
+			CompletionTime:     formatTime(agent.Status.CompletionTime),
 		})
 	}
 }
@@ -767,6 +781,7 @@ func listAgents(k8s *K8sClient) gin.HandlerFunc {
 				Squad:              a.Status.Squad,
 				SquadName:          squadByAgent[a.Namespace+"/"+a.Name],
 				Labels:             a.Spec.Labels,
+				CompletionTime:     formatTime(a.Status.CompletionTime),
 			})
 		}
 
@@ -988,6 +1003,7 @@ func patchAgent(k8s *K8sClient) gin.HandlerFunc {
 			SquadName:          resolveSquadName(c.Request.Context(), k8s, updated),
 			Errors:             nonFatalErrors,
 			Labels:             updated.Spec.Labels,
+			CompletionTime:     formatTime(updated.Status.CompletionTime),
 		})
 	}
 }

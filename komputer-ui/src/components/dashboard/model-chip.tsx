@@ -17,7 +17,7 @@ export interface ModelChipProps {
 export function ModelChip({ value, onChange }: ModelChipProps) {
   const options: ChipSelectOption[] = MODELS.map((m) => ({
     value: m.value,
-    label: <span className="font-mono text-[13px]">{m.label}</span>,
+    label: m.label,
     icon: <Cpu className="size-3 shrink-0 text-[var(--color-text-muted)]" />,
   }));
 

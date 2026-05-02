@@ -107,7 +107,7 @@ export function ChipSelect({
                     setOpen(false);
                   }}
                   className={cn(
-                    "flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--color-surface-hover)]",
+                    "flex w-full cursor-pointer items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--color-surface-hover)]",
                     selected ? "text-[var(--color-brand-blue)]" : opt.className ?? "text-[var(--color-text)]",
                   )}
                 >

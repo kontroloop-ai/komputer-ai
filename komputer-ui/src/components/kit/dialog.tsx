@@ -56,7 +56,7 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
             the screen edges on small viewports.
           */}
           <motion.div
-            className="relative z-10 max-w-[min(100%,64rem)] mx-4 flex flex-col items-stretch"
+            className="relative z-10 max-w-[min(100%,80rem)] mx-4 flex flex-col items-stretch"
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}

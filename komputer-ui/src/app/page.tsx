@@ -102,8 +102,8 @@ function StatCard({
   href?: string;
 }) {
   const inner = (
-    <Card className="bg-[var(--color-surface)] border-[var(--color-border)] ring-0 hover:shadow-[0_4px_16px_rgba(var(--shadow-color),var(--shadow-strength)),inset_0_1px_0_var(--color-border-light)] hover:border-[var(--color-border-hover)]">
-      <CardContent className="flex items-center gap-4 py-4">
+    <Card className="h-[88px] bg-[var(--color-surface)] border-[var(--color-border)] ring-0 hover:shadow-[0_4px_16px_rgba(var(--shadow-color),var(--shadow-strength)),inset_0_1px_0_var(--color-border-light)] hover:border-[var(--color-border-hover)]">
+      <CardContent className="flex h-full items-center gap-4 py-4">
         <div
           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${iconClassName ?? "bg-[var(--color-brand-blue)]/10 text-[var(--color-brand-blue)]"}`}
         >
@@ -111,16 +111,16 @@ function StatCard({
         </div>
         <div className="min-w-0">
           <p className="text-xs text-[var(--color-text-secondary)]">{label}</p>
-          <div className="flex items-baseline gap-3">
-            <p className="text-2xl font-semibold text-[var(--color-text)] tabular-nums">
+          <div className="flex items-baseline gap-3 min-w-0">
+            <p className="text-2xl font-semibold text-[var(--color-text)] tabular-nums shrink-0">
               <AnimatedNumber value={value} />
             </p>
             {breakdown && breakdown.some((b) => b.count > 0) && (
-              <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+              <div className="flex items-center gap-x-2 overflow-hidden">
                 {breakdown.map((b) =>
                   b.count > 0 ? (
-                    <span key={b.label} className="inline-flex items-center gap-1 text-xs text-[var(--color-text)]">
-                      <span className="size-1.5 rounded-full" style={{ backgroundColor: b.color }} />
+                    <span key={b.label} className="inline-flex items-center gap-1 text-xs text-[var(--color-text)] whitespace-nowrap">
+                      <span className="size-1.5 rounded-full shrink-0" style={{ backgroundColor: b.color }} />
                       {b.count} {b.label}
                     </span>
                   ) : null
@@ -139,7 +139,7 @@ function StatCard({
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -2, transition: { duration: 0.15 } }}
       transition={{ duration: 0.3, delay }}
-      className={`cursor-pointer w-[260px] shrink-0 ${href ? "" : ""}`}
+      className={`cursor-pointer shrink-0 w-[calc((100%-48px)/4)] min-w-[220px]`}
     >
       {href ? <Link href={href}>{inner}</Link> : inner}
     </motion.div>
@@ -182,7 +182,10 @@ function StatsScrollRow({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="relative min-w-0">
+    // -mb-2 cancels half of the row's pb-6 in the outer space-y-6 stack so
+    // the visual gap to the next section stays comfortable while the row
+    // still reserves room internally for hover-shadow render below the cards.
+    <div className="relative min-w-0 -mb-2">
       {/* Left fade + chevron */}
       {showLeft && (
         <>
@@ -223,7 +226,7 @@ function StatsScrollRow({ children }: { children: React.ReactNode }) {
 
       <div
         ref={rowRef}
-        className="flex gap-4 overflow-x-auto pb-1"
+        className="flex gap-4 overflow-x-auto pt-2 pb-6"
         style={{ scrollbarWidth: "none" }}
       >
         <style>{`.stats-row::-webkit-scrollbar { display: none; }`}</style>
@@ -438,28 +441,6 @@ export default function DashboardPage() {
             ]}
           />
           <StatCard
-            icon={<Wrench className="size-5" />}
-            label="Skills"
-            value={skills.length}
-            delay={0.16}
-            href="/skills"
-          />
-          <StatCard
-            icon={<Brain className="size-5" />}
-            label="Memories"
-            value={memories.length}
-            delay={0.20}
-            href="/memories"
-            iconClassName="bg-[var(--color-brand-violet)]/10 text-[var(--color-brand-violet)]"
-          />
-          <StatCard
-            icon={<KeyRound className="size-5" />}
-            label="Secrets"
-            value={secrets.length}
-            delay={0.24}
-            href="/secrets"
-          />
-          <StatCard
             icon={<Plug className="size-5" />}
             label="Connectors"
             value={connectors.length}
@@ -483,6 +464,28 @@ export default function DashboardPage() {
               { color: "#F87171", count: squadsByPhase.Orphaned, label: "Orphaned" },
               { color: "#F87171", count: squadsByPhase.Failed, label: "Failed" },
             ]}
+          />
+          <StatCard
+            icon={<Wrench className="size-5" />}
+            label="Skills"
+            value={skills.length}
+            delay={0.16}
+            href="/skills"
+          />
+          <StatCard
+            icon={<Brain className="size-5" />}
+            label="Memories"
+            value={memories.length}
+            delay={0.20}
+            href="/memories"
+            iconClassName="bg-[var(--color-brand-violet)]/10 text-[var(--color-brand-violet)]"
+          />
+          <StatCard
+            icon={<KeyRound className="size-5" />}
+            label="Secrets"
+            value={secrets.length}
+            delay={0.24}
+            href="/secrets"
           />
         </StatsScrollRow>
 

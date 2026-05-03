@@ -103,7 +103,7 @@ export function CreateSecretModal({ open, onOpenChange, onCreated }: CreateSecre
         if (!nextOpen) resetForm();
       }}
     >
-      <DialogContent>
+      <DialogContent className="max-w-3xl">
         <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
           <DialogHeader>
             <DialogTitle>Create Secret</DialogTitle>
@@ -112,7 +112,7 @@ export function CreateSecretModal({ open, onOpenChange, onCreated }: CreateSecre
             </DialogDescription>
           </DialogHeader>
 
-          <div className="mt-4 flex flex-col gap-4 overflow-y-auto flex-1 pr-1">
+          <div className="mt-4 flex flex-col gap-4 overflow-y-auto flex-1 px-2 py-2">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="secret-name">Name</Label>
               <Input

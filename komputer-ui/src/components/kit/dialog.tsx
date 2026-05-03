@@ -49,14 +49,13 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
             transition={{ duration: 0.15 }}
           />
           {/*
-            Panel — sizes to its child's max-width so dialogs center properly
-            against the content area regardless of how narrow each one is. We
-            still cap at min(100%, 64rem) so very wide DialogContents still fit
-            inside the viewport. Margin guarantees a small breathing gap from
-            the screen edges on small viewports.
+            Panel — fills the available width up to 80rem; the inner
+            DialogContent applies its own max-w-* to cap the visible card.
+            Centering happens in the parent flex frame which already accounts
+            for sidebar offset via --sidebar-width.
           */}
           <motion.div
-            className="relative z-10 max-w-[min(100%,64rem)] mx-4 flex flex-col items-stretch"
+            className="relative z-10 w-full max-w-[min(100%,80rem)] mx-4 flex flex-col items-center"
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -85,6 +84,10 @@ export function DialogContent({
         "shadow-[0_8px_32px_rgba(0,0,0,0.4),0_2px_8px_rgba(0,0,0,0.2),inset_0_1px_0_var(--color-border-light)]",
         "w-full flex flex-col",
         "p-6 text-[var(--color-text)]",
+        // Cap the visible card width per-instance via the className override.
+        // Default cap matches the previous 64rem panel cap so existing dialogs
+        // without an explicit max-w-* in className don't suddenly fill 80rem.
+        "max-w-[64rem]",
         className,
       )}
       {...props}

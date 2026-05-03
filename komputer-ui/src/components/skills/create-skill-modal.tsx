@@ -85,7 +85,7 @@ export function CreateSkillModal({ open, onOpenChange, onCreated }: CreateSkillM
         if (!nextOpen) resetForm();
       }}
     >
-      <DialogContent>
+      <DialogContent className="max-w-3xl">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Create Skill</DialogTitle>

@@ -361,13 +361,12 @@ export function PersonalAgentPrompt({ onSessionActiveChange }: PersonalAgentProm
       className="mx-auto w-full max-w-2xl"
     >
       {/*
-        Two-row grid so the selector chips above and the textarea below share
-        column widths — the selector ends up centered over the textarea, not
-        the whole container (which would put it slightly right of center
-        because of the Go button to the right).
+        The textarea takes the full container width so it sits visually
+        centered; the Go button floats just past its right edge instead of
+        shrinking the textarea on one side and leaving the other side wider.
       */}
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3">
-        {/* Selector row, spanning only the textarea column */}
+      <div>
+        {/* Selector row */}
         <div className="mb-2 flex flex-wrap items-center justify-center gap-2">
           <ActiveAgentChip
             active={active}
@@ -406,66 +405,66 @@ export function PersonalAgentPrompt({ onSessionActiveChange }: PersonalAgentProm
           />
           {error && <span className="text-xs text-red-400">{error}</span>}
         </div>
-        {/* Empty cell above the Go button so the grid columns line up. */}
-        <div aria-hidden />
-
-        <textarea
-          key={`textarea-${blurInToken}`}
-          ref={textareaRef}
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          onKeyDown={(e) => {
-            // Enter submits, Shift+Enter inserts a newline. Cmd/Ctrl+Enter
-            // also submits (kept for muscle memory from chat clients).
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              handleGo();
-            }
-          }}
-          placeholder={session !== null ? "Enter another prompt for the agent..." : placeholder}
-          rows={2}
-          className={`w-full resize-none min-h-[3.25rem] max-h-[7rem] rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3.5 py-2.5 text-sm leading-relaxed text-[var(--color-text)] placeholder:text-[var(--color-text-muted)] shadow-[inset_0_1px_2px_rgba(0,0,0,0.15)] transition-[border-color,background-color,box-shadow,height] duration-150 hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-hover)] focus:border-[var(--color-brand-blue)]/60 focus:bg-[var(--color-surface)] focus:shadow-[inset_0_1px_2px_rgba(0,0,0,0.15),0_0_0_3px_rgba(63,133,217,0.15)] focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed${blurInToken > 0 ? " animate-text-blur-in" : ""}`}
-          disabled={submitting}
-        />
-        <Button
-          type="button"
-          onClick={handleGo}
-          disabled={!prompt.trim() || submitting}
-          size="md"
-          className="button-glint min-w-[5.5rem]"
-        >
-          <AnimatePresence mode="wait" initial={false}>
-            {submitting ? (
-              <motion.span
-                key="busy"
-                initial={{ opacity: 0, scale: 0.7 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.7 }}
-                transition={{ duration: 0.18, ease: "easeOut" }}
-                className="inline-flex items-center"
-              >
-                <Loader2 className="size-4 animate-spin" />
-              </motion.span>
-            ) : (
-              <motion.span
-                key="idle"
-                initial={{ opacity: 0, scale: 0.7 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.7 }}
-                transition={{ duration: 0.18, ease: "easeOut" }}
-                className="inline-flex items-center gap-1.5"
-              >
-                <Send className="size-3.5" />
-                <span>Go</span>
-              </motion.span>
-            )}
-          </AnimatePresence>
-        </Button>
+        {/* Textarea + Go button. The Go button floats absolutely just past
+            the right edge of the textarea so the textarea itself stays
+            full-width and visually centered in the container. */}
+        <div className="relative">
+          <textarea
+            key={`textarea-${blurInToken}`}
+            ref={textareaRef}
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter submits, Shift+Enter inserts a newline. Cmd/Ctrl+Enter
+              // also submits (kept for muscle memory from chat clients).
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleGo();
+              }
+            }}
+            placeholder={session !== null ? "Enter another prompt for the agent..." : placeholder}
+            rows={2}
+            className={`w-full resize-none min-h-[3.25rem] max-h-[7rem] rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3.5 py-2.5 text-sm leading-relaxed text-[var(--color-text)] placeholder:text-[var(--color-text-muted)] shadow-[inset_0_1px_2px_rgba(0,0,0,0.15)] transition-[border-color,background-color,box-shadow,height] duration-150 hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-hover)] focus:border-[var(--color-brand-blue)]/60 focus:bg-[var(--color-surface)] focus:shadow-[inset_0_1px_2px_rgba(0,0,0,0.15),0_0_0_3px_rgba(63,133,217,0.15)] focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed${blurInToken > 0 ? " animate-text-blur-in" : ""}`}
+            disabled={submitting}
+          />
+          <Button
+            type="button"
+            onClick={handleGo}
+            disabled={!prompt.trim() || submitting}
+            size="md"
+            className="button-glint absolute left-full top-1/2 ml-3 -translate-y-1/2 min-w-[5.5rem]"
+          >
+            <AnimatePresence mode="wait" initial={false}>
+              {submitting ? (
+                <motion.span
+                  key="busy"
+                  initial={{ opacity: 0, scale: 0.7 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.7 }}
+                  transition={{ duration: 0.18, ease: "easeOut" }}
+                  className="inline-flex items-center"
+                >
+                  <Loader2 className="size-4 animate-spin" />
+                </motion.span>
+              ) : (
+                <motion.span
+                  key="idle"
+                  initial={{ opacity: 0, scale: 0.7 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.7 }}
+                  transition={{ duration: 0.18, ease: "easeOut" }}
+                  className="inline-flex items-center gap-1.5"
+                >
+                  <Send className="size-3.5" />
+                  <span>Go</span>
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </Button>
+        </div>
 
         {/*
-          Streaming preview — third row of the grid. Sits in the textarea's
-          column (col 1) so the bubbles center over the textarea, not the
-          full container. The bubbles themselves render in an absolute layer
+          Streaming preview row. The bubbles render in an absolute layer
           starting at the row's top edge so they overlap the example pills
           beneath without affecting layout.
         */}
@@ -477,7 +476,6 @@ export function PersonalAgentPrompt({ onSessionActiveChange }: PersonalAgentProm
             onClear={handleClearBubbles}
           />
         </div>
-        <div aria-hidden />
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
